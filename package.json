@@ -1,11 +1,11 @@
 {
-  "name": "absengo",
+  "name": "vexis",
   "version": "1.0.0",
-  "description": "AbsenGo Monorepo",
+  "description": "Vexis Monorepo",
   "private": true,
   "scripts": {
-    "dev:web": "pnpm --filter absengo-web dev",
-    "dev:api": "cargo run --manifest-path apps/absengo-api/Cargo.toml",
+    "dev:web": "pnpm --filter vexis-web dev",
+    "dev:api": "cargo run --manifest-path apps/vexis-api/Cargo.toml",
     "dev": "pnpm run /dev:/"
   },
   "devDependencies": {

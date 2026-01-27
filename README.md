@@ -1,6 +1,6 @@
-# AbsenGo
+# Vexis
 
-AbsenGo adalah sistem absensi berbasis web modern yang dibangun dengan performa tinggi dan keamanan sebagai prioritas utama. Proyek ini menggunakan arsitektur monorepo untuk mengelola frontend React dan backend Rust.
+Vexis adalah sistem absensi berbasis web modern yang dibangun dengan performa tinggi dan keamanan sebagai prioritas utama. Proyek ini menggunakan arsitektur monorepo untuk mengelola frontend React dan backend Rust.
 
 ## Tech Stack
 
@@ -30,10 +30,10 @@ AbsenGo adalah sistem absensi berbasis web modern yang dibangun dengan performa 
 ## Struktur Proyek
 
 ```text
-absengo/
+vexis/
 ├── apps/
-│   ├── absengo-web/   # React Frontend
-│   └── absengo-api/   # Rust Backend
+│   ├── vexis-web/   # React Frontend
+│   └── vexis-api/   # Rust Backend
 ├── packages/          # Shared Logic & Components
 └── AGENTS.md          # Instruksi khusus untuk AI Agent
 ```
@@ -56,7 +56,7 @@ absengo/
 
 ### Konfigurasi Environment
 
-Buat file `.env` di root atau di dalam masing-masing app folder (lihat contoh di `apps/absengo-api/.env`).
+Buat file `.env` di root atau di dalam masing-masing app folder (lihat contoh di `apps/vexis-api/.env`).
 
 ### Menjalankan Development
 

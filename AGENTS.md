@@ -1,13 +1,13 @@
-# Agent Instructions for AbsenGo Monorepo
+# Agent Instructions for Vexis Monorepo
 
-Welcome to the AbsenGo project. This is a monorepo for a web-based attendance system using a Rust backend and a React frontend. This file serves as the primary source of truth for AI agents operating in this repository.
+Welcome to the Vexis project. This is a monorepo for a web-based attendance system using a Rust backend and a React frontend. This file serves as the primary source of truth for AI agents operating in this repository.
 
 ## 1. Project Structure
 
 The repository is organized as a pnpm workspace:
 
-- `apps/absengo-web`: Frontend (React 19 + Vite + TypeScript + Tailwind CSS v4 + Shadcn/UI).
-- `apps/absengo-api`: Backend (Rust + Axum + MongoDB + JWT).
+- `apps/vexis-web`: Frontend (React 19 + Vite + TypeScript + Tailwind CSS v4 + Shadcn/UI).
+- `apps/vexis-api`: Backend (Rust + Axum + MongoDB + JWT).
 - `packages/`: Shared packages (intended for components, hooks, utils, and api logic).
 - `.env`: Environment variables (Local only, not committed).
 
@@ -17,10 +17,10 @@ The repository is organized as a pnpm workspace:
 
 - `pnpm install`: Install all dependencies across the workspace.
 - `pnpm dev`: Run both frontend and backend concurrently.
-- `pnpm dev:web`: Run the frontend development server (`pnpm --filter absengo-web dev`).
-- `pnpm dev:api`: Run the backend development server (`cargo run --manifest-path apps/absengo-api/Cargo.toml`).
+- `pnpm dev:web`: Run the frontend development server (`pnpm --filter vexis-web dev`).
+- `pnpm dev:api`: Run the backend development server (`cargo run --manifest-path apps/vexis-api/Cargo.toml`).
 
-### Frontend (apps/absengo-web)
+### Frontend (apps/vexis-web)
 
 - `pnpm dev`: Start Vite dev server.
 - `pnpm build`: Build for production.
@@ -32,7 +32,7 @@ The repository is organized as a pnpm workspace:
 - **Shadcn UI**:
   - `pnpm dlx shadcn@latest add <component>`: Add a new shadcn component.
 
-### Backend (apps/absengo-api)
+### Backend (apps/vexis-api)
 
 - `cargo run`: Run the server.
 - `cargo build`: Compile the project.
