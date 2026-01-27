@@ -1,88 +1,110 @@
 # Agent Instructions for AbsenGo Monorepo
 
-Welcome to the AbsenGo project. This is a monorepo for a web-based attendance system using a Rust backend and a React frontend.
+Welcome to the AbsenGo project. This is a monorepo for a web-based attendance system using a Rust backend and a React frontend. This file serves as the primary source of truth for AI agents operating in this repository.
 
-## Project Structure
+## 1. Project Structure
 
-- `apps/absengo-web`: Frontend (React 19 + Vite + TypeScript)
-- `apps/absengo-api`: Backend (Rust + Axum + MongoDB)
-- `packages/`: Shared packages (components, hooks, utils, api)
+The repository is organized as a pnpm workspace:
 
-## 1. Development Commands
+- `apps/absengo-web`: Frontend (React 19 + Vite + TypeScript + Tailwind CSS v4 + Shadcn/UI).
+- `apps/absengo-api`: Backend (Rust + Axum + MongoDB + JWT).
+- `packages/`: Shared packages (intended for components, hooks, utils, and api logic).
+- `.env`: Environment variables (Local only, not committed).
+
+## 2. Development Commands
 
 ### Root Commands (pnpm)
 
-- `pnpm install`: Install all dependencies.
+- `pnpm install`: Install all dependencies across the workspace.
 - `pnpm dev`: Run both frontend and backend concurrently.
-- `pnpm dev:web`: Run the frontend development server.
-- `pnpm dev:api`: Run the backend development server.
+- `pnpm dev:web`: Run the frontend development server (`pnpm --filter absengo-web dev`).
+- `pnpm dev:api`: Run the backend development server (`cargo run --manifest-path apps/absengo-api/Cargo.toml`).
 
 ### Frontend (apps/absengo-web)
 
 - `pnpm dev`: Start Vite dev server.
 - `pnpm build`: Build for production.
-- `pnpm lint`: Run ESLint.
+- `pnpm lint`: Run ESLint check.
 - `pnpm preview`: Preview production build.
+- **Testing**:
+  - `pnpm test`: Run all tests (if Vitest is installed).
+  - `pnpm test <filename>`: Run a specific test file.
+- **Shadcn UI**:
+  - `pnpm dlx shadcn@latest add <component>`: Add a new shadcn component.
 
 ### Backend (apps/absengo-api)
 
 - `cargo run`: Run the server.
 - `cargo build`: Compile the project.
-- `cargo test`: Run all tests.
-- `cargo test <test_name>`: Run a specific test.
 - `cargo fmt`: Format code.
-- `cargo clippy`: Run linter.
+- `cargo clippy`: Run linter/static analysis.
+- **Testing**:
+  - `cargo test`: Run all tests.
+  - `cargo test <test_name>`: Run a specific test function or module.
+  - `cargo test -- --nocapture`: Run tests and show stdout.
 
-## 2. Code Style Guidelines
+## 3. Code Style Guidelines
 
-### General
+### General Principles
 
-- **Language**: Use Indonesian for the application UI/messages (as per PRD), but use English for code (variables, functions, comments).
-- **Proactiveness**: If you see missing types or boilerplate that follows project patterns, feel free to add them.
+- **Language**: UI/User-facing strings in **Indonesian**. Code (variables, functions, comments) in **English**.
+- **Proactiveness**: Fix missing types, improve documentation, and add boilerplate following existing patterns.
+- **Documentation**: Use high-quality JSDoc/RustDoc for public-facing functions/structs.
 
 ### Frontend (React + TypeScript)
 
-- **React Version**: React 19. Use modern patterns (Actions, useOptimistic if applicable).
-- **Components**: Use functional components with arrow functions.
+- **Framework**: React 19. Prefer modern hooks and patterns (Actions, useOptimistic).
+- **Components**: Functional components with arrow functions.
   ```tsx
-  const MyComponent: React.FC<Props> = ({ prop }) => { ... };
+  interface Props { ... }
+  export const MyComponent: React.FC<Props> = ({ prop }) => { ... };
   ```
 - **Naming**:
   - Components: `PascalCase.tsx`
   - Hooks: `useCamelCase.ts`
-  - Constants: `UPPER_SNAKE_CASE`
-- **Imports**: Order imports logically:
+  - Utils/Logic: `camelCase.ts`
+  - Styles: Tailwind classes only.
+- **Path Aliases**: Use `@/` to refer to the `src` directory (configured in `tsconfig.json` and `vite.config.ts`).
+- **Imports**:
   1. React and third-party libraries.
-  2. Shared packages from `@absengo/*`.
-  3. Local components and styles.
-- **Styling**: Tailwind CSS is preferred (if installed).
-- **Types**: Always use `interface` or `type` for props and state. Avoid `any`.
+  2. Local UI components (`@/components/ui/...`).
+  3. Local business logic/components.
+  4. Styles/Assets.
+- **Types**: Use `interface` for props/objects. Avoid `any` at all costs.
 
 ### Backend (Rust + Axum)
 
-- **Framework**: Axum 0.7+.
+- **Architecture**:
+  - `models/`: Structs and BSON mapping.
+  - `handlers/`: Request processing logic.
+  - `routes/`: Axum router definitions.
+  - `config/`: Database and environment configuration.
 - **Naming**:
   - Functions/Variables: `snake_case`
   - Structs/Enums: `PascalCase`
-  - Modules: `snake_case`
 - **Error Handling**:
-  - Use `Result<T, E>` where `E` implements `IntoResponse` for Axum.
-  - Avoid `unwrap()` in production code; use `expect()` with a clear message or handle the error properly.
-- **Database**: MongoDB with `mongodb` crate. Use GeoJSON for location data.
-- **Async**: Use `tokio` for async runtime.
+  - Implement `IntoResponse` for custom error types to handle Axum error responses gracefully.
+  - **Rule**: Never use `.unwrap()` in production-ready code. Use `?` or `.expect("contextual message")`.
+- **Database**:
+  - Use `mongodb` crate with `tokio` runtime.
+  - Map MongoDB documents to Rust structs using `serde`.
+  - Use `ObjectId` for identifiers.
+  - Geofencing: Use GeoJSON `Point` for location data.
 
-## 3. PRD Alignment (MVP)
+## 4. PRD Alignment (MVP)
 
-- **Auth**: JWT with access (15m) and refresh (7d) tokens. HttpOnly cookies preferred.
-- **Face Recognition**: Manual cosine similarity on `Vec<f64>`.
-- **Geofencing**: Haversine formula or MongoDB `$geoNear`. Radius < 200m.
+- **Auth**: JWT-based (Access token 15m, Refresh token 7d).
+- **Face Recognition**: Cosine similarity calculation on `Vec<f64>` embeddings.
+- **Geofencing**: Radius < 200m validation (Manual Haversine or MongoDB `$geoNear`).
+- **Performance**: Ensure main attendance requests complete in < 300ms.
 
-## 4. Automation & Rules
+## 5. Automation & Rules
 
-- No `.cursorrules` or `.github/copilot-instructions.md` detected yet.
-- Follow ESLint and Cargo's default formatting rules.
-- Always run `pnpm lint` (web) and `cargo clippy` (api) before submitting changes.
+- **Formatting**: Always run `cargo fmt` and Prettier before committing.
+- **Linting**: No warnings allowed in `cargo clippy` or `eslint`.
+- **Git**: Use Conventional Commits (`feat:`, `fix:`, `chore:`, etc.).
+- **Security**: Never commit `.env` or secrets. Ensure `.gitignore` is up to date.
 
 ---
 
-_Note: This file is intended for AI agents to understand the codebase context and constraints._
+_Note: This file is dynamically updated. Always refer to the latest version in the root directory._
