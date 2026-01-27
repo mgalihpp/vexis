@@ -57,10 +57,10 @@ Build a functional dashboard that serves as the home screen for employees, displ
 
 ### Definition of Done
 
-- [ ] User can log in and see the Dashboard.
-- [ ] Dashboard shows "Belum Absen" if no logs exist today.
-- [ ] Dashboard shows check-in time if the user has checked in.
-- [ ] Recent logs list shows the last 5 attendance activities.
+- [x] User can log in and see the Dashboard.
+- [x] Dashboard shows "Belum Absen" if no logs exist today.
+- [x] Dashboard shows check-in time if the user has checked in.
+- [x] Recent logs list shows the last 5 attendance activities.
 
 ### Must Have
 
