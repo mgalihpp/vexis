@@ -4,6 +4,7 @@ import RegisterPage from "@/pages/auth/register-page";
 import ForgotPasswordPage from "@/pages/auth/forgot-password-page";
 import ResetPasswordPage from "@/pages/auth/reset-password-page";
 import ProfilePage from "@/pages/profile/profile-page";
+import DashboardPage from "@/pages/dashboard/dashboard-page";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { Toaster } from "@/components/ui/sonner";
 import "./App.css";
@@ -20,10 +21,7 @@ function App() {
 
         {/* User Routes */}
         <Route element={<ProtectedRoute allowedRoles={["user"]} />}>
-          <Route
-            path="/dashboard"
-            element={<div>Dashboard Pengguna (Segera Hadir)</div>}
-          />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 
