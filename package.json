@@ -1,0 +1,21 @@
+{
+  "name": "absengo",
+  "version": "1.0.0",
+  "description": "AbsenGo Monorepo",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter absengo-web dev",
+    "dev:api": "cargo run --manifest-path apps/absengo-api/Cargo.toml",
+    "dev": "pnpm run /dev:/"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.10",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.2",
+    "prettier": "^3.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.25.0"
+}
