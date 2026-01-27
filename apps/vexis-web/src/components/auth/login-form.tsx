@@ -48,13 +48,14 @@ export function LoginForm({ role = "user" }: { role?: "user" | "admin" }) {
     setError(null);
     try {
       const response = await api.post("/auth/login", data);
-      const { token, user } = response.data;
+      const { access_token, refresh_token, user } = response.data;
 
       if (user.role !== role) {
         throw new Error(`Tidak diizinkan. Portal ini hanya untuk ${role}.`);
       }
 
-      localStorage.setItem("token", token);
+      localStorage.setItem("access_token", access_token);
+      localStorage.setItem("refresh_token", refresh_token);
       localStorage.setItem("user", JSON.stringify(user));
 
       // Redirect based on role

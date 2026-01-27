@@ -3,6 +3,9 @@ import LoginPage from "@/pages/auth/login-page";
 import RegisterPage from "@/pages/auth/register-page";
 import ForgotPasswordPage from "@/pages/auth/forgot-password-page";
 import ResetPasswordPage from "@/pages/auth/reset-password-page";
+import ProfilePage from "@/pages/profile/profile-page";
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { Toaster } from "@/components/ui/sonner";
 import "./App.css";
 
 function App() {
@@ -15,18 +18,26 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Protected routes will go here */}
-        <Route
-          path="/dashboard"
-          element={<div>Dashboard Pengguna (Segera Hadir)</div>}
-        />
-        <Route
-          path="/admin/dashboard"
-          element={<div>Dashboard Admin (Segera Hadir)</div>}
-        />
+        {/* User Routes */}
+        <Route element={<ProtectedRoute allowedRoles={["user"]} />}>
+          <Route
+            path="/dashboard"
+            element={<div>Dashboard Pengguna (Segera Hadir)</div>}
+          />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+
+        {/* Admin Routes */}
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route
+            path="/admin/dashboard"
+            element={<div>Dashboard Admin (Segera Hadir)</div>}
+          />
+        </Route>
 
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
+      <Toaster position="top-center" />
     </BrowserRouter>
   );
 }

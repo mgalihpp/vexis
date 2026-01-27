@@ -3,8 +3,10 @@ mod models;
 mod handlers;
 mod routes;
 mod utils;
+mod middleware;
 
 use axum::{routing::get, Router};
+use tower_http::services::ServeDir;
 use std::net::SocketAddr;
 use dotenvy::dotenv;
 use mongodb::Database;
@@ -23,6 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = Router::new()
         .nest("/api/auth", routes::auth::auth_routes())
+        .nest("/api/users", routes::user::user_routes())
+        .nest_service("/api/uploads", ServeDir::new("uploads"))
         .route("/", get(|| async { "Hello, Vexis API with MongoDB!" }))
         .with_state(state);
 

@@ -3,17 +3,20 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use serde::{Deserialize, Serialize};
 use std::env;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: String, // User ID
     pub role: String,
     pub exp: usize,
 }
 
-pub fn create_jwt(user_id: &str, role: &str) -> Result<String, jsonwebtoken::errors::Error> {
+pub fn create_access_token(
+    user_id: &str,
+    role: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "secret".to_string());
     let expiration = Utc::now()
-        .checked_add_signed(Duration::minutes(60))
+        .checked_add_signed(Duration::minutes(15))
         .expect("valid timestamp")
         .timestamp();
 

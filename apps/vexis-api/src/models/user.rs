@@ -11,7 +11,7 @@ pub struct User {
     pub password_hash: String,
     pub role: String, // "admin" | "user"
     pub office_location: OfficeLocation,
-    pub face_embedding: Vec<f64>,
+    pub face_landmarks: Vec<f32>,
     pub photo_url: Option<String>,
 }
 

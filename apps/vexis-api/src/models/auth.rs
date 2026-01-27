@@ -9,3 +9,10 @@ pub struct PasswordReset {
     pub token: String,
     pub expires_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RefreshToken {
+    pub user_id: ObjectId,
+    pub token: String,
+    pub expires_at: DateTime<Utc>,
+}

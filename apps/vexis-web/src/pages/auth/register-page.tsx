@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2 } from "lucide-react";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LocationPicker } from "@/components/location/location-picker";
 import api from "@/lib/api";
 
 const registerSchema = z.object({
@@ -22,6 +23,10 @@ const registerSchema = z.object({
   email: z.string().email("Email tidak valid"),
   identifier: z.string().min(3, "ID (NIP/NIM) wajib diisi"),
   password: z.string().min(6, "Password minimal 6 karakter"),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }),
 });
 
 type RegisterValues = z.infer<typeof registerSchema>;
@@ -34,9 +39,13 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
+    defaultValues: {
+      location: { lat: -6.2088, lng: 106.8456 }, // Jakarta default
+    },
   });
 
   const onSubmit = async (data: RegisterValues) => {
@@ -44,10 +53,13 @@ export default function RegisterPage() {
     setError(null);
     try {
       await api.post("/auth/register", {
-        ...data,
+        name: data.name,
+        email: data.email,
+        identifier: data.identifier,
+        password: data.password,
         role: "user",
-        lat: 0, // Placeholder
-        long: 0, // Placeholder
+        lat: data.location.lat,
+        long: data.location.lng,
       });
       navigate("/login");
     } catch (err: any) {
@@ -103,6 +115,20 @@ export default function RegisterPage() {
                   {errors.password.message}
                 </p>
               )}
+            </div>
+            <div className="grid gap-2">
+              <Label>Lokasi Kantor (Pilih di Peta)</Label>
+              <Controller
+                control={control}
+                name="location"
+                render={({ field }) => (
+                  <LocationPicker
+                    value={field.value}
+                    onChange={field.onChange}
+                    height="200px"
+                  />
+                )}
+              />
             </div>
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">

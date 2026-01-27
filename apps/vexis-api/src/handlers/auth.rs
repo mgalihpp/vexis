@@ -7,8 +7,8 @@ use axum::{
 use std::sync::Arc;
 use crate::AppState;
 use crate::models::user::{User, OfficeLocation};
-use crate::models::auth::PasswordReset;
-use crate::utils::jwt::create_jwt;
+use crate::models::auth::{PasswordReset, RefreshToken};
+use crate::utils::jwt::create_access_token;
 use crate::utils::email::send_reset_email;
 use serde::{Deserialize, Serialize};
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -44,10 +44,22 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+#[derive(Deserialize)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
 #[derive(Serialize)]
 pub struct AuthResponse {
-    pub token: String,
+    pub access_token: String,
+    pub refresh_token: String,
     pub user: UserResponse,
+}
+
+#[derive(Serialize)]
+pub struct RefreshResponse {
+    pub access_token: String,
+    pub refresh_token: String,
 }
 
 #[derive(Serialize)]
@@ -93,7 +105,7 @@ pub async fn register(
             r#type: "Point".to_string(),
             coordinates: vec![payload.long, payload.lat],
         },
-        face_embedding: vec![],
+        face_landmarks: vec![],
         photo_url: None,
     };
 
@@ -108,6 +120,7 @@ pub async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> impl IntoResponse {
     let users_col = state.db.collection::<User>("users");
+    let refresh_col = state.db.collection::<RefreshToken>("refresh_tokens");
 
     let filter = doc! {
         "$or": [
@@ -126,13 +139,25 @@ pub async fn login(
         return (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response();
     }
 
-    let token = match create_jwt(&user.id.unwrap().to_hex(), &user.role) {
+    let access_token = match create_access_token(&user.id.unwrap().to_hex(), &user.role) {
         Ok(t) => t,
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Token generation error").into_response(),
     };
 
+    let refresh_token = Uuid::new_v4().to_string();
+    let refresh_token_doc = RefreshToken {
+        user_id: user.id.unwrap(),
+        token: refresh_token.clone(),
+        expires_at: Utc::now() + Duration::days(7),
+    };
+
+    if let Err(_) = refresh_col.insert_one(refresh_token_doc).await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Error saving refresh token").into_response();
+    }
+
     Json(AuthResponse {
-        token,
+        access_token,
+        refresh_token,
         user: UserResponse {
             id: user.id.unwrap().to_hex(),
             name: user.name,
@@ -140,6 +165,54 @@ pub async fn login(
             identifier: user.identifier,
             role: user.role,
         },
+    }).into_response()
+}
+
+pub async fn refresh_token(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<RefreshRequest>,
+) -> impl IntoResponse {
+    let users_col = state.db.collection::<User>("users");
+    let refresh_col = state.db.collection::<RefreshToken>("refresh_tokens");
+
+    let stored_token = match refresh_col.find_one(doc! { "token": &payload.refresh_token }).await {
+        Ok(Some(t)) => t,
+        _ => return (StatusCode::UNAUTHORIZED, "Invalid refresh token").into_response(),
+    };
+
+    if stored_token.expires_at < Utc::now() {
+        let _ = refresh_col.delete_one(doc! { "token": &payload.refresh_token }).await;
+        return (StatusCode::UNAUTHORIZED, "Refresh token expired").into_response();
+    }
+
+    let user = match users_col.find_one(doc! { "_id": stored_token.user_id }).await {
+        Ok(Some(u)) => u,
+        _ => return (StatusCode::UNAUTHORIZED, "User not found").into_response(),
+    };
+
+    // Rotate tokens
+    let new_access_token = match create_access_token(&user.id.unwrap().to_hex(), &user.role) {
+        Ok(t) => t,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Token generation error").into_response(),
+    };
+
+    let new_refresh_token = Uuid::new_v4().to_string();
+    let new_refresh_token_doc = RefreshToken {
+        user_id: user.id.unwrap(),
+        token: new_refresh_token.clone(),
+        expires_at: Utc::now() + Duration::days(7),
+    };
+
+    // Delete old token and insert new one
+    let _ = refresh_col.delete_one(doc! { "token": &payload.refresh_token }).await;
+    
+    if let Err(_) = refresh_col.insert_one(new_refresh_token_doc).await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Error saving new refresh token").into_response();
+    }
+
+    Json(RefreshResponse {
+        access_token: new_access_token,
+        refresh_token: new_refresh_token,
     }).into_response()
 }
 
