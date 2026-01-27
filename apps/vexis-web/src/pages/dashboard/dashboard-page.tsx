@@ -1,42 +1,69 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, LogIn, LogOut, Calendar, Timer } from "lucide-react";
+import { getDashboardStats, type DashboardStatsResponse } from "@/lib/api";
 
 export default function DashboardPage() {
   const [time, setTime] = useState(new Date());
+  const [dashboardData, setDashboardData] =
+    useState<DashboardStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Mock data
-  const user = { name: "Budi Santoso" };
-  const stats = {
-    checkIn: "07:45",
-    checkOut: "--:--",
-    totalHours: "4j 15m",
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getDashboardStats();
+        setDashboardData(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats:", error);
+        // Set empty data on error
+        setDashboardData({
+          check_in: null,
+          check_out: null,
+          recent_logs: [],
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  // Get user from localStorage
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : { name: "Pengguna" };
+
+  // Calculate total hours if both check-in and check-out exist
+  const calculateTotalHours = () => {
+    if (!dashboardData?.check_in || !dashboardData?.check_out) {
+      return "--:--";
+    }
+    try {
+      const [inHour, inMin] = dashboardData.check_in.split(":").map(Number);
+      const [outHour, outMin] = dashboardData.check_out.split(":").map(Number);
+
+      const totalMinutes = outHour * 60 + outMin - (inHour * 60 + inMin);
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      return `${hours}j ${minutes}m`;
+    } catch {
+      return "--:--";
+    }
   };
-  const activities = [
-    {
-      date: "27 Jan 2026",
-      checkIn: "07:50",
-      checkOut: "17:05",
-      status: "Hadir",
-    },
-    {
-      date: "26 Jan 2026",
-      checkIn: "07:45",
-      checkOut: "17:00",
-      status: "Hadir",
-    },
-    {
-      date: "25 Jan 2026",
-      checkIn: "--:--",
-      checkOut: "--:--",
-      status: "Libur",
-    },
-  ];
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 max-w-5xl">
+        <div className="text-center">Memuat...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-8">
@@ -76,8 +103,12 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.checkIn}</div>
-            <p className="text-xs text-muted-foreground mt-1">Tepat waktu</p>
+            <div className="text-2xl font-bold">
+              {dashboardData?.check_in || "--:--"}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dashboardData?.check_in ? "Tepat waktu" : "Belum absen"}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-orange-500">
@@ -87,9 +118,11 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.checkOut}</div>
+            <div className="text-2xl font-bold">
+              {dashboardData?.check_out || "--:--"}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Belum absen pulang
+              {dashboardData?.check_out ? "Sudah absen" : "Belum absen pulang"}
             </p>
           </CardContent>
         </Card>
@@ -100,7 +133,7 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalHours}</div>
+            <div className="text-2xl font-bold">{calculateTotalHours()}</div>
             <p className="text-xs text-muted-foreground mt-1">Target: 8 jam</p>
           </CardContent>
         </Card>
@@ -113,41 +146,54 @@ export default function DashboardPage() {
         </h2>
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-muted/50 text-muted-foreground">
-                  <tr>
-                    <th className="px-6 py-3 font-medium">Tanggal</th>
-                    <th className="px-6 py-3 font-medium">Masuk</th>
-                    <th className="px-6 py-3 font-medium">Pulang</th>
-                    <th className="px-6 py-3 font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {activities.map((activity, index) => (
-                    <tr
-                      key={index}
-                      className="hover:bg-muted/50 transition-colors"
-                    >
-                      <td className="px-6 py-4 font-medium">{activity.date}</td>
-                      <td className="px-6 py-4">{activity.checkIn}</td>
-                      <td className="px-6 py-4">{activity.checkOut}</td>
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            activity.status === "Hadir"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {activity.status}
-                        </span>
-                      </td>
+            {dashboardData?.recent_logs &&
+            dashboardData.recent_logs.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/50 text-muted-foreground">
+                    <tr>
+                      <th className="px-6 py-3 font-medium">Tanggal</th>
+                      <th className="px-6 py-3 font-medium">Masuk</th>
+                      <th className="px-6 py-3 font-medium">Pulang</th>
+                      <th className="px-6 py-3 font-medium">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y">
+                    {dashboardData.recent_logs.map((activity, index) => (
+                      <tr
+                        key={index}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
+                        <td className="px-6 py-4 font-medium">
+                          {activity.date}
+                        </td>
+                        <td className="px-6 py-4">
+                          {activity.check_in || "--:--"}
+                        </td>
+                        <td className="px-6 py-4">
+                          {activity.check_out || "--:--"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              activity.status === "Hadir"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {activity.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                Belum ada riwayat absensi.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

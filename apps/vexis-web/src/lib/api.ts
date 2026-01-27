@@ -53,4 +53,23 @@ api.interceptors.response.use(
   },
 );
 
+// Dashboard API
+export interface DashboardStatsResponse {
+  check_in: string | null;
+  check_out: string | null;
+  recent_logs: AttendanceLog[];
+}
+
+export interface AttendanceLog {
+  date: string;
+  check_in: string | null;
+  check_out: string | null;
+  status: string;
+}
+
+export const getDashboardStats = async (): Promise<DashboardStatsResponse> => {
+  const response = await api.get<DashboardStatsResponse>("/dashboard/stats");
+  return response.data;
+};
+
 export default api;
