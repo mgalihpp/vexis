@@ -116,7 +116,7 @@ Critical Path: Task 1 → Task 3 → Task 4
 
 ## TODOs
 
-- [ ] 1. Create Attendance Model & Register in Backend
+- [x] 1. Create Attendance Model & Register in Backend
 
   **What to do**:
   - Define `Attendance` struct in `apps/vexis-api/src/models/attendance.rs`.
@@ -137,10 +137,10 @@ Critical Path: Task 1 → Task 3 → Task 4
   - `apps/vexis-api/src/models/user.rs`: Reference for MongoDB serialization/deserialization.
 
   **Acceptance Criteria**:
-  - [ ] `apps/vexis-api/src/models/attendance.rs` exists.
-  - [ ] `cargo build` succeeds.
+  - [x] `apps/vexis-api/src/models/attendance.rs` exists.
+  - [x] `cargo build` succeeds.
 
-- [ ] 2. Implement Dashboard UI Layout (Frontend)
+- [x] 2. Implement Dashboard UI Layout (Frontend)
 
   **What to do**:
   - Create `apps/vexis-web/src/pages/dashboard/dashboard-page.tsx`.
@@ -164,10 +164,10 @@ Critical Path: Task 1 → Task 3 → Task 4
   - `apps/vexis-web/src/pages/profile/profile-page.tsx`: Layout reference.
 
   **Acceptance Criteria**:
-  - [ ] UI is visible at `/dashboard`.
-  - [ ] Layout is responsive.
+  - [x] UI is visible at `/dashboard`.
+  - [x] Layout is responsive.
 
-- [ ] 3. Implement Dashboard Stats API (Backend)
+- [x] 3. Implement Dashboard Stats API (Backend)
 
   **What to do**:
   - Create `apps/vexis-api/src/handlers/dashboard.rs`.
@@ -190,10 +190,10 @@ Critical Path: Task 1 → Task 3 → Task 4
   - `apps/vexis-api/src/handlers/user.rs`: Reference for DB querying patterns.
 
   **Acceptance Criteria**:
-  - [ ] `GET /api/dashboard/stats` returns 200 OK.
-  - [ ] JSON schema matches expectations.
+  - [x] `GET /api/dashboard/stats` returns 200 OK.
+  - [x] JSON schema matches expectations.
 
-- [ ] 4. Connect Frontend to Dashboard API
+- [x] 4. Connect Frontend to Dashboard API
 
   **What to do**:
   - Add `getDashboardStats` to `apps/vexis-web/src/lib/api.ts`.
@@ -211,7 +211,7 @@ Critical Path: Task 1 → Task 3 → Task 4
   - **Parallel Group**: Wave 2
 
   **Acceptance Criteria**:
-  - [ ] Dashboard shows real data from DB (or empty state if none).
+  - [x] Dashboard shows real data from DB (or empty state if none).
 
 ---
 
@@ -240,7 +240,7 @@ curl -X GET http://localhost:8000/api/dashboard/stats -H "Authorization: Bearer 
 
 ### Final Checklist
 
-- [ ] Greeting shows logged-in user name.
-- [ ] Real-time clock updates every second.
-- [ ] Status cards show correct information based on DB logs.
-- [ ] Recent logs list is populated correctly.
+- [x] Greeting shows logged-in user name.
+- [x] Real-time clock updates every second.
+- [x] Status cards show correct information based on DB logs.
+- [x] Recent logs list is populated correctly.
