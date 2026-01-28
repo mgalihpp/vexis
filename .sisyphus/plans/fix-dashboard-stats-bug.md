@@ -151,6 +151,6 @@ cargo run
 
 ### Final Checklist
 
-- [ ] `check_in` shows correct WIB time after check-in
-- [ ] `check_out` shows correct WIB time after check-out
-- [ ] `recent_logs` still works correctly
+- [x] `check_in` shows correct WIB time after check-in
+- [x] `check_out` shows correct WIB time after check-out
+- [x] `recent_logs` still works correctly
