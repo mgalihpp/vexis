@@ -10,7 +10,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{FixedOffset, Utc};
+use chrono::Utc;
 use futures::stream::TryStreamExt;
 use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
@@ -91,12 +91,12 @@ pub async fn check_in_out(
 
     // 5. Determine In/Out
     let now_utc = Utc::now();
-    
+
     // WIB Timezone (UTC+7)
     let wib = chrono::FixedOffset::east_opt(7 * 3600).unwrap();
     let now_wib = now_utc.with_timezone(&wib);
     let today_date = now_wib.date_naive();
-    
+
     // Query all today's logs for this user (same approach as dashboard.rs)
     let filter = doc! { "user_id": user_id };
 
@@ -108,7 +108,6 @@ pub async fn check_in_out(
     {
         Ok(c) => c,
         Err(e) => {
-            println!("DEBUG: Find error = {:?}", e);
             return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
         }
     };
@@ -118,20 +117,15 @@ pub async fn check_in_out(
     while let Ok(Some(att)) = cursor.try_next().await {
         let att_wib = att.timestamp.with_timezone(&wib);
         let att_date = att_wib.date_naive();
-        
-        println!("DEBUG: Found attendance - date={}, type={}", att_date, att.r#type);
-        
+
         if att_date == today_date {
             last_log = Some(att);
             break; // We want the most recent one, and cursor is sorted desc
         }
     }
 
-    println!("DEBUG: last_log = {:?}", last_log);
-
     let attendance_type = match &last_log {
         Some(log) => {
-            println!("DEBUG: Found log with type = {}", log.r#type);
             if log.r#type == "In" {
                 "Out".to_string()
             } else {
