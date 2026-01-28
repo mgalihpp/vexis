@@ -10,12 +10,11 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::Utc;
+use chrono::{FixedOffset, Utc};
 use futures::stream::TryStreamExt;
-use mongodb::bson::{doc, oid::ObjectId, DateTime as BsonDateTime};
+use mongodb::bson::{doc, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use std::time::SystemTime;
 
 #[derive(Deserialize)]
 pub struct AttendanceRequest {
@@ -92,52 +91,57 @@ pub async fn check_in_out(
 
     // 5. Determine In/Out
     let now_utc = Utc::now();
-    let wib_offset = chrono::Duration::hours(7);
     
-    // Calculate today's date in WIB
-    let now_wib = now_utc + wib_offset;
+    // WIB Timezone (UTC+7)
+    let wib = chrono::FixedOffset::east_opt(7 * 3600).unwrap();
+    let now_wib = now_utc.with_timezone(&wib);
     let today_date = now_wib.date_naive();
     
-    // Calculate WIB day boundaries
-    let start_of_day_wib = today_date.and_hms_opt(0, 0, 0).expect("Valid time");
-    let end_of_day_wib = today_date.and_hms_opt(23, 59, 59).expect("Invalid time");
-
-    // Convert to UTC for query
-    let today_start = (start_of_day_wib - wib_offset).and_utc();
-    let today_end = (end_of_day_wib - wib_offset).and_utc();
-
-    let filter = doc! {
-        "user_id": user_id,
-        "timestamp": {
-            "$gte": BsonDateTime::from(SystemTime::from(today_start)),
-            "$lte": BsonDateTime::from(SystemTime::from(today_end)),
-        }
-    };
+    // Query all today's logs for this user (same approach as dashboard.rs)
+    let filter = doc! { "user_id": user_id };
 
     let mut cursor = match attendance_col
         .find(filter)
         .sort(doc! { "timestamp": -1 })
-        .limit(1)
+        .limit(10) // Get recent logs
         .await
     {
         Ok(c) => c,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
+        Err(e) => {
+            println!("DEBUG: Find error = {:?}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+        }
     };
 
-    let last_log = match cursor.try_next().await {
-        Ok(log) => log,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response(),
-    };
+    // Find the most recent log from today (in WIB)
+    let mut last_log: Option<Attendance> = None;
+    while let Ok(Some(att)) = cursor.try_next().await {
+        let att_wib = att.timestamp.with_timezone(&wib);
+        let att_date = att_wib.date_naive();
+        
+        println!("DEBUG: Found attendance - date={}, type={}", att_date, att.r#type);
+        
+        if att_date == today_date {
+            last_log = Some(att);
+            break; // We want the most recent one, and cursor is sorted desc
+        }
+    }
 
-    let attendance_type = match last_log {
+    println!("DEBUG: last_log = {:?}", last_log);
+
+    let attendance_type = match &last_log {
         Some(log) => {
+            println!("DEBUG: Found log with type = {}", log.r#type);
             if log.r#type == "In" {
                 "Out".to_string()
             } else {
                 "In".to_string()
             }
         }
-        None => "In".to_string(),
+        None => {
+            println!("DEBUG: No log found, defaulting to In");
+            "In".to_string()
+        }
     };
 
     // 6. Insert Attendance

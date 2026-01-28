@@ -22,8 +22,8 @@ Vexis adalah sistem absensi berbasis web modern yang dibangun dengan performa ti
 
 - [x] Registrasi & Login (Email + Password)
 - [ ] Profil Pengguna dengan Lokasi & Face Embedding
-- [ ] Clock In / Clock Out (Geofencing < 200m & Face Validation)
-- [ ] Riwayat Absensi Pribadi
+- [x] Clock In / Clock Out (Geofencing < 200m & Face Validation)
+- [x] Riwayat Absensi Pribadi
 - [ ] Dashboard Admin (Rekap Absensi & Manajemen User)
 - [ ] Export Data ke CSV
 

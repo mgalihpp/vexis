@@ -27,6 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest("/api/auth", routes::auth::auth_routes())
         .nest("/api/users", routes::user::user_routes())
         .nest("/api/dashboard", routes::dashboard::routes())
+        .nest("/api/attendance", routes::attendance::routes())
         .nest_service("/api/uploads", ServeDir::new("uploads"))
         .route("/", get(|| async { "Hello, Vexis API with MongoDB!" }))
         .with_state(state);

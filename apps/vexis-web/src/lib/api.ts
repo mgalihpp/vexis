@@ -53,6 +53,29 @@ api.interceptors.response.use(
   },
 );
 
+// Attendance API
+export interface AttendanceCheckRequest {
+  latitude: number;
+  longitude: number;
+  landmarks: number[];
+}
+
+export interface AttendanceCheckResponse {
+  message: string;
+  type: string;
+  timestamp: string;
+}
+
+export const checkAttendance = async (
+  data: AttendanceCheckRequest,
+): Promise<AttendanceCheckResponse> => {
+  const response = await api.post<AttendanceCheckResponse>(
+    "/attendance/check",
+    data,
+  );
+  return response.data;
+};
+
 // Dashboard API
 export interface DashboardStatsResponse {
   check_in: string | null;

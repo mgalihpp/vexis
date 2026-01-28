@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Clock, LogIn, LogOut, Calendar, Timer } from "lucide-react";
+import { Clock, LogIn, LogOut, Calendar, Timer, UserCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getDashboardStats, type DashboardStatsResponse } from "@/lib/api";
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
   const [dashboardData, setDashboardData] =
     useState<DashboardStatsResponse | null>(null);
@@ -93,6 +96,41 @@ export default function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {/* Attendance Action */}
+      {(!dashboardData?.check_in || !dashboardData?.check_out) && (
+        <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-full">
+                  <UserCheck className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">
+                    {!dashboardData?.check_in
+                      ? "Belum Absen Masuk"
+                      : "Belum Absen Pulang"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {!dashboardData?.check_in
+                      ? "Silakan lakukan absensi masuk terlebih dahulu"
+                      : "Jangan lupa absen pulang sebelum meninggalkan kantor"}
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="lg"
+                className="w-full md:w-auto"
+                onClick={() => navigate("/attendance")}
+              >
+                <UserCheck className="mr-2 h-5 w-5" />
+                Absen Sekarang
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
