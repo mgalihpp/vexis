@@ -60,9 +60,9 @@ Fix the date filter logic so `check_in` and `check_out` correctly return today's
 
 ### Definition of Done
 
-- [ ] After check-in, `/api/dashboard/stats` returns `check_in` with correct time
-- [ ] After check-out, `/api/dashboard/stats` returns `check_out` with correct time
-- [ ] Times are displayed in WIB (UTC+7) format
+- [x] After check-in, `/api/dashboard/stats` returns `check_in` with correct time
+- [x] After check-out, `/api/dashboard/stats` returns `check_out` with correct time
+- [x] Times are displayed in WIB (UTC+7) format
 
 ### Must Have
 
@@ -122,9 +122,9 @@ Fix the date filter logic so `check_in` and `check_out` correctly return today's
   - `apps/vexis-api/src/handlers/attendance.rs` - Working date logic reference
 
   **Acceptance Criteria**:
-  - [ ] `cargo check` passes
-  - [ ] After restart, check-in appears in `check_in` field
-  - [ ] Time is displayed in WIB format (e.g., "08:12")
+  - [x] `cargo check` passes
+  - [x] After restart, check-in appears in `check_in` field
+  - [x] Time is displayed in WIB format (e.g., "08:12")
 
 ---
 
