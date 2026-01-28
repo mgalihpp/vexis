@@ -1,0 +1,2 @@
+- Added 'Absen Sekarang' button to dashboard page.
+- Used conditional rendering based on check_in/check_out status.
