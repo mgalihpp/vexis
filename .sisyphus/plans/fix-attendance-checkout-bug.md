@@ -81,8 +81,8 @@ Ensure that "today's" check-in is found regardless of whether it happened in the
   ```
 
   **Acceptance Criteria**:
-  - [ ] `cargo check` passes
-  - [ ] Logic handles day crossover correctly (e.g., check-in before 07:00 WIB)
+  - [x] `cargo check` passes
+  - [x] Logic handles day crossover correctly (e.g., check-in before 07:00 WIB)
 
 ---
 
