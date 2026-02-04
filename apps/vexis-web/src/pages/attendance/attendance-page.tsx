@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { checkAttendance } from "@/lib/api";
 import { FaceCapture } from "@/components/face/face-capture";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +30,28 @@ export default function AttendancePage() {
     lng: number;
   } | null>(null);
   const [faceLandmarks, setFaceLandmarks] = useState<number[] | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: checkAttendance,
+    onSuccess: (data) => {
+      toast.success(data.message);
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      navigate("/dashboard");
+    },
+    onError: (error: any) => {
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data ||
+        "Gagal mengirim absensi";
+      toast.error(
+        typeof errorMessage === "string"
+          ? errorMessage
+          : "Gagal mengirim absensi",
+      );
+    },
+  });
 
   // Time update
   useEffect(() => {
@@ -69,32 +91,14 @@ export default function AttendancePage() {
     toast.success("Wajah berhasil dideteksi");
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (!gpsCoords || !faceLandmarks) return;
-    setIsSubmitting(true);
 
-    try {
-      const response = await checkAttendance({
-        latitude: gpsCoords.lat,
-        longitude: gpsCoords.lng,
-        landmarks: faceLandmarks,
-      });
-
-      toast.success(response.message);
-      navigate("/dashboard");
-    } catch (error: any) {
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data ||
-        "Gagal mengirim absensi";
-      toast.error(
-        typeof errorMessage === "string"
-          ? errorMessage
-          : "Gagal mengirim absensi",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    mutation.mutate({
+      latitude: gpsCoords.lat,
+      longitude: gpsCoords.lng,
+      landmarks: faceLandmarks,
+    });
   };
 
   return (
@@ -214,9 +218,11 @@ export default function AttendancePage() {
           size="lg"
           className="w-full text-lg h-12"
           onClick={handleSubmit}
-          disabled={gpsStatus !== "success" || !faceLandmarks || isSubmitting}
+          disabled={
+            gpsStatus !== "success" || !faceLandmarks || mutation.isPending
+          }
         >
-          {isSubmitting ? (
+          {mutation.isPending ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Mengirim Absensi...

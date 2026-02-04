@@ -26,6 +26,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .nest("/api/auth", routes::auth::auth_routes())
         .nest("/api/users", routes::user::user_routes())
+        .nest("/api/users", routes::admin_user::admin_user_routes())
+        .nest("/api/admin/attendance", routes::admin_attendance::admin_attendance_routes())
         .nest("/api/dashboard", routes::dashboard::routes())
         .nest("/api/attendance", routes::attendance::routes())
         .nest_service("/api/uploads", ServeDir::new("uploads"))

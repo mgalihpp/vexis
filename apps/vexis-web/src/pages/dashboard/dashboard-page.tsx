@@ -1,40 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock, LogIn, LogOut, Calendar, Timer, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getDashboardStats, type DashboardStatsResponse } from "@/lib/api";
+import { getDashboardStats } from "@/lib/api";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [time, setTime] = useState(new Date());
-  const [dashboardData, setDashboardData] =
-    useState<DashboardStatsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ["dashboard", "stats"],
+    queryFn: getDashboardStats,
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await getDashboardStats();
-        setDashboardData(data);
-      } catch (error) {
-        console.error("Failed to fetch dashboard stats:", error);
-        // Set empty data on error
-        setDashboardData({
-          check_in: null,
-          check_out: null,
-          recent_logs: [],
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
   }, []);
 
   // Get user from localStorage
@@ -60,7 +43,7 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto p-6 max-w-5xl">
         <div className="text-center">Memuat...</div>

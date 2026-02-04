@@ -10,6 +10,7 @@ Vexis adalah sistem absensi berbasis web modern yang dibangun dengan performa ti
 - **TypeScript**
 - **Tailwind CSS v4**
 - **Shadcn/UI** components
+- **React Query** (TanStack Query) for data fetching
 
 ### Backend
 
@@ -24,8 +25,8 @@ Vexis adalah sistem absensi berbasis web modern yang dibangun dengan performa ti
 - [x] Profil Pengguna dengan Lokasi & Face Embedding
 - [x] Clock In / Clock Out (Geofencing < 200m & Face Validation)
 - [x] Riwayat Absensi Pribadi
-- [ ] Dashboard Admin (Rekap Absensi & Manajemen User)
-- [ ] Export Data ke CSV
+- [x] Dashboard Admin (Rekap Absensi & Manajemen User)
+- [x] Export Data ke CSV
 
 ## Struktur Proyek
 

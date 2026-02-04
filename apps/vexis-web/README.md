@@ -8,6 +8,16 @@ Aplikasi frontend Vexis yang dibangun menggunakan React 19 dan Vite.
 - Autentikasi JWT (State Management via Context/Hooks)
 - Validasi Geofencing (Browser Geolocation API)
 - Pengolahan Face Embedding (Client-side preprocessing)
+- **React Query** untuk data fetching dan state management server
+
+## Tech Stack
+
+- React 19 + Vite
+- TypeScript
+- Tailwind CSS v4
+- Shadcn/UI
+- React Query (TanStack Query v5)
+- Axios
 
 ## Development
 

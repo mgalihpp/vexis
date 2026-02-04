@@ -1,6 +1,8 @@
 {
-  "active_plan": "D:\\Document\\Code\\repo\\NeuralLift\\monorepo\\vexis\\.sisyphus\\plans\\fix-attendance-checkout-bug.md",
-  "started_at": "2026-01-28T01:35:00.000Z",
-  "session_ids": ["ses_3fdd136d6ffekCETdOgHAH2waO"],
-  "plan_name": "fix-attendance-checkout-bug"
+  "active_plan": "D:\\Document\\Code\\repo\\NeuralLift\\monorepo\\vexis\\.sisyphus\\plans\\admin-dashboard.md",
+  "started_at": "2026-02-04T02:41:09.329Z",
+  "session_ids": [
+    "ses_3d982086effexDlxJnKcofPWPk"
+  ],
+  "plan_name": "admin-dashboard"
 }

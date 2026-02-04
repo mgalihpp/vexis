@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
   User as UserIcon,
@@ -25,7 +26,7 @@ import { EditProfileForm } from "@/components/profile/edit-profile-form";
 import { FaceCapture } from "@/components/face/face-capture";
 
 interface UserProfile {
-  id: String;
+  id: string;
   name: string;
   email: string;
   identifier: string;
@@ -39,25 +40,52 @@ interface UserProfile {
 }
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isRegisteringFace, setIsRegisteringFace] = useState(false);
   const navigate = useNavigate();
 
-  const fetchProfile = async () => {
-    try {
-      const response = await api.get("/users/me");
-      setUser(response.data);
-    } catch (error) {
-      toast.error("Gagal memuat profil");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: user, isLoading: loading } = useQuery<UserProfile>({
+    queryKey: ["profile"],
+    queryFn: () => api.get("/users/me").then((r) => r.data),
+  });
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  const uploadPhotoMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("photo", file);
+      const res = await api.post("/users/me/photo", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      toast.success("Foto berhasil diperbarui", {
+        id: "upload",
+      });
+    },
+    onError: () => {
+      toast.error("Gagal mengunggah foto", { id: "upload" });
+    },
+  });
+
+  const registerFaceMutation = useMutation({
+    mutationFn: async (landmarks: any) => {
+      await api.post("/users/me/face", { landmarks });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      setIsRegisteringFace(false);
+      toast.success("Wajah berhasil didaftarkan", {
+        id: "face",
+      });
+    },
+    onError: () => {
+      toast.error("Gagal mendaftarkan wajah", {
+        id: "face",
+      });
+    },
+  });
 
   const handleLogout = () => {
     localStorage.clear();
@@ -98,29 +126,12 @@ export default function ProfilePage() {
                     type="file"
                     className="hidden"
                     accept="image/*"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
 
-                      const formData = new FormData();
-                      formData.append("photo", file);
-
-                      try {
-                        toast.loading("Mengunggah foto...", { id: "upload" });
-                        const res = await api.post(
-                          "/users/me/photo",
-                          formData,
-                          {
-                            headers: { "Content-Type": "multipart/form-data" },
-                          },
-                        );
-                        setUser({ ...user, photo_url: res.data.photo_url });
-                        toast.success("Foto berhasil diperbarui", {
-                          id: "upload",
-                        });
-                      } catch (err) {
-                        toast.error("Gagal mengunggah foto", { id: "upload" });
-                      }
+                      toast.loading("Mengunggah foto...", { id: "upload" });
+                      uploadPhotoMutation.mutate(file);
                     }}
                   />
                 </label>
@@ -206,8 +217,10 @@ export default function ProfilePage() {
                       name: user.name,
                       identifier: user.identifier,
                     }}
-                    onSuccess={(updated: any) => {
-                      setUser({ ...user, ...updated });
+                    onSuccess={() => {
+                      queryClient.invalidateQueries({
+                        queryKey: ["profile"],
+                      });
                     }}
                   />
                 </CardContent>
@@ -226,25 +239,11 @@ export default function ProfilePage() {
                 <CardContent className="flex flex-col items-center justify-center py-10 text-center">
                   {isRegisteringFace ? (
                     <FaceCapture
-                      onCapture={async (landmarks) => {
-                        try {
-                          toast.loading("Mendaftarkan wajah...", {
-                            id: "face",
-                          });
-                          await api.post("/users/me/face", { landmarks });
-                          setUser({
-                            ...user,
-                            has_face_landmarks: true,
-                          } as UserProfile);
-                          setIsRegisteringFace(false);
-                          toast.success("Wajah berhasil didaftarkan", {
-                            id: "face",
-                          });
-                        } catch (err) {
-                          toast.error("Gagal mendaftarkan wajah", {
-                            id: "face",
-                          });
-                        }
+                      onCapture={(landmarks) => {
+                        toast.loading("Mendaftarkan wajah...", {
+                          id: "face",
+                        });
+                        registerFaceMutation.mutate(landmarks);
                       }}
                       onCancel={() => setIsRegisteringFace(false)}
                     />

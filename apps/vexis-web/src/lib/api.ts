@@ -90,9 +90,102 @@ export interface AttendanceLog {
   status: string;
 }
 
+// Admin API Types
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  identifier: string;
+  role: string;
+  photo_url: string | null;
+  has_face_landmarks: boolean;
+  office_location: {
+    type: string;
+    coordinates: number[];
+  } | null;
+}
+
+export interface UserListResponse {
+  users: User[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface AttendanceAdminDetail {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  timestamp: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface AdminAttendanceResponse {
+  data: AttendanceAdminDetail[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface AttendanceFilterParams extends PaginationParams {
+  start_date?: string;
+  end_date?: string;
+  user_id?: string;
+}
+
 export const getDashboardStats = async (): Promise<DashboardStatsResponse> => {
   const response = await api.get<DashboardStatsResponse>("/dashboard/stats");
   return response.data;
+};
+
+// Admin API Functions
+export const getUsers = async (
+  params: PaginationParams,
+): Promise<UserListResponse> => {
+  const response = await api.get<UserListResponse>("/users", { params });
+  return response.data;
+};
+
+export const deleteUser = async (id: string): Promise<void> => {
+  await api.delete(`/users/${id}`);
+};
+
+export const getGlobalAttendance = async (
+  params: AttendanceFilterParams,
+): Promise<AdminAttendanceResponse> => {
+  const response = await api.get<AdminAttendanceResponse>("/admin/attendance", {
+    params,
+  });
+  return response.data;
+};
+
+export const downloadAttendanceReport = async (
+  params: AttendanceFilterParams,
+): Promise<void> => {
+  const response = await api.get("/admin/attendance/export", {
+    params,
+    responseType: "blob",
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute(
+    "download",
+    `attendance-report-${new Date().toISOString().split("T")[0]}.csv`,
+  );
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 export default api;
