@@ -1,0 +1,50 @@
+# Zustand Docs
+
+> A multilingual Rspress documentation site.
+
+## Learn
+
+- [Learn](/learn/index.md): A guided path to understand Zustand fundamentals, common patterns, and when to reach for specific tools.
+- [Introduction](/learn/getting-started/introduction.md): How to use Zustand
+- [Comparison](/learn/getting-started/comparison.md): How Zustand stacks up against similar libraries
+- [Tutorial: Tic-Tac-Toe](/learn/guides/tutorial-tic-tac-toe.md): Building a game
+- [Updating state](/learn/guides/updating-state.md)
+- [Practice with no store actions](/learn/guides/practice-with-no-store-actions.md)
+- [Slices Pattern](/learn/guides/slices-pattern.md)
+- [Immutable state and merging](/learn/guides/immutable-state-and-merging.md)
+- [Map and Set Usage](/learn/guides/maps-and-sets-usage.md): Map and Set are mutable data structures. To use them in Zustand, you must create new instances when updating.
+- [Prevent rerenders with useShallow](/learn/guides/prevent-rerenders-with-use-shallow.md)
+- [Connect to state with URL](/learn/guides/connect-to-state-with-url-hash.md)
+- [Calling actions outside a React event handler in pre React 18](/learn/guides/event-handler-in-pre-react-18.md)
+- [Beginner TypeScript Guide](/learn/guides/beginner-typescript.md)
+- [Advanced TypeScript Guide](/learn/guides/advanced-typescript.md)
+- [Auto Generating Selectors](/learn/guides/auto-generating-selectors.md)
+- [Setup with Next.js](/learn/guides/nextjs.md)
+- [SSR and Hydration](/learn/guides/ssr-and-hydration.md)
+- [Initialize state with props](/learn/guides/initialize-state-with-props.md)
+- [Testing](/learn/guides/testing.md): Writing Tests
+- [Flux inspired practice](/learn/guides/flux-inspired-practice.md)
+- [How to reset state](/learn/guides/how-to-reset-state.md)
+
+## Reference
+
+- [Reference](/reference/index.md): API-first reference for stores, hooks, middlewares, and integrations.
+- [create](/reference/apis/create.md): How to create stores
+- [createStore](/reference/apis/create-store.md): How to create vanilla stores
+- [createWithEqualityFn](/reference/apis/create-with-equality-fn.md): How to create efficient stores
+- [shallow](/reference/apis/shallow.md): How compare simple data effectively
+- [useStore](/reference/hooks/use-store.md): How to use vanilla stores in React
+- [useStoreWithEqualityFn](/reference/hooks/use-store-with-equality-fn.md): How to use vanilla stores effectively in React
+- [useShallow](/reference/hooks/use-shallow.md): How to memoize selector functions
+- [persist](/reference/middlewares/persist.md): How to persist a store
+- [devtools](/reference/middlewares/devtools.md): How to time-travel debug your store
+- [redux](/reference/middlewares/redux.md): How to use actions and reducers in a store
+- [immer](/reference/middlewares/immer.md): How to perform immutable updates in a store without boilerplate code
+- [combine](/reference/middlewares/combine.md): How to create a store and get types automatically inferred
+- [subscribeWithSelector](/reference/middlewares/subscribe-with-selector.md): How to subscribe to granular store updates in a store
+- [How to Migrate to v5 from v4](/reference/migrations/migrating-to-v5.md): We highly recommend to update to the latest version of v4, before migrating to v5. It will show all deprecation warnings without breaking your app.
+- [Migrating to v4](/reference/migrations/migrating-to-v4.md)
+- [createContext from zustand/context](/reference/previous-versions/zustand-v3-create-context.md)
+- [Immer middleware](/reference/integrations/immer-middleware.md)
+- [Persisting store data](/reference/integrations/persisting-store-data.md)
+- [Third-party Libraries](/reference/integrations/third-party-libraries.md)

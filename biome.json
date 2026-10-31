@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": false },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/.output",
+      "!**/.nitro",
+      "!**/.tanstack",
+      "!**/.state",
+      "!docs",
+      "!**/routeTree.gen.ts",
+      "!apps/web/src/components/ui",
+      "!apps/web/src/hooks/use-mobile.ts",
+      "!apps/web/src/hooks/use-highlighted-code.ts",
+      "!apps/web/src/lib/highlighter.tsx"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": { "preset": "recommended" }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  }
+}

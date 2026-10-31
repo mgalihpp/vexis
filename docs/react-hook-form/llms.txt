@@ -1,0 +1,84 @@
+# React Hook Form
+
+> Performant, flexible and extensible forms for React with easy-to-use validation. These docs describe React Hook Form v7 (the latest stable release); v8 is in beta and its changes are covered in the migration guide.
+
+- Package: [react-hook-form on npm](https://www.npmjs.com/package/react-hook-form)
+- Source: [github.com/react-hook-form/react-hook-form](https://github.com/react-hook-form/react-hook-form)
+- Guides and learning paths: [Guides](https://react-hook-form.com/guides)
+- Schema resolvers (Zod, Yup, Valibot, etc.): [@hookform/resolvers](https://github.com/react-hook-form/resolvers)
+- Full documentation in a single file: [llms-full.txt](https://react-hook-form.com/llms-full.txt)
+
+Every page below is also available as HTML by dropping the `.md` suffix.
+
+## Get Started
+
+- [Get Started](https://react-hook-form.com/get-started.md): Get started with React Hook Form: install the library, register inputs, validate forms, and handle submission in React with minimal code and re-renders.
+
+## Integrations
+
+- [React Hook Form Integrations](https://react-hook-form.com/integrations.md): Integrate React Hook Form with Zod, Yup, every official schema resolver, Next.js, shadcn/ui, and React 19 using practical TypeScript examples.
+- [React Hook Form with Next.js](https://react-hook-form.com/integrations/nextjs.md): Use React Hook Form with Next.js App Router and Server Actions, including Client Components, progressive enhancement, and server validation.
+- [React Hook Form with React 19](https://react-hook-form.com/integrations/react-19.md): Use React Hook Form with React 19 form actions, progressive enhancement, Server Actions, useActionState, validation, and submission state.
+- [React Hook Form Schema Resolvers](https://react-hook-form.com/integrations/resolvers.md): Compare every official React Hook Form resolver for Zod, Yup, Valibot, ArkType, AJV, Joi, TypeBox, Standard Schema, and more.
+- [React Hook Form with shadcn/ui](https://react-hook-form.com/integrations/shadcn-ui.md): Use React Hook Form with shadcn/ui FormField, controlled components, Zod validation, default values, and accessible error messages.
+- [React Hook Form with Yup](https://react-hook-form.com/integrations/yup.md): Use React Hook Form with Yup and yupResolver. Learn installation, TypeScript inference, validation errors, schema casting, and form context.
+- [React Hook Form with Zod](https://react-hook-form.com/integrations/zod.md): Use React Hook Form with Zod and zodResolver. Learn installation, TypeScript inference, transformed values, errors, and numeric input validation.
+
+## API Reference
+
+- [createFormControl](https://react-hook-form.com/docs/createFormControl.md): Create standalone React Hook Form state outside of a React component, useful for global or shared form state management across your app.
+- [FormProvider](https://react-hook-form.com/docs/formprovider.md): Wrap your form tree with FormProvider to share useForm methods across deeply nested components without passing props manually.
+- [useController](https://react-hook-form.com/docs/usecontroller.md): React hook for building reusable controlled inputs with full access to field value, validation state, and form state from React Hook Form.
+- [Controller](https://react-hook-form.com/docs/usecontroller/controller.md): Wrapper component for integrating controlled external inputs like MUI, Chakra UI, and React-Select with React Hook Form validation.
+- [useFieldArray](https://react-hook-form.com/docs/usefieldarray.md): React hook for dynamic field arrays. Append, prepend, insert, remove, swap, move, update, and replace fields with optimized performance.
+- [FieldArray](https://react-hook-form.com/docs/usefieldarray/fieldarray.md): React Hook Form's FieldArray component wraps useFieldArray in a render prop, so you can append, remove, and manage dynamic form fields declaratively.
+- [useForm](https://react-hook-form.com/docs/useform.md): The primary React Hook Form hook. Initialize your form with validation rules, default values, and submission handling in a single call.
+- [clearErrors](https://react-hook-form.com/docs/useform/clearerrors.md): Manually clear validation errors for one field, an array of fields, or the entire React Hook Form without triggering re-validation.
+- [control](https://react-hook-form.com/docs/useform/control.md): The control object returned by useForm, required to register controlled inputs via the Controller component and useController hook.
+- [Form Component](https://react-hook-form.com/docs/useform/form.md): Use React Hook Form's Form component to validate and submit React forms to APIs or Server Actions, with built-in loading, success, and error states.
+- [formState](https://react-hook-form.com/docs/useform/formstate.md): Access real-time form state including isDirty, isValid, errors, isSubmitting, touchedFields, and dirtyFields from React Hook Form.
+- [getErrors](https://react-hook-form.com/docs/useform/geterrors.md): Read all, individual, or multiple currently stored form errors without running validation.
+- [getFieldState](https://react-hook-form.com/docs/useform/getfieldstate.md): Get the current validation and interaction state of a specific field — invalid, isDirty, isTouched, and error — from React Hook Form.
+- [getValues](https://react-hook-form.com/docs/useform/getvalues.md): Read current form values without subscribing to re-renders. Retrieve a single field, multiple fields, or the entire form data object.
+- [handleSubmit](https://react-hook-form.com/docs/useform/handlesubmit.md): Validate form inputs and invoke your submit callback with typed form data, or pass errors to an error handler on validation failure.
+- [register](https://react-hook-form.com/docs/useform/register.md): Register an input with React Hook Form to enable validation, value tracking, and form submission. Supports text, checkbox, select, and more.
+- [reset](https://react-hook-form.com/docs/useform/reset.md): Reset the entire form to default values, clearing all errors, dirty fields, and touched state in React Hook Form.
+- [resetDefaultValues](https://react-hook-form.com/docs/useform/resetdefaultvalues.md): Update the baseline default values after async operations like form submission, preserving in-flight user edits and recomputing dirty state in React Hook Form.
+- [resetField](https://react-hook-form.com/docs/useform/resetfield.md): Reset a single field's value and state — errors, dirty, and touched — independently without resetting the entire React Hook Form.
+- [setError](https://react-hook-form.com/docs/useform/seterror.md): Manually set a validation error on one or multiple fields, with support for server-side and custom errors in React Hook Form.
+- [setFocus](https://react-hook-form.com/docs/useform/setfocus.md): Programmatically focus any registered input field, with an option to also select its current value in React Hook Form.
+- [setValue](https://react-hook-form.com/docs/useform/setvalue.md): Dynamically update a registered field's value with options to trigger validation, mark the field dirty, or set it as touched.
+- [setValues](https://react-hook-form.com/docs/useform/setvalues.md): Update multiple React Hook Form field values at once using an object or a callback that receives the current form values and returns changes.
+- [subscribe](https://react-hook-form.com/docs/useform/subscribe.md): Subscribe to React Hook Form state changes outside the render cycle — ideal for analytics, side effects, and non-React integrations.
+- [trigger](https://react-hook-form.com/docs/useform/trigger.md): Manually trigger validation for one field, a list of fields, or the entire React Hook Form without submitting.
+- [unregister](https://react-hook-form.com/docs/useform/unregister.md): Remove a registered input from React Hook Form, optionally preserving its value, error, dirty, or touched state on unmount.
+- [watch](https://react-hook-form.com/docs/useform/watch.md): Subscribe to one or more input value changes and trigger re-renders. Useful for conditional form logic and dependent field calculations.
+- [useFormContext](https://react-hook-form.com/docs/useformcontext.md): Access all useForm methods deep in the component tree without prop drilling, using React Hook Form's built-in context API.
+- [useFormState](https://react-hook-form.com/docs/useformstate.md): Subscribe to specific form state properties and isolate re-renders at the component level for better performance in large React Hook Forms.
+- [ErrorMessage](https://react-hook-form.com/docs/useformstate/errormessage.md): Render validation error messages for a registered field. Supports multiple errors per field and custom message rendering in React Hook Form.
+- [FormState](https://react-hook-form.com/docs/useformstate/formstate.md): A renderless React component that subscribes to form state changes and re-renders children only when the relevant state updates occur.
+- [useLens](https://react-hook-form.com/docs/uselens.md): Type-safe functional lenses that scope form context to a nested field path, reducing boilerplate in deeply nested React Hook Forms.
+- [useWatch](https://react-hook-form.com/docs/usewatch.md): Subscribe to input value changes with isolated component-level re-renders, offering better performance than watch for large React Hook Forms.
+- [Watch](https://react-hook-form.com/docs/usewatch/watch.md): A React component that subscribes to form input changes and re-renders only its children, scoping updates for better performance.
+
+## TypeScript
+
+- [Typescript Support](https://react-hook-form.com/ts.md): TypeScript support in React Hook Form: exported types for useForm, field values, errors, and resolvers to build fully type-safe React forms.
+
+## Advanced
+
+- [Advanced](https://react-hook-form.com/advanced-usage.md): Practical React Hook Form guides for editing saved data, server errors, conditional fields, accessibility, performance, testing, and multi-step forms.
+
+## FAQs
+
+- [FAQs](https://react-hook-form.com/faqs.md): React Hook Form FAQ: fix missing errors, failed submissions, default values, controlled inputs, async data, re-renders, schema validation, and test warnings.
+
+## Migrate to v8
+
+- [Migrate V7 to V8 (BETA)](https://react-hook-form.com/migrate-v7-to-v8.md): Upgrade from React Hook Form v7 to v8: breaking changes, renamed APIs, and step-by-step code updates to migrate your React forms safely.
+
+## Optional
+
+- [DevTools](https://react-hook-form.com/dev-tools): Visual debugging for React Hook Form.
+- [Form Builder](https://react-hook-form.com/form-builder): Generate form code with validation.
+- [Community Integrations](https://react-hook-form.com/resources/3rd-party-bindings): Community bindings for UI libraries.

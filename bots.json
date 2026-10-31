@@ -1,0 +1,18 @@
+{
+  "bots": [
+    {
+      "id": "sim-tiang",
+      "name": "Tiang · HYPE-SOL (sim)",
+      "kind": "tiang",
+      "dir": ".state/sim-tiang",
+      "staleAfterMs": 30000
+    },
+    {
+      "id": "sim-auto",
+      "name": "Auto-rebalance · SOL-USDC (sim)",
+      "kind": "auto-rebalance",
+      "dir": ".state/sim-auto",
+      "staleAfterMs": 30000
+    }
+  ]
+}
