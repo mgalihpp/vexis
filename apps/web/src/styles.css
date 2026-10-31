@@ -20,7 +20,7 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/50 scrollbar-thin;
   }
 }
 

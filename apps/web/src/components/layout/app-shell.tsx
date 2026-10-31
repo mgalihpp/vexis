@@ -36,7 +36,7 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
     <div className="flex h-dvh flex-col">
       <AppHeader />
       <FavoritesBar />
-      <main className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       <AppFooter prices={prices} />
     </div>
   );

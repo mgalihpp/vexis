@@ -57,7 +57,7 @@ function DateField({
           if (!Number.isNaN(parsed)) onChange(parsed);
           setDraft(null);
         }}
-        className="h-[1.7rem] w-[5.6rem] rounded-md border border-brand/60 bg-transparent px-1.5 text-[0.65rem] text-foreground outline-none placeholder:text-muted-foreground focus:border-brand"
+        className="h-7 w-[6.6rem] rounded-md border border-brand/60 bg-transparent px-2 text-xs text-foreground outline-none placeholder:text-muted-foreground focus:border-brand"
       />
     </label>
   );
@@ -115,8 +115,8 @@ export function RangePicker({ now }: { now: number }) {
         <span className="text-foreground/80">{summary(applied)}</span>
         <ChevronDownIcon className="size-3.25" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(36.5rem,calc(100vw-0.8rem))] gap-0 overflow-hidden p-0">
-        <div className="flex h-[19rem]">
+      <PopoverContent align="end" className="w-[min(44rem,calc(100vw-0.8rem))] gap-0 overflow-hidden p-0">
+        <div className="flex h-[25rem]">
           <ul className="w-[11.1rem] shrink-0 overflow-y-auto border-r p-0.75">
             {RANGE_PRESETS.map((p) => (
               <li key={p.id}>
@@ -133,7 +133,7 @@ export function RangePicker({ now }: { now: number }) {
             ))}
           </ul>
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-end gap-2.5 border-b p-3.25">
+            <div className="flex items-end gap-2.5 border-b p-4">
               <DateField label="Start date" value={draft.from} onChange={(ms) => setEdge("from", ms)} />
               <span className="pb-1.5 text-muted-foreground">-</span>
               <DateField
@@ -142,12 +142,13 @@ export function RangePicker({ now }: { now: number }) {
                 onChange={(ms) => setEdge("to", ms)}
               />
             </div>
-            <div className="flex flex-1 items-center justify-center overflow-auto p-1.5">
+            <div className="flex flex-1 items-center justify-center overflow-hidden p-1.5">
               {preset === "all" ? (
                 <span className="text-xs text-muted-foreground">All dates selected</span>
               ) : (
                 <Calendar
                   mode="range"
+                  className="[--cell-size:--spacing(8)]"
                   numberOfMonths={2}
                   defaultMonth={toLocal((draft.to ?? now + DAY_MS) - DAY_MS - 31 * DAY_MS)}
                   selected={{

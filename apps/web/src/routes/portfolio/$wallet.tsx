@@ -81,7 +81,7 @@ function PortfolioLayout() {
           Balances
         </span>
       </nav>
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {!ownToolbar && (
           <div className="flex items-center justify-between gap-2.5 px-2 pt-1.5 pb-0.5">
             <CurrencyToggle />

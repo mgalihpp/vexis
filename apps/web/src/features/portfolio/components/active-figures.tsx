@@ -28,7 +28,7 @@ export function Tile({
   children: ReactNode;
 }) {
   return (
-    <div className={`rounded-md border bg-background/90 p-3 ${className}`}>
+    <div className={`rounded-md border bg-background/90 p-3 text-xs ${className}`}>
       <div className="mb-1 flex min-h-4.5 items-center justify-between gap-2">
         <span className="text-[0.6875rem] font-medium tracking-[0.025em] text-muted-foreground uppercase">{label}</span>
         {action}
