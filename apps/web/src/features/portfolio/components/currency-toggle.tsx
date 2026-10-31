@@ -7,8 +7,8 @@ export function CurrencyToggle() {
   const navigate = useNavigate({ from: "/portfolio/$wallet" });
   const sol = currency === "sol";
   return (
-    <div className="flex items-center gap-1">
-      <UsdcIcon className={`size-5 ${sol ? "opacity-50" : ""}`} />
+    <div className="flex items-center gap-0.75">
+      <UsdcIcon className={`size-4 ${sol ? "opacity-50" : ""}`} />
       <button
         type="button"
         role="switch"
@@ -21,13 +21,13 @@ export function CurrencyToggle() {
             resetScroll: false,
           })
         }
-        className="relative h-5 w-9 rounded-full bg-[#9b5cff] transition-colors"
+        className="relative h-4 w-7.25 rounded-full bg-[#9b5cff] transition-colors"
       >
         <span
-          className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-[left] ${sol ? "left-[1.125rem]" : "left-0.5"}`}
+          className={`absolute top-0.5 size-3.25 rounded-full bg-white shadow transition-[left] ${sol ? "left-[0.9rem]" : "left-0.5"}`}
         />
       </button>
-      <SolIcon className={`size-5 ${sol ? "" : "opacity-50"}`} />
+      <SolIcon className={`size-4 ${sol ? "" : "opacity-50"}`} />
     </div>
   );
 }

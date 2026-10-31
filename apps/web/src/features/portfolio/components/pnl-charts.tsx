@@ -51,7 +51,7 @@ function ChartTooltip({
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
   return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-md">
+    <div className="rounded-md border bg-popover px-2.5 py-1.5 text-[0.625rem] shadow-md">
       <div className="text-muted-foreground">{formatLabel(point.start)}</div>
       <div className={`mt-0.5 font-semibold tabular-nums ${tone(point.value)}`}>
         {money(point.value, currency, { signed: true })}
@@ -73,8 +73,8 @@ function ChartPanel({
 }) {
   return (
     <Panel className="flex flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="flex items-center gap-3 text-lg font-semibold">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <h2 className="flex items-center gap-2.5 text-sm font-semibold">
           {title}
           <button
             type="button"
@@ -82,10 +82,10 @@ function ChartPanel({
             onClick={onShare}
             className="text-foreground/60 hover:text-foreground"
           >
-            <ShareIcon className="size-[1.125rem]" />
+            <ShareIcon className="size-[0.9rem]" />
           </button>
         </h2>
-        <div className="flex flex-wrap items-center gap-3">{controls}</div>
+        <div className="flex flex-wrap items-center gap-2.5">{controls}</div>
       </div>
       {children}
     </Panel>
@@ -191,14 +191,14 @@ function ShareHeader({
   currency: Currency;
 }) {
   return (
-    <div className="mt-4 mb-4">
-      <h3 data-share-item className="text-3xl font-extrabold uppercase">
+    <div className="mt-3.25 mb-3.25">
+      <h3 data-share-item className="text-2xl font-extrabold uppercase">
         {title}
       </h3>
-      <p data-share-item className="mt-1 font-semibold">
+      <p data-share-item className="mt-0.75 font-semibold">
         {subtitle}
       </p>
-      <p data-share-item className="mt-2 text-2xl font-semibold">
+      <p data-share-item className="mt-1.5 text-xl font-semibold">
         Total <span className={`font-bold tabular-nums ${tone(total)}`}>{money(total, currency)}</span>
       </p>
     </div>
@@ -216,7 +216,7 @@ export function CumulativeChart({ closed, currency }: { closed: ClosedPosition[]
       onShare={() => setSharing(true)}
       controls={<Segmented value={metric} options={METRIC_OPTIONS} onChange={setMetric} />}
     >
-      <div className="mt-6 h-[22.5rem]">
+      <div className="mt-4.75 h-[18rem]">
         {data.length ? <CumulativeArea data={data} currency={currency} /> : <Empty />}
       </div>
       <ShareDialog
@@ -226,7 +226,7 @@ export function CumulativeChart({ closed, currency }: { closed: ClosedPosition[]
         title="Cumulative P&L"
       >
         <ShareHeader title={rangeTitle(data)} subtitle="Cumulative P&L" total={total} currency={currency} />
-        <div data-share-item className="h-[13.75rem]">
+        <div data-share-item className="h-[11rem]">
           <CumulativeArea data={data} currency={currency} />
         </div>
       </ShareDialog>
@@ -265,7 +265,7 @@ export function PeriodChart({ closed, currency }: { closed: ClosedPosition[]; cu
         </>
       }
     >
-      <div className="mt-6 h-[22.5rem]">
+      <div className="mt-4.75 h-[18rem]">
         {data.length ? <PeriodBars data={data} currency={currency} label={label} /> : <Empty />}
       </div>
       <ShareDialog
@@ -275,7 +275,7 @@ export function PeriodChart({ closed, currency }: { closed: ClosedPosition[]; cu
         title={title}
       >
         <ShareHeader title={rangeTitle(data)} subtitle={title} total={total} currency={currency} />
-        <div data-share-item className="h-[13.75rem]">
+        <div data-share-item className="h-[11rem]">
           <PeriodBars data={data} currency={currency} label={label} />
         </div>
       </ShareDialog>
@@ -285,7 +285,7 @@ export function PeriodChart({ closed, currency }: { closed: ClosedPosition[]; cu
 
 function Empty() {
   return (
-    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
       No closed positions in this range.
     </div>
   );

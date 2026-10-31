@@ -141,32 +141,32 @@ export function ShareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(60rem,calc(100vw-2rem))] gap-0 p-0 sm:max-w-[60rem]">
+      <DialogContent className="max-w-[min(55rem,calc(100vw-2rem))] gap-0 p-0 sm:max-w-[55rem]">
         <DialogTitle className="sr-only">Share {title}</DialogTitle>
-        <div className="grid gap-6 p-8 md:grid-cols-[1fr_14.375rem]">
+        <div className="grid gap-8 p-9 md:grid-cols-[1fr_11.5rem]">
           <div className="min-w-0">
             <CurrencyToggle />
-            <p className="mt-2 mb-3 text-[0.8125rem] text-muted-foreground">{hint}</p>
+            <p className="mt-1.5 mb-2.5 text-[0.65rem] text-muted-foreground">{hint}</p>
             {/* Fixed width so the exported image looks the same whatever the dialog size. */}
             <div className="overflow-x-auto">
               {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: pointer-only editing aid; the image renders without it */}
               <div
                 ref={card}
                 onClick={toggleItem}
-                className={`${scope} relative w-[37.5rem] overflow-hidden bg-card p-5 text-card-foreground [&_[data-hidden]]:opacity-0 [&_[data-share-item]]:cursor-pointer`}
+                className={`${scope} relative w-[36.75rem] overflow-hidden bg-card p-6 text-card-foreground [&_[data-hidden]]:opacity-0 [&_[data-share-item]]:cursor-pointer`}
                 style={{ backgroundColor: background ?? undefined }}
               >
                 <div className="pointer-events-none absolute inset-0" style={layer} />
                 <div className="relative">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-[0.9375rem] font-bold">
+                    <span className="flex items-center gap-1.25 text-xs font-bold">
                       <Logo height={14} />
                       Vexis
                     </span>
-                    <span className="text-xs text-muted-foreground">DLMM portfolio</span>
+                    <span className="text-[0.625rem] text-muted-foreground">DLMM portfolio</span>
                   </div>
                   {children}
-                  <p className="mt-3 text-right text-xs text-muted-foreground">
+                  <p className="mt-2.5 text-right text-[0.625rem] text-muted-foreground">
                     {new Date().toISOString().slice(0, 19).replace("T", " ")} UTC
                   </p>
                 </div>
@@ -174,24 +174,24 @@ export function ShareDialog({
             </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4.75">
             <div>
-              <h3 className="mb-3 font-semibold">Background</h3>
-              <div className="flex flex-wrap gap-2">
+              <h3 className="mb-2.5 font-semibold">Background</h3>
+              <div className="flex flex-wrap gap-1.5">
                 {BACKGROUNDS.map((color) => (
                   <button
                     key={color ?? "none"}
                     type="button"
                     aria-label={color ?? "No background"}
                     onClick={() => setBackground(color)}
-                    className={`relative size-7 overflow-hidden rounded-md border bg-card ${background === color ? "ring-2 ring-foreground" : ""}`}
+                    className={`relative size-5.5 overflow-hidden rounded-md border bg-card ${background === color ? "ring-2 ring-foreground" : ""}`}
                     style={color ? { backgroundColor: color } : undefined}
                   >
-                    {color === null && <span className="absolute inset-0 m-auto h-px w-9 -rotate-45 bg-loss" />}
+                    {color === null && <span className="absolute inset-0 m-auto h-px w-7.25 -rotate-45 bg-loss" />}
                   </button>
                 ))}
-                <label className="relative flex size-7 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground">
-                  <PaletteIcon className="size-4" />
+                <label className="relative flex size-5.5 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground">
+                  <PaletteIcon className="size-3.25" />
                   <input
                     type="color"
                     className="absolute inset-0 cursor-pointer opacity-0"
@@ -202,15 +202,15 @@ export function ShareDialog({
             </div>
 
             <div>
-              <h3 className="mb-3 font-semibold">Texture</h3>
-              <div className="grid grid-cols-8 gap-1.5">
+              <h3 className="mb-2.5 font-semibold">Texture</h3>
+              <div className="grid grid-cols-8 gap-1.25">
                 {TEXTURES.map((t) => (
                   <button
                     key={t.id}
                     type="button"
                     aria-label={t.id}
                     onClick={() => setTexture(t.id)}
-                    className={`relative size-6 overflow-hidden rounded border bg-card text-foreground ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
+                    className={`relative size-4.75 overflow-hidden rounded border bg-card text-foreground ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
                   >
                     <span className="absolute inset-0 opacity-80" style={t.style(`${t.size}px ${t.size}px`)} />
                   </button>
@@ -219,9 +219,9 @@ export function ShareDialog({
                   type="button"
                   aria-label="No texture"
                   onClick={() => setTexture(null)}
-                  className={`relative size-6 overflow-hidden rounded border bg-card ${texture === null ? "ring-2 ring-foreground" : ""}`}
+                  className={`relative size-4.75 overflow-hidden rounded border bg-card ${texture === null ? "ring-2 ring-foreground" : ""}`}
                 >
-                  <span className="absolute inset-0 m-auto h-px w-8 -rotate-45 bg-loss" />
+                  <span className="absolute inset-0 m-auto h-px w-6.5 -rotate-45 bg-loss" />
                 </button>
               </div>
             </div>
@@ -248,23 +248,23 @@ export function ShareDialog({
             />
           </div>
         </div>
-        <div className="flex justify-end gap-3 border-t px-8 py-5">
+        <div className="flex justify-end gap-2.5 border-t px-9 py-4">
           <button
             type="button"
             onClick={copy}
             disabled={busy !== null}
-            className="inline-flex h-10 items-center gap-2 rounded-md border px-4 text-[0.9375rem] font-medium hover:bg-muted disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3.25 text-xs font-medium hover:bg-muted disabled:opacity-60"
           >
-            <CopyIcon className="size-4" />
+            <CopyIcon className="size-3.25" />
             {busy === "copy" ? "Copying…" : "Copy to Clipboard"}
           </button>
           <button
             type="button"
             onClick={download}
             disabled={busy !== null}
-            className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 text-[0.9375rem] font-medium text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3.25 text-xs font-medium text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
           >
-            <DownloadIcon className="size-4" />
+            <DownloadIcon className="size-3.25" />
             {busy === "download" ? "Rendering…" : "Download Image"}
           </button>
         </div>
@@ -285,12 +285,12 @@ function SliderRow(props: {
 }) {
   return (
     <div>
-      <div className="mb-3 flex items-center justify-between text-[0.9375rem]">
+      <div className="mb-2.5 flex items-center justify-between text-xs">
         <span className="text-foreground/80">{props.label}</span>
-        <span className="flex items-center gap-2 tabular-nums text-foreground/80">
+        <span className="flex items-center gap-1.5 tabular-nums text-foreground/80">
           {props.display}
           <button type="button" aria-label={`Reset ${props.label}`} onClick={props.onReset}>
-            <RotateCcwIcon className="size-3.5" />
+            <RotateCcwIcon className="size-2.75" />
           </button>
         </span>
       </div>

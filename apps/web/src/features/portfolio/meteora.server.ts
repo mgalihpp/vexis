@@ -1,5 +1,16 @@
 import { z } from "zod";
-import type { ActiveAmounts, ActivePosition, Amounts, ClosedPosition, Portfolio } from "./portfolio";
+import type {
+  ActiveAmounts,
+  ActivePool,
+  ActivePosition,
+  Amounts,
+  ClosedPosition,
+  PoolMeta,
+  Portfolio,
+  PositionEvent,
+  Token,
+} from "./portfolio";
+import { loadTokenInfo } from "./prices.server";
 
 // Meteora DLMM data API. Schema: docs/meteora/dlmm-openapi.json
 const API = process.env.METEORA_DATAPI_URL ?? "https://dlmm.datapi.meteora.ag";
@@ -13,6 +24,14 @@ const num = z
 
 const Side = z.object({ sol: num, usd: num });
 const Total = z.object({ total: Side });
+const TokenAmount = z.object({ usd: num, amountSol: num });
+
+const Unrealized = z.object({
+  balances: num,
+  balancesSol: num,
+  unclaimedFeeTokenX: TokenAmount.nullish(),
+  unclaimedFeeTokenY: TokenAmount.nullish(),
+});
 
 const PositionPnl = z.object({
   positionAddress: z.string(),
@@ -21,12 +40,16 @@ const PositionPnl = z.object({
   closedAt: z.number().nullish(),
   lowerBinId: z.number(),
   upperBinId: z.number(),
+  minPrice: num,
+  maxPrice: num,
+  poolActiveBinId: z.number().nullish(),
   isOutOfRange: z.boolean().nullish(),
   allTimeDeposits: Total,
   allTimeWithdrawals: Total,
   allTimeFees: Total,
   pnlSol: num,
   pnlUsd: num,
+  unrealizedPnl: Unrealized.nullish(),
 });
 type PositionPnl = z.infer<typeof PositionPnl>;
 
@@ -41,6 +64,12 @@ const ClosedPool = z.object({
   poolAddress: z.string(),
   tokenX: z.string(),
   tokenY: z.string(),
+  tokenXMint: z.string(),
+  tokenYMint: z.string(),
+  tokenXIcon: z.string().nullish(),
+  tokenYIcon: z.string().nullish(),
+  binStep: num,
+  baseFee: num,
   lastClosedAt: z.number().nullish(),
 });
 const ClosedPage = z.object({ hasNext: z.boolean(), pools: z.array(ClosedPool) });
@@ -49,16 +78,43 @@ const OpenPool = z.object({
   poolAddress: z.string(),
   tokenX: z.string(),
   tokenY: z.string(),
-  listPositions: z.array(z.string()),
-  balances: num,
-  balancesSol: num,
-  unclaimedFees: num,
-  unclaimedFeesSol: num,
+  tokenXMint: z.string(),
+  tokenYMint: z.string(),
+  tokenXIcon: z.string().nullish(),
+  tokenYIcon: z.string().nullish(),
+  binStep: num,
+  baseFee: num,
+  poolPrice: num,
 });
 const OpenPage = z.object({ hasNext: z.boolean(), pools: z.array(OpenPool), solPrice: num });
 
+const PoolToken = z.object({ is_verified: z.boolean().nullish(), price: num, total_supply: num, market_cap: num });
+const PoolInfo = z.object({
+  token_x: PoolToken,
+  token_y: PoolToken,
+  tvl: z.number().nullish(),
+  dynamic_fee_pct: z.number().nullish(),
+});
+
+const History = z.object({
+  events: z.array(
+    z.object({
+      signature: z.string(),
+      ixIndex: z.number().nullish(),
+      eventType: z.string(),
+      blockTime: z.number(),
+      amountX: num,
+      amountY: num,
+      amountXUsd: num,
+      amountYUsd: num,
+      totalUsd: num,
+    }),
+  ),
+});
+
 // The API returns seconds; accept milliseconds too so a change upstream cannot shift dates by 1000x.
-const toMs = (t: number | null | undefined) => (t == null ? null : t < 1e12 ? t * 1000 : t);
+const ms = (t: number) => (t < 1e12 ? t * 1000 : t);
+const toMs = (t: number | null | undefined) => (t == null ? null : ms(t));
 
 // The API answers with x-ratelimit-remaining / x-ratelimit-reset (epoch seconds). Every request
 // shares this budget, and a 429 waits for the window to reset instead of failing the page.
@@ -121,9 +177,9 @@ const amounts = (p: PositionPnl, side: "sol" | "usd"): Amounts => ({
   pnl: side === "sol" ? p.pnlSol : p.pnlUsd,
 });
 
-async function fetchClosed(user: string): Promise<ClosedPosition[]> {
+async function fetchClosed(user: string): Promise<{ closed: ClosedPosition[]; closedPools: PoolMeta[] }> {
   const pools = await allPages(async (page) => {
-    const r = await get("/portfolio", ClosedPage, { user, page, page_size: 50, days_back: 365 });
+    const r = await get("/portfolio", ClosedPage, { user, page, page_size: 1000, days_back: 365 });
     return { hasNext: r.hasNext, items: r.pools };
   });
   const perPool = await mapLimit(pools, CONCURRENCY, async (pool) => {
@@ -150,65 +206,174 @@ async function fetchClosed(user: string): Promise<ClosedPosition[]> {
     closedByPool.set(key, { lastClosedAt: pool.lastClosedAt, positions: mapped });
     return mapped;
   });
-  return perPool.flat().sort((a, b) => a.closedAt - b.closedAt);
+  const token = (symbol: string, mint: string, icon: string | null | undefined): Token => ({
+    symbol,
+    mint,
+    icon: icon || null,
+    verified: false,
+    priceUsd: null,
+    organicScore: null,
+    risks: null,
+  });
+  return {
+    closed: perPool.flat().sort((a, b) => a.closedAt - b.closedAt),
+    closedPools: pools.map((p) => ({
+      address: p.poolAddress,
+      pair: `${p.tokenX}-${p.tokenY}`,
+      tokenX: token(p.tokenX, p.tokenXMint, p.tokenXIcon),
+      tokenY: token(p.tokenY, p.tokenYMint, p.tokenYIcon),
+      binStep: p.binStep,
+      baseFee: p.baseFee,
+      // Closed pools have no live fee; like the reference UI, show the base fee in its place.
+      dynamicFee: p.baseFee,
+    })),
+  };
 }
 
 const closedByPool = new Map<string, { lastClosedAt: number | null | undefined; positions: ClosedPosition[] }>();
 
-async function fetchActive(user: string): Promise<{ active: ActivePosition[]; solPrice: number | null }> {
+const activeAmounts = (p: PositionPnl, side: "sol" | "usd"): ActiveAmounts => {
+  const u = p.unrealizedPnl;
+  const fee = side === "sol" ? "amountSol" : "usd";
+  return {
+    ...amounts(p, side),
+    balance: (side === "sol" ? u?.balancesSol : u?.balances) ?? 0,
+    unclaimed: (u?.unclaimedFeeTokenX?.[fee] ?? 0) + (u?.unclaimedFeeTokenY?.[fee] ?? 0),
+  };
+};
+
+async function fetchActive(user: string): Promise<{ active: ActivePool[]; solPrice: number | null }> {
   let solPrice: number | null = null;
   const pools = await allPages(async (page) => {
     const r = await get("/portfolio/open", OpenPage, { user, page, page_size: 50 });
     solPrice = r.solPrice || solPrice;
     return { hasNext: r.hasNext, items: r.pools };
   });
-  const perPool = await mapLimit(pools, CONCURRENCY, async (pool) => {
-    const positions = await poolPositions(pool.poolAddress, user, "open");
-    const share = 1 / Math.max(positions.length, 1);
-    // The API reports balance and unclaimed fees per pool only; split them evenly across its positions.
-    const extra = (side: "sol" | "usd", p: PositionPnl): ActiveAmounts => ({
-      ...amounts(p, side),
-      balance: (side === "sol" ? pool.balancesSol : pool.balances) * share,
-      unclaimed: (side === "sol" ? pool.unclaimedFeesSol : pool.unclaimedFees) * share,
-    });
-    return positions.map(
-      (p): ActivePosition => ({
-        address: p.positionAddress,
-        pool: pool.poolAddress,
-        pair: `${pool.tokenX}-${pool.tokenY}`,
-        openedAt: toMs(p.createdAt),
-        lowerBin: p.lowerBinId,
-        upperBin: p.upperBinId,
-        inRange: p.isOutOfRange == null ? null : !p.isOutOfRange,
-        sol: extra("sol", p),
-        usd: extra("usd", p),
-      }),
-    );
+  const perPool = await mapLimit(pools, CONCURRENCY, async (pool): Promise<ActivePool[]> => {
+    const [positions, info] = await Promise.all([
+      poolPositions(pool.poolAddress, user, "open"),
+      // Pool stats only decorate the row (FDV, TVL, dynamic fee); a failure must not lose the positions.
+      get(`/pools/${pool.poolAddress}`, PoolInfo, {}).catch(() => null),
+    ]);
+    if (positions.length === 0) return [];
+    const pair = `${pool.tokenX}-${pool.tokenY}`;
+    const x = info?.token_x;
+    return [
+      {
+        address: pool.poolAddress,
+        pair,
+        tokenX: {
+          symbol: pool.tokenX,
+          mint: pool.tokenXMint,
+          icon: pool.tokenXIcon || null,
+          verified: x?.is_verified ?? false,
+          priceUsd: x?.price || null,
+          organicScore: null,
+          risks: null,
+        },
+        tokenY: {
+          symbol: pool.tokenY,
+          mint: pool.tokenYMint,
+          icon: pool.tokenYIcon || null,
+          verified: info?.token_y.is_verified ?? false,
+          priceUsd: info?.token_y.price || null,
+          organicScore: null,
+          risks: null,
+        },
+        binStep: pool.binStep,
+        baseFee: pool.baseFee,
+        dynamicFee: info?.dynamic_fee_pct ?? null,
+        price: pool.poolPrice,
+        activeBin: positions[0]?.poolActiveBinId ?? null,
+        fdv: x ? x.price * x.total_supply || x.market_cap || null : null,
+        tvl: info?.tvl ?? null,
+        positions: positions
+          .map(
+            (p): ActivePosition => ({
+              address: p.positionAddress,
+              pool: pool.poolAddress,
+              pair,
+              openedAt: toMs(p.createdAt),
+              lowerBin: p.lowerBinId,
+              upperBin: p.upperBinId,
+              minPrice: p.minPrice,
+              maxPrice: p.maxPrice,
+              inRange: p.isOutOfRange == null ? null : !p.isOutOfRange,
+              sol: activeAmounts(p, "sol"),
+              usd: activeAmounts(p, "usd"),
+            }),
+          )
+          .sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0)),
+      },
+    ];
   });
   return { active: perPool.flat(), solPrice };
+}
+
+/** One Jupiter lookup for every token on the page; concurrent lookups get rate limited. */
+async function addTokenInfo(pools: PoolMeta[]) {
+  const tokens = pools.flatMap((p) => [p.tokenX, p.tokenY]);
+  const info = await loadTokenInfo(tokens.map((t) => t.mint));
+  for (const token of tokens) {
+    const t = info.get(token.mint);
+    if (!t) continue;
+    token.organicScore = t.organicScore;
+    token.risks = t.risks;
+    token.verified ||= t.verified === true;
+  }
 }
 
 // /portfolio only lists pools with a close in the last 365 days; this total covers every closed position.
 const AllTime = z.object({ totalClosedPositions: z.number(), totalPnlSol: num, totalPnlUsd: num });
 
-const cache = new Map<string, { at: number; value: Promise<Portfolio> }>();
-
-export function loadPortfolio(wallet: string): Promise<Portfolio> {
-  const hit = cache.get(wallet);
+function cached<T>(store: Map<string, { at: number; value: Promise<T> }>, key: string, load: () => Promise<T>) {
+  const hit = store.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
-  const value = Promise.all([
-    fetchClosed(wallet),
-    fetchActive(wallet),
-    get("/portfolio/total", AllTime, { user: wallet }),
-  ]).then(([closed, { active, solPrice }, allTime]) => ({
-    wallet,
-    fetchedAt: Date.now(),
-    solPrice,
-    closed,
-    active,
-    allTime: { closedPositions: allTime.totalClosedPositions, sol: allTime.totalPnlSol, usd: allTime.totalPnlUsd },
-  }));
-  value.catch(() => cache.delete(wallet));
-  cache.set(wallet, { at: Date.now(), value });
+  const value = load();
+  value.catch(() => store.delete(key));
+  store.set(key, { at: Date.now(), value });
   return value;
 }
+
+const portfolios = new Map<string, { at: number; value: Promise<Portfolio> }>();
+
+export const loadPortfolio = (wallet: string): Promise<Portfolio> =>
+  cached(portfolios, wallet, () =>
+    Promise.all([fetchClosed(wallet), fetchActive(wallet), get("/portfolio/total", AllTime, { user: wallet })]).then(
+      async ([{ closed, closedPools }, { active, solPrice }, allTime]) => {
+        await addTokenInfo([...closedPools, ...active]);
+        return {
+          wallet,
+          fetchedAt: Date.now(),
+          solPrice,
+          closed,
+          closedPools,
+          active,
+          allTime: {
+            closedPositions: allTime.totalClosedPositions,
+            sol: allTime.totalPnlSol,
+            usd: allTime.totalPnlUsd,
+          },
+        };
+      },
+    ),
+  );
+
+const activities = new Map<string, { at: number; value: Promise<PositionEvent[]> }>();
+
+/** Every event on a position, oldest first. */
+export const loadActivity = (position: string): Promise<PositionEvent[]> =>
+  cached(activities, position, async () => {
+    const r = await get(`/positions/${position}/historical`, History, { order_direction: "asc" });
+    return r.events.map((e) => ({
+      id: `${e.signature}:${e.ixIndex ?? 0}:${e.eventType}`,
+      signature: e.signature,
+      type: e.eventType,
+      at: ms(e.blockTime),
+      amountX: e.amountX,
+      amountY: e.amountY,
+      amountXUsd: e.amountXUsd,
+      amountYUsd: e.amountYUsd,
+      totalUsd: e.totalUsd,
+    }));
+  });

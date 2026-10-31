@@ -15,15 +15,15 @@ export const Route = createFileRoute("/tg")({
     app.expand();
     return { fleet, user: app.initDataUnsafe.user?.first_name ?? null };
   },
-  pendingComponent: () => <p className="text-sm text-zinc-500">Connecting to Telegram…</p>,
+  pendingComponent: () => <p className="text-xs text-zinc-500">Connecting to Telegram…</p>,
   component: TelegramHome,
 });
 
 function TelegramHome() {
   const { fleet, user } = Route.useLoaderData();
   return (
-    <section className="mx-auto max-w-5xl space-y-4 px-4 py-6">
-      <p className="text-sm text-zinc-400">{user ? `Hi ${user}.` : "Open this page from the bot in Telegram."}</p>
+    <section className="mx-auto max-w-5xl space-y-3.25 px-3.25 py-4.75">
+      <p className="text-xs text-zinc-400">{user ? `Hi ${user}.` : "Open this page from the bot in Telegram."}</p>
       {fleet.bots.map((bot) => (
         <BotCard key={bot.id} bot={bot} now={fleet.now} />
       ))}

@@ -51,27 +51,32 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
   return (
     <Panel className="flex flex-col">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-3 text-lg font-semibold">
+        <h2 className="flex items-center gap-2.5 text-sm font-medium">
           Realized PnL
           <ShareButton label="Share month" onClick={() => openShare({ kind: "month" })} size="md" />
         </h2>
         <Segmented value={metric} options={METRIC_OPTIONS} onChange={setMetric} />
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <button type="button" aria-label="Previous month" onClick={() => shift(-1)} className="p-1 hover:text-brand">
-            <ChevronLeftIcon className="size-4" />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            aria-label="Previous month"
+            onClick={() => shift(-1)}
+            className="p-0.75 hover:text-brand"
+          >
+            <ChevronLeftIcon className="size-3.25" />
           </button>
-          <span className="min-w-36 text-center text-lg font-semibold">{monthName(view.year, view.month)}</span>
-          <button type="button" aria-label="Next month" onClick={() => shift(1)} className="p-1 hover:text-brand">
-            <ChevronRightIcon className="size-4" />
+          <span className="min-w-28.75 text-center text-sm font-medium">{monthName(view.year, view.month)}</span>
+          <button type="button" aria-label="Next month" onClick={() => shift(1)} className="p-0.75 hover:text-brand">
+            <ChevronRightIcon className="size-3.25" />
           </button>
           <button
             type="button"
             disabled={isThisMonth}
             onClick={() => setView({ year: nowDate.getUTCFullYear(), month: nowDate.getUTCMonth() })}
-            className="ml-3 rounded-md bg-muted px-3 py-1 text-[0.9375rem] font-medium disabled:opacity-100 enabled:hover:bg-muted/70"
+            className="ml-2.5 rounded-md bg-muted px-2.5 py-0.75 text-xs font-medium disabled:opacity-100 enabled:hover:bg-muted/70"
           >
             This month
           </button>
@@ -79,7 +84,7 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
         <MonthStats cal={cal} currency={currency} />
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-3.25 overflow-x-auto">
         <CalendarGrid
           cal={cal}
           currency={currency}
@@ -97,8 +102,8 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
       >
         {share?.kind === "month" && (
           <>
-            <div className="mt-4 mb-4 flex items-end justify-between">
-              <h3 className="text-3xl font-extrabold uppercase">{monthName(view.year, view.month)}</h3>
+            <div className="mt-3.25 mb-3.25 flex items-end justify-between">
+              <h3 className="text-2xl font-extrabold uppercase">{monthName(view.year, view.month)}</h3>
               <MonthStats cal={cal} currency={currency} />
             </div>
             <CalendarGrid cal={cal} currency={currency} today={dayStart(now)} compact />
@@ -127,10 +132,10 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
 
 function MonthStats({ cal, currency }: { cal: MonthCalendar; currency: Currency }) {
   return (
-    <div data-share-item className="flex items-center gap-3 text-[0.9375rem] whitespace-nowrap">
-      <span className="text-foreground/80">Monthly stats:</span>
+    <div data-share-item className="flex items-center gap-2.5 text-xs whitespace-nowrap">
+      <span className="text-muted-foreground">Monthly stats:</span>
       <span className={`font-medium tabular-nums ${tone(cal.total)}`}>{money(cal.total, currency, { digits: 2 })}</span>
-      <span className="text-foreground/80">
+      <span className="text-muted-foreground">
         {cal.activeDays} day{cal.activeDays === 1 ? "" : "s"}
       </span>
     </div>
@@ -145,7 +150,7 @@ function ShareButton({ label, onClick, size = "sm" }: { label: string; onClick: 
       onClick={onClick}
       className="text-foreground/60 transition-colors hover:text-foreground"
     >
-      <ShareIcon className={size === "md" ? "size-[1.125rem]" : "size-3.5"} />
+      <ShareIcon className={size === "md" ? "size-[0.9rem]" : "size-2.75"} />
     </button>
   );
 }
@@ -165,22 +170,22 @@ function CalendarGrid({
   onShareDay?: (bucket: Bucket) => void;
   onShareWeek?: (week: CalendarWeek, n: number) => void;
 }) {
-  const cellH = compact ? "h-[4rem]" : "h-[5.4375rem]";
-  const big = compact ? "text-[0.6875rem]" : "text-[1.0625rem]";
-  const small = compact ? "text-[0.5rem]" : "text-[0.6875rem]";
+  const cellH = compact ? "h-[3.2rem]" : "h-[4.35rem]";
+  const big = compact ? "text-[0.55rem]" : "text-[0.85rem]";
+  const small = compact ? "text-[0.4rem]" : "text-[0.55rem]";
   return (
     <div
-      className={`grid ${compact ? "grid-cols-[repeat(7,1fr)_1.3fr]" : "min-w-[45rem] grid-cols-[repeat(7,1fr)_6.875rem]"}`}
+      className={`grid ${compact ? "grid-cols-[repeat(7,1fr)_1.3fr]" : "min-w-[36rem] grid-cols-[repeat(7,1fr)_6.875rem]"}`}
     >
       {WEEKDAYS.map((d) => (
         <div
           key={d}
-          className={`pb-2 text-center text-foreground/70 ${compact ? "text-[0.625rem]" : "text-[0.8125rem]"}`}
+          className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.5rem]" : "text-[0.65rem]"}`}
         >
           {d}
         </div>
       ))}
-      <div className={`pb-2 text-center text-foreground/70 ${compact ? "text-[0.625rem]" : "text-[0.8125rem]"}`}>
+      <div className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.5rem]" : "text-[0.65rem]"}`}>
         {compact ? "Week" : ""}
       </div>
 
@@ -193,17 +198,17 @@ function CalendarGrid({
             return (
               <div
                 key={cell.date}
-                className={`relative flex ${cellH} flex-col items-center justify-center border-[0.0313rem] border-border ${bg} ${
+                className={`relative flex ${cellH} flex-col items-center justify-center border-[0.025rem] border-border ${bg} ${
                   isToday ? "outline-2 -outline-offset-2 outline-foreground/70" : ""
                 }`}
               >
                 <span
-                  className={`absolute top-1.5 right-2 text-foreground/70 ${compact ? "text-[0.5rem]" : "text-xs"}`}
+                  className={`absolute top-1.25 right-1.5 text-muted-foreground ${compact ? "text-[0.4rem]" : "text-[0.625rem]"}`}
                 >
                   {cell.day}
                 </span>
                 {b && onShareDay && (
-                  <span className="absolute top-2 left-4">
+                  <span className="absolute top-1.5 left-3.25">
                     <ShareButton label={`Share ${dayName(cell.date)}`} onClick={() => onShareDay(b)} />
                   </span>
                 )}
@@ -212,21 +217,21 @@ function CalendarGrid({
                     <div className={`${big} font-bold whitespace-nowrap tabular-nums ${tone(b.value)}`}>
                       {money(b.value, currency, { signed: true, digits: 2 })}
                     </div>
-                    <div className={`${small} text-foreground/80`}>
+                    <div className={`${small} text-muted-foreground`}>
                       {b.positions} position{b.positions === 1 ? "" : "s"}
                     </div>
-                    <div className={`${small} tabular-nums text-foreground/80`}>{pct(b.wins / b.positions, 1)}</div>
+                    <div className={`${small} tabular-nums text-muted-foreground`}>{pct(b.wins / b.positions, 1)}</div>
                   </div>
                 )}
               </div>
             );
           })}
           <div
-            className={`flex ${cellH} flex-col items-center justify-center leading-tight ${compact ? "border-[0.0313rem] border-border" : "ml-2 border-l"}`}
+            className={`flex ${cellH} flex-col items-center justify-center leading-tight ${compact ? "border-[0.025rem] border-border" : "ml-1.5 border-l"}`}
             data-share-item
           >
             <span
-              className={`flex items-center gap-1.5 ${compact ? "text-[0.625rem] font-semibold" : "text-[0.8125rem]"}`}
+              className={`flex items-center gap-1.25 ${compact ? "text-[0.5rem] font-semibold" : "text-[0.65rem]"}`}
             >
               Week {wi + 1}
               {onShareWeek && week.activeDays > 0 && (
@@ -234,11 +239,11 @@ function CalendarGrid({
               )}
             </span>
             <span
-              className={`mt-1 font-semibold tabular-nums ${compact ? "text-[0.6875rem]" : "text-[0.9375rem]"} ${tone(week.total)}`}
+              className={`mt-0.75 font-semibold tabular-nums ${compact ? "text-[0.55rem]" : "text-xs"} ${tone(week.total)}`}
             >
               {money(week.total, currency, { digits: 2 })}
             </span>
-            <span className={`mt-0.5 text-foreground/70 ${compact ? "text-[0.5rem]" : "text-[0.6875rem]"}`}>
+            <span className={`mt-0.5 text-muted-foreground ${compact ? "text-[0.4rem]" : "text-[0.55rem]"}`}>
               {week.activeDays} day{week.activeDays === 1 ? "" : "s"}
             </span>
           </div>
@@ -260,28 +265,28 @@ function PeriodCard({
   currency: Currency;
 }) {
   return (
-    <div className="py-8">
-      <h3 data-share-item className="text-3xl font-extrabold uppercase">
+    <div className="py-6.5">
+      <h3 data-share-item className="text-2xl font-extrabold uppercase">
         {title}
       </h3>
-      <p data-share-item className={`mt-6 text-5xl font-bold tabular-nums ${tone(bucket.value)}`}>
+      <p data-share-item className={`mt-4.75 text-4xl font-bold tabular-nums ${tone(bucket.value)}`}>
         {money(bucket.value, currency, { signed: true })}
       </p>
-      <div className="mt-6 flex gap-8 text-sm">
+      <div className="mt-4.75 flex gap-6.5 text-xs">
         <span data-share-item>
           <span className="block text-muted-foreground">Positions</span>
-          <span className="text-lg font-semibold tabular-nums">{bucket.positions}</span>
+          <span className="text-sm font-semibold tabular-nums">{bucket.positions}</span>
         </span>
         <span data-share-item>
           <span className="block text-muted-foreground">Win rate</span>
-          <span className="text-lg font-semibold tabular-nums">
+          <span className="text-sm font-semibold tabular-nums">
             {bucket.positions ? pct(bucket.wins / bucket.positions, 1) : "—"}
           </span>
         </span>
         {days !== undefined && (
           <span data-share-item>
             <span className="block text-muted-foreground">Active days</span>
-            <span className="text-lg font-semibold tabular-nums">{days}</span>
+            <span className="text-sm font-semibold tabular-nums">{days}</span>
           </span>
         )}
       </div>

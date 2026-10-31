@@ -7,17 +7,17 @@ export function getRouter() {
     scrollRestoration: true,
     defaultPreload: "intent",
     defaultErrorComponent: ({ error }) => (
-      <div className="panel border-rose-500/40 p-6">
+      <div className="panel border-rose-500/40 p-4.75">
         <p className="font-medium text-rose-300">Something broke while loading this page.</p>
-        <pre className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">
+        <pre className="mt-2.5 whitespace-pre-wrap text-xs text-muted-foreground">
           {error instanceof Error ? error.message : String(error)}
         </pre>
       </div>
     ),
     defaultNotFoundComponent: () => (
-      <div className="panel p-6">
+      <div className="panel p-4.75">
         <p className="font-medium">Nothing here.</p>
-        <Link to="/" className="mt-2 inline-block text-sm text-brand hover:underline">
+        <Link to="/" className="mt-1.5 inline-block text-xs text-brand hover:underline">
           Back to the fleet
         </Link>
       </div>

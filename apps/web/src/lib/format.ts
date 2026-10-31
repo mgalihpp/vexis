@@ -11,5 +11,6 @@ export function ago(ms: number): string {
 }
 
 export const solscanTx = (signature: string) => `https://solscan.io/tx/${signature}`;
+export const solscanAccount = (address: string) => `https://solscan.io/account/${address}`;
 
 export const shortAddr = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`;

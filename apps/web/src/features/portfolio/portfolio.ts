@@ -33,9 +33,73 @@ export interface ActivePosition {
   openedAt: number | null;
   lowerBin: number;
   upperBin: number;
+  /** Prices (token Y per token X) at the lower and upper bin. */
+  minPrice: number;
+  maxPrice: number;
   inRange: boolean | null;
   sol: ActiveAmounts;
   usd: ActiveAmounts;
+}
+
+export interface Token {
+  symbol: string;
+  mint: string;
+  icon: string | null;
+  verified: boolean;
+  /** USD price, used with `ActivePool.fdv` to price historical events. */
+  priceUsd: number | null;
+  /** Jupiter's 0-100 organic trading score; null when Jupiter has no data. */
+  organicScore: number | null;
+  /** Jupiter audit warnings, e.g. "Mint authority enabled"; null when Jupiter has no data. */
+  risks: string[] | null;
+}
+
+/** The subset of Jupiter's token `audit` block (plus `mintAuthority`) that decides the warnings. */
+export interface TokenAudit {
+  isSus?: boolean | null;
+  mintAuthority?: string | null;
+  mintAuthorityDisabled?: boolean | null;
+  freezeAuthorityDisabled?: boolean | null;
+  topHoldersPercentage?: number | null;
+  devMints?: number | null;
+}
+
+// Jupiter's docs call top-holder concentration under 20% low risk.
+const TOP_HOLDERS_RISK_PCT = 20;
+
+export function tokenRisks(a: TokenAudit): string[] {
+  const out: string[] = [];
+  if (a.isSus) out.push("Flagged as suspicious");
+  // Jupiter omits mintAuthorityDisabled for some tokens; a live mint authority on the token itself still counts.
+  if (a.mintAuthorityDisabled === false || (a.mintAuthorityDisabled == null && a.mintAuthority))
+    out.push("Mint authority enabled");
+  if (a.freezeAuthorityDisabled === false) out.push("Freeze authority enabled");
+  if ((a.topHoldersPercentage ?? 0) > TOP_HOLDERS_RISK_PCT)
+    out.push(`Top holders own ${Math.round(a.topHoldersPercentage ?? 0)}%`);
+  if ((a.devMints ?? 0) > 0) out.push(`Developer has launched ${a.devMints} tokens`);
+  return out;
+}
+
+/** What identifies a pool on screen: the pair, its tokens and its fee tier. */
+export interface PoolMeta {
+  address: string;
+  pair: string;
+  tokenX: Token;
+  tokenY: Token;
+  binStep: number;
+  /** Percent, e.g. 0.25 for 0.25%. */
+  baseFee: number;
+  dynamicFee: number | null;
+}
+
+export interface ActivePool extends PoolMeta {
+  /** Current price, token Y per token X. */
+  price: number;
+  activeBin: number | null;
+  /** Token X fully diluted value in USD. */
+  fdv: number | null;
+  tvl: number | null;
+  positions: ActivePosition[];
 }
 
 export interface Portfolio {
@@ -43,7 +107,9 @@ export interface Portfolio {
   fetchedAt: number;
   solPrice: number | null;
   closed: ClosedPosition[];
-  active: ActivePosition[];
+  /** Metadata for every pool in `closed`. */
+  closedPools: PoolMeta[];
+  active: ActivePool[];
   /** Meteora's own all-time total, which can include positions outside the loaded window. */
   allTime: { closedPositions: number; sol: number; usd: number };
 }
@@ -320,4 +386,202 @@ export function monthCalendar(days: Bucket[], year: number, month: number): Mont
     weeks.push({ cells, total: weekTotal, activeDays: weekDays });
   }
   return { year, month, weeks, total, activeDays };
+}
+
+// ---------- Active positions ----------
+
+export const SOL_MINT = "So11111111111111111111111111111111111111112";
+
+/** One on-chain action on a position. `type` is "add", "remove", "claim_fee", or anything newer. */
+export interface PositionEvent {
+  /** Signature, instruction index and type: one instruction can both claim fees and remove liquidity. */
+  id: string;
+  signature: string;
+  type: string;
+  at: number;
+  amountX: number;
+  amountY: number;
+  amountXUsd: number;
+  amountYUsd: number;
+  totalUsd: number;
+}
+
+export function poolTotals(positions: ActivePosition[], currency: Currency): ActiveAmounts {
+  const t = { deposit: 0, withdraw: 0, fees: 0, pnl: 0, balance: 0, unclaimed: 0 };
+  for (const p of positions) {
+    const a = p[currency];
+    t.deposit += a.deposit;
+    t.withdraw += a.withdraw;
+    t.fees += a.fees;
+    t.pnl += a.pnl;
+    t.balance += a.balance;
+    t.unclaimed += a.unclaimed;
+  }
+  return t;
+}
+
+export interface ClosedPoolRow {
+  pool: PoolMeta;
+  /** Newest close first; `n` numbers them by open time, oldest = 1. */
+  positions: { position: ClosedPosition; n: number }[];
+  lastClosedAt: number;
+  /** Time held, summed over the positions. */
+  heldMs: number;
+  sol: Amounts;
+  usd: Amounts;
+}
+
+const unknownToken = (symbol: string): Token => ({
+  symbol,
+  mint: "",
+  icon: null,
+  verified: false,
+  priceUsd: null,
+  organicScore: null,
+  risks: null,
+});
+
+const addAmounts = (t: Amounts, a: Amounts) => {
+  t.deposit += a.deposit;
+  t.withdraw += a.withdraw;
+  t.fees += a.fees;
+  t.pnl += a.pnl;
+};
+
+/** Closed positions grouped by pool, in first-seen order. */
+export function closedPoolRows(closed: ClosedPosition[], pools: PoolMeta[]): ClosedPoolRow[] {
+  const meta = new Map(pools.map((p) => [p.address, p]));
+  const groups = new Map<string, ClosedPosition[]>();
+  for (const p of closed) groups.set(p.pool, [...(groups.get(p.pool) ?? []), p]);
+  return [...groups].map(([address, positions]) => {
+    const [x = "", y = ""] = positions[0]?.pair.split("-") ?? [];
+    const pool = meta.get(address) ?? {
+      address,
+      pair: positions[0]?.pair ?? "",
+      tokenX: unknownToken(x),
+      tokenY: unknownToken(y),
+      binStep: 0,
+      baseFee: 0,
+      dynamicFee: null,
+    };
+    const byOpen = [...positions].sort((a, b) => a.openedAt - b.openedAt);
+    const sol = { deposit: 0, withdraw: 0, fees: 0, pnl: 0 };
+    const usd = { ...sol };
+    for (const p of positions) {
+      addAmounts(sol, p.sol);
+      addAmounts(usd, p.usd);
+    }
+    return {
+      pool,
+      positions: byOpen
+        .map((position, i) => ({ position, n: i + 1 }))
+        .sort((a, b) => b.position.closedAt - a.position.closedAt),
+      lastClosedAt: Math.max(...positions.map((p) => p.closedAt)),
+      heldMs: positions.reduce((t, p) => t + (p.closedAt - p.openedAt), 0),
+      sol,
+      usd,
+    };
+  });
+}
+
+export type BinRange = Pick<ActivePosition, "lowerBin" | "upperBin" | "minPrice" | "maxPrice">;
+
+/** The bins covered by every position together, or null when there are none. */
+export function binSpan(positions: ActivePosition[]): BinRange | null {
+  let out: BinRange | null = null;
+  for (const p of positions) {
+    if (!out) {
+      out = { lowerBin: p.lowerBin, upperBin: p.upperBin, minPrice: p.minPrice, maxPrice: p.maxPrice };
+      continue;
+    }
+    if (p.lowerBin < out.lowerBin) Object.assign(out, { lowerBin: p.lowerBin, minPrice: p.minPrice });
+    if (p.upperBin > out.upperBin) Object.assign(out, { upperBin: p.upperBin, maxPrice: p.maxPrice });
+  }
+  return out;
+}
+
+export const openedAt = (positions: ActivePosition[]) => {
+  const times = positions.flatMap((p) => (p.openedAt === null ? [] : [p.openedAt]));
+  return times.length ? Math.min(...times) : null;
+};
+
+/** How far the range edges sit from the current price, as ratios (-0.005 is 0.5% below). */
+export const rangeOffsets = (range: Pick<BinRange, "minPrice" | "maxPrice">, price: number) => ({
+  lower: range.minPrice / price - 1,
+  upper: range.maxPrice / price - 1,
+});
+
+/** Below the active bin a DLMM bin holds token Y, above it token X. */
+export type BinSide = "y" | "active" | "x";
+
+export interface Bin {
+  bin: number;
+  price: number;
+  side: BinSide;
+}
+
+export function binLadder(range: BinRange, pool: Pick<ActivePool, "binStep" | "activeBin" | "price">): Bin[] {
+  const step = 1 + pool.binStep / 10_000;
+  const active = pool.activeBin ?? range.lowerBin + Math.round(Math.log(pool.price / range.minPrice) / Math.log(step));
+  const out: Bin[] = [];
+  for (let bin = range.lowerBin; bin <= range.upperBin; bin++) {
+    const side = bin < active ? "y" : bin > active ? "x" : "active";
+    out.push({ bin, price: range.minPrice * step ** (bin - range.lowerBin), side });
+  }
+  return out;
+}
+
+/** Token X's FDV if its price moved to `price`. */
+export const fdvAt = (pool: Pick<ActivePool, "fdv" | "price">, price: number) =>
+  pool.fdv === null || !pool.price ? null : (pool.fdv * price) / pool.price;
+
+export interface ActivityValue {
+  amount: number;
+  usd: number;
+  /** Null when no SOL price is known at all. */
+  sol: number | null;
+}
+
+export interface ActivityRow {
+  id: string;
+  signature: string;
+  type: string;
+  at: number;
+  x: ActivityValue;
+  y: ActivityValue;
+  total: Omit<ActivityValue, "amount">;
+  /** Token X's FDV when the event happened. */
+  fdv: number | null;
+}
+
+/**
+ * Events carry USD values only. A SOL side's own USD/amount is the SOL price at that moment, and
+ * token X's USD/amount scaled by its supply (fdv / price) is the FDV then; both carry forward to
+ * events that do not reveal them. Events oldest first.
+ */
+export function activityRows(
+  events: PositionEvent[],
+  pool: Pick<ActivePool, "tokenX" | "tokenY" | "fdv">,
+  solPrice: number | null,
+): ActivityRow[] {
+  const supply = pool.fdv !== null && pool.tokenX.priceUsd ? pool.fdv / pool.tokenX.priceUsd : null;
+  let solUsd: number | null = null;
+  let fdv: number | null = null;
+  return events.map((e) => {
+    if (pool.tokenY.mint === SOL_MINT && e.amountY > 0 && e.amountYUsd > 0) solUsd = e.amountYUsd / e.amountY;
+    else if (pool.tokenX.mint === SOL_MINT && e.amountX > 0 && e.amountXUsd > 0) solUsd = e.amountXUsd / e.amountX;
+    if (supply !== null && e.amountX > 0 && e.amountXUsd > 0) fdv = (e.amountXUsd / e.amountX) * supply;
+    const rate = solUsd ?? solPrice;
+    const sol = (usd: number) => (rate ? usd / rate : null);
+    return {
+      id: e.id,
+      signature: e.signature,
+      type: e.type,
+      at: e.at,
+      x: { amount: e.amountX, usd: e.amountXUsd, sol: sol(e.amountXUsd) },
+      y: { amount: e.amountY, usd: e.amountYUsd, sol: sol(e.amountYUsd) },
+      total: { usd: e.totalUsd, sol: sol(e.totalUsd) },
+      fdv,
+    };
+  });
 }

@@ -33,10 +33,10 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
   }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col pb-8">
+    <div className="flex h-dvh flex-col">
       <AppHeader />
       <FavoritesBar />
-      <main className="flex-1">{children}</main>
+      <main className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">{children}</main>
       <AppFooter prices={prices} />
     </div>
   );
@@ -46,11 +46,11 @@ function NavItem({ to, children, badge }: { to: "/portfolio" | "/analytics"; chi
   return (
     <Link
       to={to}
-      className="relative text-[1.0625rem] font-semibold text-foreground transition-colors hover:text-brand data-[status=active]:text-brand"
+      className="relative text-sm font-medium text-foreground transition-colors hover:text-brand data-[status=active]:text-brand"
     >
       {children}
       {badge && (
-        <span className="absolute -top-2 -right-1 translate-x-full rounded-[0.25rem] border border-brand/60 px-1 text-[0.5625rem] leading-[0.8125rem] font-bold tracking-wider text-brand">
+        <span className="absolute -top-1.5 -right-0.75 translate-x-full rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
           {badge}
         </span>
       )}
@@ -60,13 +60,13 @@ function NavItem({ to, children, badge }: { to: "/portfolio" | "/analytics"; chi
 
 function AppHeader() {
   return (
-    <header className="border-b">
-      <div className="flex h-[3.75rem] items-center gap-10 px-2.5">
-        <Link to="/portfolio" className="flex items-center gap-2 text-[1.625rem] font-bold tracking-tight">
+    <header className="shrink-0 border-b">
+      <div className="flex h-[3rem] items-center gap-8 px-2">
+        <Link to="/portfolio" className="flex items-center gap-1.5 text-[1.3rem] font-bold tracking-tight">
           <Logo height={22} />
           Vexis
         </Link>
-        <nav className="flex items-center gap-12">
+        <nav className="flex items-center gap-9.5">
           <NavItem to="/portfolio" badge="BETA">
             Portfolio
           </NavItem>
@@ -83,13 +83,16 @@ function FavoritesBar() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex h-10 items-center gap-3 overflow-x-auto border-b px-2.5 text-[0.9375rem]">
-      <StarIcon className="size-4 shrink-0 fill-foreground text-foreground" />
+    <div className="flex h-8 shrink-0 items-center gap-2.5 overflow-x-auto border-b px-2 text-xs">
+      <StarIcon className="size-3.25 shrink-0 fill-foreground text-foreground" />
       {favorites.length === 0 ? (
         <span className="text-muted-foreground">Add wallets to your favorites</span>
       ) : (
         favorites.map((wallet) => (
-          <span key={wallet} className="inline-flex shrink-0 items-center gap-1 rounded-md bg-card px-2 py-0.5 text-sm">
+          <span
+            key={wallet}
+            className="inline-flex shrink-0 items-center gap-0.75 rounded-md bg-card px-1.5 py-0.5 text-xs"
+          >
             <button
               type="button"
               className="hover:text-brand"
@@ -103,7 +106,7 @@ function FavoritesBar() {
               className="text-muted-foreground hover:text-foreground"
               onClick={() => toggleFavorite(wallet)}
             >
-              <XIcon className="size-3" />
+              <XIcon className="size-2.5" />
             </button>
           </span>
         ))
@@ -115,16 +118,16 @@ function FavoritesBar() {
 function AppFooter({ prices }: { prices: Prices }) {
   const { theme, setTheme } = useTheme();
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-8 items-center gap-4 border-t bg-background px-2.5 text-[0.9375rem] font-medium tabular-nums">
-      <span className="inline-flex items-center gap-1.5 text-sky-700 dark:text-[#5ec8f0]">
-        <SolIcon className="size-4" />
+    <footer className="flex h-6.5 shrink-0 items-center gap-3.25 border-t bg-background px-2 text-xs font-medium tabular-nums">
+      <span className="inline-flex items-center gap-1.25 text-sky-700 dark:text-[#5ec8f0]">
+        <SolIcon className="size-3.25" />
         {prices.sol === null ? "—" : usd.format(prices.sol)}
       </span>
-      <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-[#f7931a]">
-        <BtcIcon className="size-4" />
+      <span className="inline-flex items-center gap-1.25 text-amber-700 dark:text-[#f7931a]">
+        <BtcIcon className="size-3.25" />
         {prices.btc === null ? "—" : usdWhole.format(prices.btc)}
       </span>
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2.5">
         {DATA_SOURCES.map((s) => (
           <Tooltip key={s.name}>
             <TooltipTrigger asChild>
@@ -135,13 +138,13 @@ function AppFooter({ prices }: { prices: Prices }) {
                 aria-label={s.name}
                 className="opacity-80 transition-opacity hover:opacity-100"
               >
-                <img src={s.icon} alt="" className="size-[1.125rem] rounded-full" />
+                <img src={s.icon} alt="" className="size-[0.9rem] rounded-full" />
               </a>
             </TooltipTrigger>
             <TooltipContent>{s.name}</TooltipContent>
           </Tooltip>
         ))}
-        <span className="h-4 border-l" />
+        <span className="h-3.25 border-l" />
         <div className="flex items-center rounded-md border p-0.5">
           {THEMES.map(({ value, label, Icon }) => (
             <Tooltip key={value}>
@@ -151,11 +154,11 @@ function AppFooter({ prices }: { prices: Prices }) {
                   aria-pressed={theme === value}
                   aria-label={label}
                   onClick={() => setTheme(value)}
-                  className={`rounded-[0.25rem] p-1 transition-colors ${
+                  className={`rounded-[0.2rem] p-0.75 transition-colors ${
                     theme === value ? "bg-muted text-foreground" : "text-foreground/60 hover:text-foreground"
                   }`}
                 >
-                  <Icon className="size-3.5" />
+                  <Icon className="size-2.75" />
                 </button>
               </TooltipTrigger>
               <TooltipContent>{label}</TooltipContent>

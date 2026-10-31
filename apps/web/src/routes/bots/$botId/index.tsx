@@ -32,14 +32,14 @@ function FeedPage() {
   };
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap gap-1.5">
+    <section className="space-y-3.25">
+      <div className="flex flex-wrap gap-1.25">
         {EVENT_KINDS.map((kind) => (
           <Link
             key={kind}
             from={Route.fullPath}
             search={(prev) => ({ ...prev, kinds: toggle(kind) })}
-            className={`rounded-full border px-2.5 py-0.5 text-xs ${
+            className={`rounded-full border px-2 py-0.5 text-[0.625rem] ${
               selected.has(kind) ? `border-zinc-500 bg-zinc-800 ${kindTone[kind]}` : "border-zinc-800 text-zinc-500"
             }`}
           >
@@ -49,10 +49,10 @@ function FeedPage() {
       </div>
 
       <ol className="panel divide-y divide-zinc-800">
-        {events.length === 0 && <li className="p-5 text-sm text-zinc-500">No events match.</li>}
+        {events.length === 0 && <li className="p-4 text-xs text-zinc-500">No events match.</li>}
         {events.map((event) => (
-          <li key={event.seq} className="flex gap-4 p-4">
-            <span className="num w-16 shrink-0 pt-0.5 text-xs text-zinc-500">{ago(now - event.at)}</span>
+          <li key={event.seq} className="flex gap-3.25 p-3.25">
+            <span className="num w-12.75 shrink-0 pt-0.5 text-[0.625rem] text-zinc-500">{ago(now - event.at)}</span>
             <div className="min-w-0">
               <EventDetail event={event} />
             </div>
@@ -64,7 +64,7 @@ function FeedPage() {
         <Link
           from={Route.fullPath}
           search={(prev) => ({ ...prev, limit: Math.min(500, limit * 2) })}
-          className="block text-center text-sm text-emerald-300 hover:underline"
+          className="block text-center text-xs text-emerald-300 hover:underline"
         >
           Show more ({total - events.length} older)
         </Link>

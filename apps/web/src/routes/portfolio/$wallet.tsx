@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound, Outlet, stripSearchParams } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, Outlet, stripSearchParams, useMatchRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { z } from "zod";
 import { CurrencyToggle } from "@/features/portfolio/components/currency-toggle";
@@ -43,7 +43,7 @@ const TABS = [
 ] as const;
 
 const tabClass =
-  "relative -mb-px border-b-2 border-transparent px-3.5 py-2.5 text-[0.9375rem] font-medium text-foreground/70";
+  "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5";
 
 function PortfolioLayout() {
   const { wallet } = Route.useParams();
@@ -51,11 +51,16 @@ function PortfolioLayout() {
   const visit = useWallets((s) => s.visit);
   useEffect(() => visit(wallet), [visit, wallet]);
   const pairs = [...new Set([...portfolio.closed, ...portfolio.active].map((p) => p.pair))].sort();
+  const matchRoute = useMatchRoute();
+  // The position tables carry their own toolbar (currency toggle and pool filter) and ignore the date range.
+  const onActive = Boolean(matchRoute({ to: "/portfolio/$wallet/active", params: { wallet } }));
+  const onClosed = Boolean(matchRoute({ to: "/portfolio/$wallet/closed", params: { wallet } }));
+  const ownToolbar = onActive || onClosed;
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       <WalletBar wallet={wallet} />
-      <nav className="flex overflow-x-auto border-b px-2.5">
+      <nav className="flex shrink-0 overflow-x-auto border-b px-2">
         {TABS.map((tab) => (
           <Link
             key={tab.to}
@@ -63,33 +68,37 @@ function PortfolioLayout() {
             params={{ wallet }}
             search={(prev) => prev}
             activeOptions={{ exact: tab.exact, includeSearch: false }}
-            className={`${tabClass} hover:text-foreground`}
-            activeProps={{ className: "border-brand! text-foreground!" }}
+            className={`${tabClass} hover:text-muted-foreground`}
+            activeProps={{ className: "text-foreground! after:bg-brand" }}
           >
             {tab.label}
           </Link>
         ))}
         {["Transactions", "Balances"].map((label) => (
-          <span key={label} title="Coming soon" className={`${tabClass} cursor-not-allowed text-foreground/40`}>
+          <span key={label} title="Coming soon" className={`${tabClass} cursor-not-allowed`}>
             {label}
           </span>
         ))}
       </nav>
-      <div className="flex items-center justify-between gap-3 px-2.5 py-2.5">
-        <CurrencyToggle />
-        <div className="flex items-center gap-2">
-          <PairFilter pairs={pairs} />
-          <RangePicker now={portfolio.fetchedAt} />
-        </div>
-      </div>
-      <div className="px-2.5 pb-4">
-        {portfolio.closed.length < portfolio.allTime.closedPositions && (
-          <p className="mb-2.5 rounded-md border border-brand/30 bg-brand/10 px-3 py-2 text-sm text-foreground/80">
-            Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora
-            reports for this wallet. Its portfolio API only lists pools with a position closed in the last 365 days.
-          </p>
+      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {!ownToolbar && (
+          <div className="flex items-center justify-between gap-2.5 px-2 pt-1.5 pb-0.5">
+            <CurrencyToggle />
+            <div className="flex items-center gap-1.5">
+              <PairFilter pairs={pairs} />
+              <RangePicker now={portfolio.fetchedAt} />
+            </div>
+          </div>
         )}
-        <Outlet />
+        <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${onClosed ? "" : "pb-3.25"}`}>
+          {!onActive && portfolio.closed.length < portfolio.allTime.closedPositions && (
+            <p className="mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
+              Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora
+              reports for this wallet. Its portfolio API only lists pools with a position closed in the last 365 days.
+            </p>
+          )}
+          <Outlet />
+        </div>
       </div>
     </div>
   );
@@ -97,18 +106,18 @@ function PortfolioLayout() {
 
 function PortfolioSkeleton() {
   return (
-    <div className="space-y-2.5 p-2.5">
-      <div className="h-14 animate-pulse rounded-md bg-card" />
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="space-y-2 p-2">
+      <div className="h-11.25 animate-pulse rounded-md bg-card" />
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-[9.375rem] animate-pulse rounded-lg bg-card" />
+          <div key={i} className="h-[7.5rem] animate-pulse rounded-lg bg-card" />
         ))}
       </div>
-      <div className="grid gap-2.5 xl:grid-cols-[1fr_2fr]">
-        <div className="h-[36.875rem] animate-pulse rounded-lg bg-card" />
-        <div className="h-[36.875rem] animate-pulse rounded-lg bg-card" />
+      <div className="grid gap-2 xl:grid-cols-[1fr_2fr]">
+        <div className="h-[29.5rem] animate-pulse rounded-lg bg-card" />
+        <div className="h-[29.5rem] animate-pulse rounded-lg bg-card" />
       </div>
-      <p className="text-center text-sm text-muted-foreground">Loading positions from Meteora…</p>
+      <p className="text-center text-xs text-muted-foreground">Loading positions from Meteora…</p>
     </div>
   );
 }

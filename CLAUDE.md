@@ -39,7 +39,7 @@ Build target is a flag, not code: `NITRO_PRESET=node-server bun run build`. Prod
 - `*.functions.ts` — `createServerFn` wrappers, safe to import anywhere (routes call these in loaders).
 - `*.server.ts` — server-only code, imported only by `*.functions.ts`.
 - plain `.ts` — client-safe types, schemas, pure logic.
-In this Start version the validator method is `.validator(zodSchema)`, not `inputValidator`.
+  In this Start version the validator method is `.validator(zodSchema)`, not `inputValidator`.
 
 **Feature folders**: domain code lives in `apps/web/src/features/<feature>/` (bots, portfolio, telegram, theme). Routes in `src/routes` stay thin (search schema, loader, SSR mode, layout). Import with `@/`, no barrel `index.ts` files.
 
@@ -54,7 +54,7 @@ In this Start version the validator method is `.validator(zodSchema)`, not `inpu
 **Bot data flow** (`packages/bot-state`): bots write their own journals (`journal.jsonl` for tiang, `activity.jsonl` with local-time timestamps for auto-rebalance) plus `HALT`; the dashboard also expects a `snapshot.json` heartbeat each cycle (schema `Snapshot` in `model.ts`, contract in README). Parsers drop torn lines and keep the file line number as `seq` (used as React keys). The root layout calls `router.invalidate()` every 15 s as the live-update mechanism.
 
 **Styling and theme**:
-- Root font-size is 80% to match the reference UI's density (the reference UI); arbitrary Tailwind values are written in `rem`, not `px`, so they scale with it.
+- The reference UI is shadcn on Tailwind with the browser-default 16px root and the zinc base color, so our classes mean the same px as theirs: body text is `text-xs` (12px), radius `0.45rem`. Match it by measuring the reference UI's computed styles in a browser (`getComputedStyle`), not screenshots, since screenshots on a 125% Windows display are scaled. Only the lime `--brand` differs.
 - Tokens in `src/styles.css`: `--brand` (lime `#BAF448` sampled from `public/logo.png` in dark; a deeper lime in light), `--profit`, `--loss`. Profit/loss values were tuned to clear WCAG 4.5:1 on their own tinted calendar cells; re-measure if you change them.
 - Theme is light/dark/system, stored in `localStorage` (`vexis-theme`), default dark. `features/theme/theme.ts` exports an inline script that the root route puts in `<head>` to set `.dark` before paint; `<html>` has `suppressHydrationWarning` for that reason. Components must render the same markup for every theme on the server.
 - The share-image card (`share-dialog.tsx`, rendered with `html-to-image`) follows the app theme with no background, switches to `.dark` or `.light-card` token scopes for a picked color, and draws textures in `currentColor`.

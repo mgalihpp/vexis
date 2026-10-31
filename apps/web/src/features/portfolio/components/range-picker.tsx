@@ -46,7 +46,7 @@ function DateField({
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
-    <label className="flex flex-col gap-2 text-sm text-foreground/80">
+    <label className="flex flex-col gap-1.5 text-xs text-foreground/80">
       {label}
       <input
         value={draft ?? (value === null ? "" : pretty(value))}
@@ -57,7 +57,7 @@ function DateField({
           if (!Number.isNaN(parsed)) onChange(parsed);
           setDraft(null);
         }}
-        className="h-[2.125rem] w-[7rem] rounded-md border border-brand/60 bg-transparent px-2 text-[0.8125rem] text-foreground outline-none placeholder:text-muted-foreground focus:border-brand"
+        className="h-[1.7rem] w-[5.6rem] rounded-md border border-brand/60 bg-transparent px-1.5 text-[0.65rem] text-foreground outline-none placeholder:text-muted-foreground focus:border-brand"
       />
     </label>
   );
@@ -107,23 +107,23 @@ export function RangePicker({ now }: { now: number }) {
 
   return (
     <Popover open={open} onOpenChange={reset}>
-      <PopoverTrigger className="inline-flex h-8 items-center gap-2 rounded-md border px-2.5 text-[0.9375rem]">
-        <CalendarIcon className="size-4" />
+      <PopoverTrigger className="inline-flex h-6.5 items-center gap-1.5 rounded-md border px-2 text-xs">
+        <CalendarIcon className="size-3.25" />
         <span className="font-semibold">
           {search.range === "custom" ? "Custom" : presetLabel(search.range).split(" (")[0]}
         </span>
         <span className="text-foreground/80">{summary(applied)}</span>
-        <ChevronDownIcon className="size-4" />
+        <ChevronDownIcon className="size-3.25" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(45.625rem,calc(100vw-1rem))] gap-0 overflow-hidden p-0">
-        <div className="flex h-[23.75rem]">
-          <ul className="w-[13.875rem] shrink-0 overflow-y-auto border-r p-1">
+      <PopoverContent align="end" className="w-[min(36.5rem,calc(100vw-0.8rem))] gap-0 overflow-hidden p-0">
+        <div className="flex h-[19rem]">
+          <ul className="w-[11.1rem] shrink-0 overflow-y-auto border-r p-0.75">
             {RANGE_PRESETS.map((p) => (
               <li key={p.id}>
                 <button
                   type="button"
                   onClick={() => choose(p.id)}
-                  className={`w-full rounded-md px-2.5 py-1.5 text-left text-[0.9375rem] whitespace-nowrap ${
+                  className={`w-full rounded-md px-2 py-1.25 text-left text-xs whitespace-nowrap ${
                     preset === p.id ? "bg-brand text-brand-foreground" : "hover:bg-muted"
                   }`}
                 >
@@ -133,18 +133,18 @@ export function RangePicker({ now }: { now: number }) {
             ))}
           </ul>
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex items-end gap-3 border-b p-4">
+            <div className="flex items-end gap-2.5 border-b p-3.25">
               <DateField label="Start date" value={draft.from} onChange={(ms) => setEdge("from", ms)} />
-              <span className="pb-2 text-muted-foreground">-</span>
+              <span className="pb-1.5 text-muted-foreground">-</span>
               <DateField
                 label="End date"
                 value={draft.to === null ? null : draft.to - DAY_MS}
                 onChange={(ms) => setEdge("to", ms)}
               />
             </div>
-            <div className="flex flex-1 items-center justify-center overflow-auto p-2">
+            <div className="flex flex-1 items-center justify-center overflow-auto p-1.5">
               {preset === "all" ? (
-                <span className="text-[0.9375rem] text-muted-foreground">All dates selected</span>
+                <span className="text-xs text-muted-foreground">All dates selected</span>
               ) : (
                 <Calendar
                   mode="range"
@@ -166,18 +166,18 @@ export function RangePicker({ now }: { now: number }) {
             </div>
           </div>
         </div>
-        <div className="flex justify-end gap-3 border-t px-4 py-3">
+        <div className="flex justify-end gap-2.5 border-t px-3.25 py-2.5">
           <button
             type="button"
             onClick={() => reset(false)}
-            className="px-3 text-[0.9375rem] font-semibold hover:text-foreground/80"
+            className="px-2.5 text-xs font-semibold hover:text-foreground/80"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={apply}
-            className="h-8 rounded-md bg-brand px-3 text-[0.9375rem] font-semibold text-brand-foreground hover:bg-brand/90"
+            className="h-6.5 rounded-md bg-brand px-2.5 text-xs font-semibold text-brand-foreground hover:bg-brand/90"
           >
             Apply
           </button>
@@ -197,25 +197,25 @@ export function PairFilter({ pairs }: { pairs: string[] }) {
     <Popover>
       <PopoverTrigger
         aria-label="Filter by pair"
-        className={`relative p-1.5 hover:text-foreground ${selected.size ? "text-brand" : "text-foreground/80"}`}
+        className={`relative p-1.25 hover:text-foreground ${selected.size ? "text-brand" : "text-foreground/80"}`}
       >
-        <FilterIcon className="size-4" />
+        <FilterIcon className="size-3.25" />
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 p-2">
-        <div className="flex items-center justify-between px-1 pb-2 text-sm font-semibold">
+      <PopoverContent align="end" className="w-51.25 p-1.5">
+        <div className="flex items-center justify-between px-0.75 pb-1.5 text-xs font-semibold">
           Pairs
           {selected.size > 0 && (
-            <button type="button" className="text-xs font-normal text-brand" onClick={() => set(new Set())}>
+            <button type="button" className="text-[0.625rem] font-normal text-brand" onClick={() => set(new Set())}>
               Clear
             </button>
           )}
         </div>
-        <ul className="max-h-72 overflow-y-auto">
+        <ul className="max-h-57.5 overflow-y-auto">
           {pairs.map((pair) => (
             <li key={pair}>
               <label
                 htmlFor={`pair-${pair}`}
-                className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-sm hover:bg-muted"
+                className="flex cursor-pointer items-center gap-1.5 rounded px-0.75 py-1.25 text-xs hover:bg-muted"
               >
                 <Checkbox
                   id={`pair-${pair}`}
@@ -231,7 +231,7 @@ export function PairFilter({ pairs }: { pairs: string[] }) {
               </label>
             </li>
           ))}
-          {pairs.length === 0 && <li className="px-1 py-2 text-sm text-muted-foreground">No pairs yet.</li>}
+          {pairs.length === 0 && <li className="px-0.75 py-1.5 text-xs text-muted-foreground">No pairs yet.</li>}
         </ul>
       </PopoverContent>
     </Popover>

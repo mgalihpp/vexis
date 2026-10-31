@@ -11,10 +11,10 @@ const healthStyle: Record<BotHealth["state"], { label: string; dot: string; text
 export function HealthBadge({ health }: { health: BotHealth }) {
   const style = healthStyle[health.state];
   return (
-    <span className={`inline-flex items-center gap-2 text-sm font-medium ${style.text}`}>
-      <span className={`size-2 rounded-full ${style.dot} ${health.state === "live" ? "animate-pulse" : ""}`} />
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${style.text}`}>
+      <span className={`size-1.5 rounded-full ${style.dot} ${health.state === "live" ? "animate-pulse" : ""}`} />
       {style.label}
-      {"ageMs" in health && <span className="num text-xs text-zinc-500">{ago(health.ageMs)}</span>}
+      {"ageMs" in health && <span className="num text-[0.625rem] text-zinc-500">{ago(health.ageMs)}</span>}
     </span>
   );
 }

@@ -10,7 +10,7 @@ export function Segmented<T extends string>({
   variant?: "brand" | "muted";
 }) {
   return (
-    <div className="inline-flex rounded-md border p-0.5 text-[0.8125rem] font-medium">
+    <div className="inline-flex rounded-md border p-0.5 text-[0.65rem] font-medium">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -19,7 +19,7 @@ export function Segmented<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`rounded-[0.3125rem] px-2.5 py-1 transition-colors ${
+            className={`rounded-[0.25rem] px-2 py-0.75 transition-colors ${
               active
                 ? variant === "brand"
                   ? "bg-brand text-brand-foreground"

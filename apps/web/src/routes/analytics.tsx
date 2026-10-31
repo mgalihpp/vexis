@@ -8,10 +8,10 @@ export const Route = createFileRoute("/analytics")({
 
 function Analytics() {
   return (
-    <div className="mx-auto flex max-w-lg flex-col items-center px-4 pt-24 text-center">
-      <ChartNoAxesCombinedIcon className="size-12 text-brand" />
-      <h1 className="mt-5 text-2xl font-semibold">Analytics</h1>
-      <p className="mt-2 text-[0.9375rem] text-muted-foreground">Not built yet.</p>
+    <div className="mx-auto flex max-w-lg flex-col items-center px-3.25 pt-19.25 text-center">
+      <ChartNoAxesCombinedIcon className="size-9.5 text-brand" />
+      <h1 className="mt-4 text-xl font-semibold">Analytics</h1>
+      <p className="mt-1.5 text-xs text-muted-foreground">Not built yet.</p>
     </div>
   );
 }

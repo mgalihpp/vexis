@@ -16,16 +16,16 @@ function Overview() {
   const stats = useMemo(() => summarize(closed, currency), [closed, currency]);
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <StatCards stats={stats} currency={currency} />
-      <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-        <div className="space-y-2.5">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="space-y-2">
           <ActiveSummary active={active} currency={currency} />
           <Performance stats={stats} active={active} currency={currency} />
         </div>
         <PnlCalendar closed={closed} currency={currency} now={portfolio.fetchedAt} />
       </div>
-      <div className="grid gap-2.5 xl:grid-cols-2">
+      <div className="grid gap-2 xl:grid-cols-2">
         <CumulativeChart closed={closed} currency={currency} />
         <PeriodChart closed={closed} currency={currency} />
       </div>
