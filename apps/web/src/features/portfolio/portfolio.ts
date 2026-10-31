@@ -585,3 +585,72 @@ export function activityRows(
     };
   });
 }
+
+// ---------- Transactions ----------
+
+/** One position's events, oldest first, as `loadActivity` returns them. */
+export interface PositionHistory {
+  position: string;
+  pool: string;
+  openedAt: number | null;
+  /** Null while the position is open. */
+  closedAt: number | null;
+  events: PositionEvent[];
+}
+
+/** What a transaction row needs from its pool; a closed pool has no FDV. */
+export type TransactionPool = PoolMeta & { fdv: number | null };
+
+/** Opening and closing a position carry no event signature, so those rows have none. */
+export type TransactionRow = Omit<ActivityRow, "signature"> & {
+  signature: string | null;
+  position: string;
+  pool: TransactionPool;
+};
+
+/** Pools by address for `transactionRows`; an active pool wins because it knows its FDV. */
+export const transactionPools = (portfolio: Pick<Portfolio, "closedPools" | "active">) =>
+  new Map<string, TransactionPool>([
+    ...portfolio.closedPools.map((p): [string, TransactionPool] => [p.address, { ...p, fdv: null }]),
+    ...portfolio.active.map((p): [string, TransactionPool] => [p.address, p]),
+  ]);
+
+/**
+ * Every position's activity in one list, newest first. Meteora's history has no open or close
+ * event, so those come from the position's own timestamps. A history whose pool is unknown is skipped.
+ */
+export function transactionRows(
+  histories: PositionHistory[],
+  pools: ReadonlyMap<string, TransactionPool>,
+  solPrice: number | null,
+): TransactionRow[] {
+  return histories
+    .flatMap((h) => {
+      const pool = pools.get(h.pool);
+      if (!pool) return [];
+      const lifecycle = (type: string, at: number): TransactionRow => ({
+        id: `${h.position}:${type}`,
+        signature: null,
+        type,
+        at,
+        x: { amount: 0, usd: 0, sol: 0 },
+        y: { amount: 0, usd: 0, sol: 0 },
+        total: { usd: 0, sol: 0 },
+        fdv: null,
+        position: h.position,
+        pool,
+      });
+      // One signature can touch two positions, so the position address keeps ids unique.
+      const events = activityRows(h.events, pool, solPrice).map(
+        (row): TransactionRow => ({ ...row, id: `${h.position}:${row.id}`, position: h.position, pool }),
+      );
+      const rows = [
+        ...(h.openedAt === null ? [] : [lifecycle("initialize", h.openedAt)]),
+        ...events,
+        ...(h.closedAt === null ? [] : [lifecycle("close", h.closedAt)]),
+      ];
+      // Reversed so the stable sort below keeps same-instant rows in lifecycle order, latest on top.
+      return rows.reverse();
+    })
+    .sort((a, b) => b.at - a.at);
+}

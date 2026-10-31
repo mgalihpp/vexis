@@ -40,6 +40,7 @@ const TABS = [
   { to: "/portfolio/$wallet", label: "Overview", exact: true },
   { to: "/portfolio/$wallet/active", label: "Active Positions", exact: false },
   { to: "/portfolio/$wallet/closed", label: "Closed Positions", exact: false },
+  { to: "/portfolio/$wallet/transactions", label: "Transactions", exact: false },
 ] as const;
 
 const tabClass =
@@ -52,10 +53,12 @@ function PortfolioLayout() {
   useEffect(() => visit(wallet), [visit, wallet]);
   const pairs = [...new Set([...portfolio.closed, ...portfolio.active].map((p) => p.pair))].sort();
   const matchRoute = useMatchRoute();
-  // The position tables carry their own toolbar (currency toggle and pool filter) and ignore the date range.
+  // The tables carry their own toolbar (currency toggle and pool filter) and ignore the date range.
   const onActive = Boolean(matchRoute({ to: "/portfolio/$wallet/active", params: { wallet } }));
   const onClosed = Boolean(matchRoute({ to: "/portfolio/$wallet/closed", params: { wallet } }));
-  const ownToolbar = onActive || onClosed;
+  const onTransactions = Boolean(matchRoute({ to: "/portfolio/$wallet/transactions", params: { wallet } }));
+  const ownToolbar = onActive || onClosed || onTransactions;
+  const pagedTable = onClosed || onTransactions;
 
   return (
     <div className="flex h-full flex-col">
@@ -74,11 +77,9 @@ function PortfolioLayout() {
             {tab.label}
           </Link>
         ))}
-        {["Transactions", "Balances"].map((label) => (
-          <span key={label} title="Coming soon" className={`${tabClass} cursor-not-allowed`}>
-            {label}
-          </span>
-        ))}
+        <span title="Coming soon" className={`${tabClass} cursor-not-allowed`}>
+          Balances
+        </span>
       </nav>
       <div className="scrollbar-thin flex min-h-0 flex-1 flex-col overflow-y-auto">
         {!ownToolbar && (
@@ -90,7 +91,7 @@ function PortfolioLayout() {
             </div>
           </div>
         )}
-        <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${onClosed ? "" : "pb-3.25"}`}>
+        <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
           {!onActive && portfolio.closed.length < portfolio.allTime.closedPositions && (
             <p className="mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
               Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora

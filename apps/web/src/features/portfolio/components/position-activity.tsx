@@ -52,16 +52,17 @@ const EVENTS: Record<string, { label: string; className: string }> = {
   add: { label: "Added Liquidity", className: "bg-profit/15 text-profit" },
   remove: { label: "Removed Liquidity", className: "bg-loss/15 text-loss" },
   claim_fee: { label: "Claimed Fees", className: "bg-brand/15 text-brand" },
+  close: { label: "Closed Position", className: "bg-muted text-foreground/80" },
 };
 
 const eventKind = (type: string) =>
   EVENTS[type] ?? { label: type.replace(/_/g, " "), className: "bg-muted text-foreground/80 capitalize" };
 
-function EventBadge({ row }: { row: ActivityRow }) {
-  const kind = eventKind(row.type);
+export function EventBadge({ type, href }: { type: string; href: string }) {
+  const kind = eventKind(type);
   return (
     <a
-      href={solscanTx(row.signature)}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className={`inline-block rounded px-1 py-0.5 whitespace-nowrap ${kind.className}`}
@@ -71,7 +72,7 @@ function EventBadge({ row }: { row: ActivityRow }) {
   );
 }
 
-function FdvChip({ row, pool }: { row: ActivityRow; pool: ActivityPool }) {
+export function FdvChip({ row, pool }: { row: Pick<ActivityRow, "fdv">; pool: ActivityPool }) {
   if (row.fdv === null) return null;
   return (
     <span className="inline-flex items-center gap-1 rounded-sm border bg-foreground/5 px-1.5 py-0.5 text-[0.625rem] font-semibold text-muted-foreground tabular-nums">
@@ -83,7 +84,7 @@ function FdvChip({ row, pool }: { row: ActivityRow; pool: ActivityPool }) {
 
 const tokenAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 6 });
 
-const value = (v: number | null, currency: Currency) => (v === null ? "—" : money(v, currency));
+export const value = (v: number | null, currency: Currency) => (v === null ? "—" : money(v, currency));
 
 function TokenLine({ token, side, currency }: { token: Token; side: ActivityValue; currency: Currency }) {
   return (
@@ -96,7 +97,15 @@ function TokenLine({ token, side, currency }: { token: Token; side: ActivityValu
   );
 }
 
-function TokenLines({ row, pool, currency }: { row: ActivityRow; pool: ActivityPool; currency: Currency }) {
+export function TokenLines({
+  row,
+  pool,
+  currency,
+}: {
+  row: Pick<ActivityRow, "x" | "y">;
+  pool: ActivityPool;
+  currency: Currency;
+}) {
   return (
     <>
       {row.x.amount > 0 && <TokenLine token={pool.tokenX} side={row.x} currency={currency} />}
@@ -131,7 +140,7 @@ export function ActivityList({
               <SolscanLink href={solscanTx(row.signature)} label="Transaction on Solscan" />
             </span>
             <span className="w-30 shrink-0">
-              <EventBadge row={row} />
+              <EventBadge type={row.type} href={solscanTx(row.signature)} />
             </span>
             <span className="w-37.5 shrink-0 text-muted-foreground tabular-nums">{utcStamp(row.at)}</span>
             <span className="w-16 shrink-0">
@@ -153,7 +162,7 @@ export function ActivityList({
           <div className="flex items-center justify-between gap-1.5">
             <span className="flex items-center gap-1.5">
               <SolscanLink href={solscanTx(row.signature)} label="Transaction on Solscan" />
-              <EventBadge row={row} />
+              <EventBadge type={row.type} href={solscanTx(row.signature)} />
             </span>
             <span className="font-semibold tabular-nums">{value(row.total[currency], currency)}</span>
           </div>

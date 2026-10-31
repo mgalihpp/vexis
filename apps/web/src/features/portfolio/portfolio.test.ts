@@ -23,6 +23,8 @@ import {
   series,
   summarize,
   tokenRisks,
+  transactionPools,
+  transactionRows,
 } from "./portfolio";
 
 const at = (iso: string) => Date.parse(iso);
@@ -320,6 +322,127 @@ describe("closed pools", () => {
     const [row] = closedPoolRows([closedIn("b", "2026-10-02T00:00:00Z", "2026-10-02T00:30:00Z", -2)], []);
     expect(row?.pool.pair).toBe("PEPE-SOL");
     expect(row?.pool.tokenX.symbol).toBe("PEPE");
+  });
+});
+
+describe("transactions", () => {
+  const token = (symbol: string, mint = symbol) => ({
+    symbol,
+    mint,
+    icon: null,
+    verified: false,
+    priceUsd: 2,
+    organicScore: null,
+    risks: null,
+  });
+  const meta = (address: string): PoolMeta => ({
+    address,
+    pair: "DOGE-SOL",
+    tokenX: token("DOGE"),
+    tokenY: token("SOL", SOL_MINT),
+    binStep: 10,
+    baseFee: 0.1,
+    dynamicFee: null,
+  });
+  const event = (signature: string, iso: string, amountY = 1, amountYUsd = 100): PositionEvent => ({
+    id: `${signature}:0:add`,
+    signature,
+    type: "add",
+    at: at(iso),
+    amountX: 10,
+    amountY,
+    amountXUsd: 20,
+    amountYUsd,
+    totalUsd: 20 + amountYUsd,
+  });
+  const pools = transactionPools({ closedPools: [meta("a"), meta("b")], active: [] });
+
+  test("merges every position newest first, each priced from its own history", () => {
+    const rows = transactionRows(
+      [
+        {
+          position: "p1",
+          pool: "a",
+          openedAt: null,
+          closedAt: null,
+          events: [event("s1", "2026-10-01T00:00:00Z", 1, 100), event("s3", "2026-10-03T00:00:00Z", 0, 0)],
+        },
+        {
+          position: "p2",
+          pool: "b",
+          openedAt: null,
+          closedAt: null,
+          events: [event("s2", "2026-10-02T00:00:00Z", 1, 200)],
+        },
+      ],
+      pools,
+      150,
+    );
+    expect(rows.map((r) => [r.signature, r.pool.address])).toEqual([
+      ["s3", "a"],
+      ["s2", "b"],
+      ["s1", "a"],
+    ]);
+    // s3 has no SOL side, so it carries p1's SOL price forward, not p2's later one.
+    expect(rows[0]?.total.sol).toBeCloseTo(20 / 100);
+  });
+
+  test("one signature touching two positions yields two distinct ids", () => {
+    const shared = event("s1", "2026-10-01T00:00:00Z");
+    const rows = transactionRows(
+      [
+        { position: "p1", pool: "a", openedAt: null, closedAt: null, events: [shared] },
+        { position: "p2", pool: "b", openedAt: null, closedAt: null, events: [shared] },
+      ],
+      pools,
+      null,
+    );
+    expect(new Set(rows.map((r) => r.id)).size).toBe(2);
+  });
+
+  test("a history whose pool is unknown is skipped", () => {
+    const rows = transactionRows(
+      [
+        { position: "p1", pool: "gone", openedAt: null, closedAt: null, events: [event("s1", "2026-10-01T00:00:00Z")] },
+        { position: "p2", pool: "a", openedAt: null, closedAt: null, events: [event("s2", "2026-10-02T00:00:00Z")] },
+      ],
+      pools,
+      null,
+    );
+    expect(rows.map((r) => r.signature)).toEqual(["s2"]);
+  });
+
+  test("opening and closing a position become rows around its events", () => {
+    const rows = transactionRows(
+      [
+        {
+          position: "p1",
+          pool: "a",
+          openedAt: at("2026-10-01T00:00:00Z"),
+          closedAt: at("2026-10-02T00:00:00Z"),
+          events: [event("s1", "2026-10-01T00:00:00Z"), event("s2", "2026-10-02T00:00:00Z")],
+        },
+        { position: "p2", pool: "b", openedAt: at("2026-10-03T00:00:00Z"), closedAt: null, events: [] },
+      ],
+      pools,
+      null,
+    );
+    // Same-instant rows keep lifecycle order with the latest on top: close above the last event, add above open.
+    expect(rows.map((r) => [r.position, r.type, r.signature])).toEqual([
+      ["p2", "initialize", null],
+      ["p1", "close", null],
+      ["p1", "add", "s2"],
+      ["p1", "add", "s1"],
+      ["p1", "initialize", null],
+    ]);
+    expect(rows[1]?.total).toEqual({ usd: 0, sol: 0 });
+  });
+
+  test("an active pool's FDV wins over the same pool listed as closed", () => {
+    const live = { ...meta("a"), price: 1, activeBin: null, fdv: 2_000, tvl: null, positions: [] };
+    const merged = transactionPools({ closedPools: [meta("a")], active: [live] });
+    expect(merged.get("a")?.fdv).toBe(2_000);
+    expect(pools.get("a")?.fdv).toBeNull();
   });
 });
 

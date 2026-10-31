@@ -2,7 +2,10 @@ import {
   ArrowDownIcon,
   ArrowUpDownIcon,
   ArrowUpIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
   LayoutGridIcon,
   SearchIcon,
   TableIcon,
@@ -108,5 +111,90 @@ export function ViewToggle({ view, onChange }: { view: View; onChange: (view: Vi
         </button>
       ))}
     </>
+  );
+}
+
+function PageButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex size-6 items-center justify-center rounded-md text-muted-foreground enabled:hover:bg-muted enabled:hover:text-foreground disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
+
+const count = new Intl.NumberFormat("en-US");
+
+export function Pagination({
+  total,
+  page,
+  pages,
+  pageSize,
+  sizes,
+  onPage,
+  onPageSize,
+}: {
+  total: number;
+  page: number;
+  pages: number;
+  pageSize: number;
+  sizes: readonly number[];
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
+  const first = total === 0 ? 0 : page * pageSize + 1;
+  const last = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t bg-background px-3 py-2 text-xs">
+      <label className="flex items-center gap-2">
+        Rows per page
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSize(Number(e.target.value))}
+          className="h-7 rounded-md border bg-background px-2 outline-none focus-visible:border-ring"
+        >
+          {sizes.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex items-center gap-3">
+        <span className="tabular-nums">
+          {count.format(first)}-{count.format(last)} <span className="text-muted-foreground">of</span>{" "}
+          {count.format(total)}
+        </span>
+        <div className="flex items-center gap-1">
+          <PageButton label="First page" disabled={page === 0} onClick={() => onPage(0)}>
+            <ChevronsLeftIcon className="size-3.5" />
+          </PageButton>
+          <PageButton label="Previous page" disabled={page === 0} onClick={() => onPage(page - 1)}>
+            <ChevronLeftIcon className="size-3.5" />
+          </PageButton>
+          <PageButton label="Next page" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>
+            <ChevronRightIcon className="size-3.5" />
+          </PageButton>
+          <PageButton label="Last page" disabled={page >= pages - 1} onClick={() => onPage(pages - 1)}>
+            <ChevronsRightIcon className="size-3.5" />
+          </PageButton>
+        </div>
+      </div>
+    </div>
   );
 }

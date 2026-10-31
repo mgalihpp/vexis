@@ -8,6 +8,7 @@ import type {
   PoolMeta,
   Portfolio,
   PositionEvent,
+  PositionHistory,
   Token,
 } from "./portfolio";
 import { loadTokenInfo } from "./prices.server";
@@ -361,19 +362,60 @@ export const loadPortfolio = (wallet: string): Promise<Portfolio> =>
 
 const activities = new Map<string, { at: number; value: Promise<PositionEvent[]> }>();
 
+async function fetchActivity(position: string): Promise<PositionEvent[]> {
+  const r = await get(`/positions/${position}/historical`, History, { order_direction: "asc" });
+  return r.events.map((e) => ({
+    id: `${e.signature}:${e.ixIndex ?? 0}:${e.eventType}`,
+    signature: e.signature,
+    type: e.eventType,
+    at: ms(e.blockTime),
+    amountX: e.amountX,
+    amountY: e.amountY,
+    amountXUsd: e.amountXUsd,
+    amountYUsd: e.amountYUsd,
+    totalUsd: e.totalUsd,
+  }));
+}
+
 /** Every event on a position, oldest first. */
 export const loadActivity = (position: string): Promise<PositionEvent[]> =>
-  cached(activities, position, async () => {
-    const r = await get(`/positions/${position}/historical`, History, { order_direction: "asc" });
-    return r.events.map((e) => ({
-      id: `${e.signature}:${e.ixIndex ?? 0}:${e.eventType}`,
-      signature: e.signature,
-      type: e.eventType,
-      at: ms(e.blockTime),
-      amountX: e.amountX,
-      amountY: e.amountY,
-      amountXUsd: e.amountXUsd,
-      amountYUsd: e.amountYUsd,
-      totalUsd: e.totalUsd,
-    }));
+  cached(activities, position, () => fetchActivity(position));
+
+// A closed position's history is final, so it is kept for the life of the process.
+const closedActivities = new Map<string, Promise<PositionEvent[]>>();
+
+function loadClosedActivity(position: string): Promise<PositionEvent[]> {
+  const hit = closedActivities.get(position);
+  if (hit) return hit;
+  const value = fetchActivity(position);
+  value.catch(() => closedActivities.delete(position));
+  closedActivities.set(position, value);
+  return value;
+}
+
+const transactions = new Map<string, { at: number; value: Promise<PositionHistory[]> }>();
+
+/** Every position's history. Meteora has no wallet-wide endpoint, so this is one request per position. */
+export const loadTransactions = (wallet: string): Promise<PositionHistory[]> =>
+  cached(transactions, wallet, async () => {
+    const { closed, active } = await loadPortfolio(wallet);
+    const positions = [
+      ...closed.map((p) => ({
+        position: p.address,
+        pool: p.pool,
+        openedAt: p.openedAt,
+        closedAt: p.closedAt,
+        load: loadClosedActivity,
+      })),
+      ...active.flatMap((pool) =>
+        pool.positions.map((p) => ({
+          position: p.address,
+          pool: p.pool,
+          openedAt: p.openedAt,
+          closedAt: null,
+          load: loadActivity,
+        })),
+      ),
+    ];
+    return mapLimit(positions, CONCURRENCY, async ({ load, ...p }) => ({ ...p, events: await load(p.position) }));
   });

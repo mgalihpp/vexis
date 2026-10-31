@@ -4,7 +4,8 @@ import { SolIcon, UsdcIcon } from "@/components/icons";
 /** Switches every amount on the portfolio page between USD and SOL via the `currency` search param. */
 export function CurrencyToggle() {
   const { currency } = useSearch({ from: "/portfolio/$wallet" });
-  const navigate = useNavigate({ from: "/portfolio/$wallet" });
+  // No `from`: navigating from the layout route would land on the Overview tab instead of staying on this one.
+  const navigate = useNavigate();
   const sol = currency === "sol";
   return (
     <div className="flex items-center gap-0.75">
@@ -16,6 +17,7 @@ export function CurrencyToggle() {
         aria-label="Show amounts in SOL"
         onClick={() =>
           navigate({
+            to: ".",
             search: (prev) => ({ ...prev, currency: sol ? "usd" : "sol" }),
             replace: true,
             resetScroll: false,

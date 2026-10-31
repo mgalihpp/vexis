@@ -21,6 +21,7 @@ import { Route as BotsBotIdJournalRouteImport } from './routes/bots/$botId/journ
 import { Route as PortfolioWalletIndexRouteImport } from './routes/portfolio/$wallet/index'
 import { Route as PortfolioWalletActiveRouteImport } from './routes/portfolio/$wallet/active'
 import { Route as PortfolioWalletClosedRouteImport } from './routes/portfolio/$wallet/closed'
+import { Route as PortfolioWalletTransactionsRouteImport } from './routes/portfolio/$wallet/transactions'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +83,12 @@ const PortfolioWalletClosedRoute = PortfolioWalletClosedRouteImport.update({
   path: '/closed',
   getParentRoute: () => PortfolioWalletRoute,
 } as any)
+const PortfolioWalletTransactionsRoute =
+  PortfolioWalletTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
+    getParentRoute: () => PortfolioWalletRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
+  '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
   '/bots/$botId/': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet/': typeof PortfolioWalletIndexRoute
 }
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
   '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
+  '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
   '/bots/$botId': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet': typeof PortfolioWalletIndexRoute
 }
@@ -121,6 +130,7 @@ export interface FileRoutesById {
   '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
+  '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
   '/bots/$botId/': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet/': typeof PortfolioWalletIndexRoute
 }
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/closed'
+    | '/portfolio/$wallet/transactions'
     | '/bots/$botId/'
     | '/portfolio/$wallet/'
   fileRoutesByTo: FileRoutesByTo
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/closed'
+    | '/portfolio/$wallet/transactions'
     | '/bots/$botId'
     | '/portfolio/$wallet'
   id:
@@ -163,6 +175,7 @@ export interface FileRouteTypes {
     | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/closed'
+    | '/portfolio/$wallet/transactions'
     | '/bots/$botId/'
     | '/portfolio/$wallet/'
   fileRoutesById: FileRoutesById
@@ -263,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortfolioWalletClosedRouteImport
       parentRoute: typeof PortfolioWalletRoute
     }
+    '/portfolio/$wallet/transactions': {
+      id: '/portfolio/$wallet/transactions'
+      path: '/transactions'
+      fullPath: '/portfolio/$wallet/transactions'
+      preLoaderRoute: typeof PortfolioWalletTransactionsRouteImport
+      parentRoute: typeof PortfolioWalletRoute
+    }
   }
 }
 
@@ -283,12 +303,14 @@ const BotsBotIdRouteWithChildren = BotsBotIdRoute._addFileChildren(
 interface PortfolioWalletRouteChildren {
   PortfolioWalletActiveRoute: typeof PortfolioWalletActiveRoute
   PortfolioWalletClosedRoute: typeof PortfolioWalletClosedRoute
+  PortfolioWalletTransactionsRoute: typeof PortfolioWalletTransactionsRoute
   PortfolioWalletIndexRoute: typeof PortfolioWalletIndexRoute
 }
 
 const PortfolioWalletRouteChildren: PortfolioWalletRouteChildren = {
   PortfolioWalletActiveRoute: PortfolioWalletActiveRoute,
   PortfolioWalletClosedRoute: PortfolioWalletClosedRoute,
+  PortfolioWalletTransactionsRoute: PortfolioWalletTransactionsRoute,
   PortfolioWalletIndexRoute: PortfolioWalletIndexRoute,
 }
 
