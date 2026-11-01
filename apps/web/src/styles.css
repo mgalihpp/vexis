@@ -110,6 +110,7 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.45rem;
+  --texture-ink: 0.35;
   /* Light theme: a deeper lime so brand text stays readable on white. */
   --brand: oklch(0.55 0.16 131);
   --brand-foreground: oklch(0.985 0 0);
@@ -128,6 +129,7 @@
 
 .dark {
   /* Sampled from public/logo.png */
+  --texture-ink: 1;
   --brand: #baf448;
   --brand-foreground: oklch(0.18 0 0);
   --background: oklch(0.141 0.005 285.823);
@@ -174,5 +176,6 @@
   --border: oklch(0.92 0.004 286.32);
   --profit: oklch(0.48 0.12 160);
   --loss: oklch(0.5 0.19 25);
+  --texture-ink: 0.35;
   color-scheme: light;
 }

@@ -9,7 +9,8 @@ import { CurrencyToggle } from "./currency-toggle";
 const BACKGROUNDS = [null, "#0f3b3a", "#2b1846", "#13233f", "#0f3a1c", "#3a2a0a", "#1c2433"] as const;
 
 // Textures draw in currentColor, so they read as light-on-dark or dark-on-light with the card.
-const ink = (pct: number) => `color-mix(in oklch, currentColor ${pct}%, transparent)`;
+// Dark ink on a light card is far more visible than light ink on a dark one, so --texture-ink scales it down.
+const ink = (pct: number) => `color-mix(in oklch, currentColor calc(${pct}% * var(--texture-ink)), transparent)`;
 
 const NOISE =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E\")";
@@ -210,7 +211,7 @@ export function ShareDialog({
                     type="button"
                     aria-label={t.id}
                     onClick={() => setTexture(t.id)}
-                    className={`relative size-4.75 overflow-hidden rounded border bg-card text-foreground ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
+                    className={`relative size-4.75 overflow-hidden rounded border bg-card text-foreground [--texture-ink:1] ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
                   >
                     <span className="absolute inset-0 opacity-80" style={t.style(`${t.size}px ${t.size}px`)} />
                   </button>
