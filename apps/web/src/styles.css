@@ -2,11 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import "@fontsource/chakra-petch/700.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-brand: "Chakra Petch", var(--font-sans);
 }
 
 @layer base {

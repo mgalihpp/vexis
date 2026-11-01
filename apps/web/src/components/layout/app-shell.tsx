@@ -83,7 +83,7 @@ function AppHeader() {
         <Link
           to="/portfolio"
           aria-label="Vexis"
-          className="flex items-center gap-1.5 text-[1.3rem] font-bold tracking-tight"
+          className="flex items-center gap-1.5 font-brand text-[1.3rem] font-bold"
         >
           <Logo height={22} />
           <span className="hidden md:inline">Vexis</span>
@@ -109,7 +109,7 @@ function MobileMenu() {
       </SheetTrigger>
       <SheetContent side="left" showCloseButton={false} className="w-64 max-w-[80vw]">
         <SheetHeader className="border-b">
-          <SheetTitle className="flex items-center gap-1.5 text-base font-bold">
+          <SheetTitle className="flex items-center gap-1.5 font-brand text-base font-bold">
             <Logo height={18} />
             Vexis
           </SheetTitle>

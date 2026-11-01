@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { StarIcon } from "lucide-react";
+import { ArrowRightIcon, StarIcon } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { WalletSearch } from "@/features/portfolio/components/wallet-bar";
 import { shortAddr } from "@/lib/format";
@@ -16,11 +16,21 @@ function PortfolioHome() {
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-3.25 pt-19.25 text-center">
       <Logo height={45} />
-      <h1 className="mt-4 text-xl font-semibold">DLMM portfolio</h1>
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        Paste a Solana wallet to see its Meteora DLMM positions, realized P&L, and daily performance.
-      </p>
-      <WalletSearch autoFocus className="mt-6.5 w-full" />
+      <h1 className="mt-4 text-xl font-semibold">How's your LP doing?</h1>
+      <p className="mt-1.5 text-xs text-muted-foreground">Drop a wallet address to find out.</p>
+      <WalletSearch
+        autoFocus
+        className="mt-6.5 w-full"
+        action={
+          <button
+            type="submit"
+            aria-label="Open wallet"
+            className="mr-0.75 flex size-5.5 shrink-0 items-center justify-center rounded-[0.3rem] text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-brand"
+          >
+            <ArrowRightIcon className="size-3.5" />
+          </button>
+        }
+      />
       {wallets.length > 0 && (
         <div className="mt-8 w-full text-left">
           <p className="mb-1.5 text-[0.625rem] text-muted-foreground">Favorites and recent</p>
