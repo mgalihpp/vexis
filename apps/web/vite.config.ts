@@ -12,5 +12,11 @@ const src = fileURLToPath(new URL("./src", import.meta.url));
 export default defineConfig({
   server: { port: 3000 },
   resolve: { alias: { "@": src } },
-  plugins: [tailwindcss(), tanstackStart(), nitro({ preset: process.env.NITRO_PRESET ?? "bun" }), viteReact()],
+  plugins: [
+    tailwindcss(),
+    tanstackStart(),
+    // analytics.server.ts loads the DLMM SDK through createRequire, which the bundler can't see, so trace it by name.
+    nitro({ preset: process.env.NITRO_PRESET ?? "bun", traceDeps: ["@meteora-ag/dlmm*", "@solana/web3.js*"] }),
+    viteReact(),
+  ],
 });
