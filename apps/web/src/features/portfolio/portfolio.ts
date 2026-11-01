@@ -112,6 +112,8 @@ export interface Portfolio {
   active: ActivePool[];
   /** Meteora's own all-time total, which can include positions outside the loaded window. */
   allTime: { closedPositions: number; sol: number; usd: number };
+  /** Closed pools whose positions are loaded (`loaded`) out of `total`; `running` while a fetch is in flight. */
+  closedProgress: { loaded: number; total: number; running: boolean };
 }
 
 export const DAY_MS = 86_400_000;

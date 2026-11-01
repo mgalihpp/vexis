@@ -1,4 +1,12 @@
 import { z } from "zod";
+import {
+  type ClosedPoolRef,
+  freshCount,
+  type PoolCache,
+  readPoolCache,
+  stalePools,
+  writePoolCache,
+} from "./closed-history.server";
 import type {
   ActiveAmounts,
   ActivePool,
@@ -178,34 +186,33 @@ const amounts = (p: PositionPnl, side: "sol" | "usd"): Amounts => ({
   pnl: side === "sol" ? p.pnlSol : p.pnlUsd,
 });
 
-async function fetchClosed(user: string): Promise<{ closed: ClosedPosition[]; closedPools: PoolMeta[] }> {
+interface ClosedPoolInfo extends ClosedPoolRef {
+  pair: string;
+}
+
+async function fetchPoolClosed(user: string, pool: ClosedPoolInfo): Promise<ClosedPosition[]> {
+  const positions = await poolPositions(pool.pool, user, "closed");
+  return positions.flatMap((p): ClosedPosition[] => {
+    const closedAt = toMs(p.closedAt);
+    if (!p.isClosed || closedAt === null) return [];
+    return [
+      {
+        address: p.positionAddress,
+        pool: pool.pool,
+        pair: pool.pair,
+        openedAt: toMs(p.createdAt) ?? closedAt,
+        closedAt,
+        sol: amounts(p, "sol"),
+        usd: amounts(p, "usd"),
+      },
+    ];
+  });
+}
+
+async function fetchClosedPools(user: string): Promise<{ pools: ClosedPoolInfo[]; closedPools: PoolMeta[] }> {
   const pools = await allPages(async (page) => {
     const r = await get("/portfolio", ClosedPage, { user, page, page_size: 1000, days_back: 365 });
     return { hasNext: r.hasNext, items: r.pools };
-  });
-  const perPool = await mapLimit(pools, CONCURRENCY, async (pool) => {
-    // Closed positions never change, so a pool is refetched only when it has a newer close.
-    const key = `${user}:${pool.poolAddress}`;
-    const hit = closedByPool.get(key);
-    if (hit && hit.lastClosedAt === pool.lastClosedAt) return hit.positions;
-    const positions = await poolPositions(pool.poolAddress, user, "closed");
-    const mapped = positions.flatMap((p): ClosedPosition[] => {
-      const closedAt = toMs(p.closedAt);
-      if (!p.isClosed || closedAt === null) return [];
-      return [
-        {
-          address: p.positionAddress,
-          pool: pool.poolAddress,
-          pair: `${pool.tokenX}-${pool.tokenY}`,
-          openedAt: toMs(p.createdAt) ?? closedAt,
-          closedAt,
-          sol: amounts(p, "sol"),
-          usd: amounts(p, "usd"),
-        },
-      ];
-    });
-    closedByPool.set(key, { lastClosedAt: pool.lastClosedAt, positions: mapped });
-    return mapped;
   });
   const token = (symbol: string, mint: string, icon: string | null | undefined): Token => ({
     symbol,
@@ -217,7 +224,11 @@ async function fetchClosed(user: string): Promise<{ closed: ClosedPosition[]; cl
     risks: null,
   });
   return {
-    closed: perPool.flat().sort((a, b) => a.closedAt - b.closedAt),
+    pools: pools.map((p) => ({
+      pool: p.poolAddress,
+      pair: `${p.tokenX}-${p.tokenY}`,
+      lastClosedAt: p.lastClosedAt ?? null,
+    })),
     closedPools: pools.map((p) => ({
       address: p.poolAddress,
       pair: `${p.tokenX}-${p.tokenY}`,
@@ -230,8 +241,6 @@ async function fetchClosed(user: string): Promise<{ closed: ClosedPosition[]; cl
     })),
   };
 }
-
-const closedByPool = new Map<string, { lastClosedAt: number | null | undefined; positions: ClosedPosition[] }>();
 
 const activeAmounts = (p: PositionPnl, side: "sol" | "usd"): ActiveAmounts => {
   const u = p.unrealizedPnl;
@@ -336,29 +345,108 @@ function cached<T>(store: Map<string, { at: number; value: Promise<T> }>, key: s
   return value;
 }
 
-const portfolios = new Map<string, { at: number; value: Promise<Portfolio> }>();
+/** Everything on the page except the closed positions themselves. */
+type BaseSnapshot = Omit<Portfolio, "closed" | "closedProgress"> & { pools: ClosedPoolInfo[] };
 
-export const loadPortfolio = (wallet: string): Promise<Portfolio> =>
-  cached(portfolios, wallet, () =>
-    Promise.all([fetchClosed(wallet), fetchActive(wallet), get("/portfolio/total", AllTime, { user: wallet })]).then(
-      async ([{ closed, closedPools }, { active, solPrice }, allTime]) => {
-        await addTokenInfo([...closedPools, ...active]);
-        return {
-          wallet,
-          fetchedAt: Date.now(),
-          solPrice,
-          closed,
-          closedPools,
-          active,
-          allTime: {
-            closedPositions: allTime.totalClosedPositions,
-            sol: allTime.totalPnlSol,
-            usd: allTime.totalPnlUsd,
-          },
-        };
-      },
-    ),
+const bases = new Map<string, { at: number; value: Promise<BaseSnapshot> }>();
+
+const fetchBase = (wallet: string): Promise<BaseSnapshot> =>
+  Promise.all([fetchClosedPools(wallet), fetchActive(wallet), get("/portfolio/total", AllTime, { user: wallet })]).then(
+    async ([{ pools, closedPools }, { active, solPrice }, allTime]) => {
+      await addTokenInfo([...closedPools, ...active]);
+      return {
+        wallet,
+        fetchedAt: Date.now(),
+        solPrice,
+        pools,
+        closedPools,
+        active,
+        allTime: {
+          closedPositions: allTime.totalClosedPositions,
+          sol: allTime.totalPnlSol,
+          usd: allTime.totalPnlUsd,
+        },
+      };
+    },
   );
+
+function loadBase(wallet: string): Promise<BaseSnapshot> {
+  const hit = bases.get(wallet);
+  // A refresh mid-job would queue behind the job on the shared rate-limit budget.
+  if (hit && closedJobs.has(wallet)) return hit.value;
+  return cached(bases, wallet, () => fetchBase(wallet));
+}
+
+const CACHE_DIR = process.env.VEXIS_CACHE_DIR ?? "../../.state/portfolio-cache";
+const SAVE_EVERY = 50;
+const poolCaches = new Map<string, Promise<PoolCache>>();
+const closedJobs = new Map<string, Promise<void>>();
+// One job per base snapshot, so pools that failed wait for the next refresh instead of retrying on every poll.
+const jobStarted = new WeakSet<BaseSnapshot>();
+
+function loadPoolCache(wallet: string): Promise<PoolCache> {
+  let cache = poolCaches.get(wallet);
+  if (!cache) {
+    cache = readPoolCache(CACHE_DIR, wallet);
+    poolCaches.set(wallet, cache);
+  }
+  return cache;
+}
+
+/** Fetches the wallet's stale pools in the background; returns the job already running, if any. */
+function startClosedJob(base: BaseSnapshot, cache: PoolCache): Promise<void> {
+  const { wallet } = base;
+  const running = closedJobs.get(wallet);
+  if (running) return running;
+  if (jobStarted.has(base)) return Promise.resolve();
+  jobStarted.add(base);
+  const stale = stalePools(base.pools, cache);
+  if (stale.length === 0) return Promise.resolve();
+  let saving = Promise.resolve();
+  const save = () => {
+    saving = saving
+      .then(() => writePoolCache(CACHE_DIR, wallet, cache))
+      .catch((err) => console.error(`portfolio cache write failed for ${wallet}`, err));
+    return saving;
+  };
+  let done = 0;
+  const job = mapLimit(stale, CONCURRENCY, async (pool) => {
+    try {
+      cache.set(pool.pool, { lastClosedAt: pool.lastClosedAt, positions: await fetchPoolClosed(wallet, pool) });
+      if (++done % SAVE_EVERY === 0) void save();
+    } catch (err) {
+      console.error(`closed positions failed for pool ${pool.pool}`, err);
+    }
+  })
+    .then(save)
+    .finally(() => closedJobs.delete(wallet));
+  closedJobs.set(wallet, job);
+  return job;
+}
+
+async function snapshot(wallet: string) {
+  const [base, cache] = await Promise.all([loadBase(wallet), loadPoolCache(wallet)]);
+  const job = startClosedJob(base, cache);
+  return { base, cache, job };
+}
+
+function compose({ pools, ...base }: BaseSnapshot, cache: PoolCache): Portfolio {
+  return {
+    ...base,
+    closed: pools.flatMap((p) => cache.get(p.pool)?.positions ?? []).sort((a, b) => a.closedAt - b.closedAt),
+    closedProgress: {
+      loaded: freshCount(pools, cache),
+      total: pools.length,
+      running: closedJobs.has(base.wallet),
+    },
+  };
+}
+
+/** Returns once the base snapshot is ready, with whatever closed positions are cached so far. */
+export async function loadPortfolio(wallet: string): Promise<Portfolio> {
+  const { base, cache } = await snapshot(wallet);
+  return compose(base, cache);
+}
 
 const activities = new Map<string, { at: number; value: Promise<PositionEvent[]> }>();
 
@@ -398,7 +486,9 @@ const transactions = new Map<string, { at: number; value: Promise<PositionHistor
 /** Every position's history. Meteora has no wallet-wide endpoint, so this is one request per position. */
 export const loadTransactions = (wallet: string): Promise<PositionHistory[]> =>
   cached(transactions, wallet, async () => {
-    const { closed, active } = await loadPortfolio(wallet);
+    const { base, cache, job } = await snapshot(wallet);
+    await job;
+    const { closed, active } = compose(base, cache);
     const positions = [
       ...closed.map((p) => ({
         position: p.address,
