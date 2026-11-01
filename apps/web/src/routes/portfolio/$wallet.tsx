@@ -1,4 +1,12 @@
-import { createFileRoute, Link, notFound, Outlet, stripSearchParams, useMatchRoute } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  notFound,
+  Outlet,
+  stripSearchParams,
+  useMatchRoute,
+  useRouter,
+} from "@tanstack/react-router";
 import { useEffect } from "react";
 import { z } from "zod";
 import { CurrencyToggle } from "@/features/portfolio/components/currency-toggle";
@@ -44,6 +52,10 @@ const TABS = [
   { to: "/portfolio/$wallet/balances", label: "Balances", exact: false },
 ] as const;
 
+const CLOSED_POLL_MS = 2000;
+
+const noticeClass = "mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80";
+
 const tabClass =
   "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5";
 
@@ -61,6 +73,13 @@ function PortfolioLayout() {
   const onBalances = Boolean(matchRoute({ to: "/portfolio/$wallet/balances", params: { wallet } }));
   const ownToolbar = onActive || onClosed || onTransactions || onBalances;
   const pagedTable = onClosed || onTransactions;
+  const { loaded, total, running } = portfolio.closedProgress;
+  const router = useRouter();
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => router.invalidate(), CLOSED_POLL_MS);
+    return () => clearInterval(id);
+  }, [running, router]);
 
   return (
     <div className="flex h-full flex-col">
@@ -91,8 +110,20 @@ function PortfolioLayout() {
           </div>
         )}
         <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
-          {!onActive && !onBalances && portfolio.closed.length < portfolio.allTime.closedPositions && (
-            <p className="mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
+          {running ? (
+            <p className={noticeClass}>
+              Loading closed positions: {loaded} of {total} pools. Totals are partial until this finishes.
+            </p>
+          ) : (
+            loaded < total && (
+              <p className={noticeClass}>
+                {total - loaded} {total - loaded === 1 ? "pool" : "pools"} failed to load and will retry on the next
+                refresh.
+              </p>
+            )
+          )}
+          {!running && !onActive && !onBalances && portfolio.closed.length < portfolio.allTime.closedPositions && (
+            <p className={noticeClass}>
               Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora
               reports for this wallet. Its portfolio API only lists pools with a position closed in the last 365 days.
             </p>
