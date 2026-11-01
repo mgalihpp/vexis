@@ -103,7 +103,7 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
         {share?.kind === "month" && (
           <>
             <div className="mt-3.25 mb-3.25 flex items-end justify-between">
-              <h3 className="text-2xl font-extrabold uppercase">{monthName(view.year, view.month)}</h3>
+              <h3 className="text-3xl font-bold uppercase">{monthName(view.year, view.month)}</h3>
               <MonthStats cal={cal} currency={currency} />
             </div>
             <CalendarGrid cal={cal} currency={currency} today={dayStart(now)} compact />
@@ -170,9 +170,9 @@ function CalendarGrid({
   onShareDay?: (bucket: Bucket) => void;
   onShareWeek?: (week: CalendarWeek, n: number) => void;
 }) {
-  const cellH = compact ? "h-[3.2rem]" : "h-[4.35rem]";
-  const big = compact ? "text-[0.55rem]" : "text-[0.85rem]";
-  const small = compact ? "text-[0.4rem]" : "text-[0.55rem]";
+  const cellH = compact ? "h-[3.6rem]" : "h-[4.35rem]";
+  const big = compact ? "text-[0.625rem]" : "text-[0.85rem]";
+  const small = compact ? "text-[0.5rem]" : "text-[0.55rem]";
   return (
     <div
       className={`grid ${compact ? "grid-cols-[repeat(7,1fr)_1.3fr]" : "min-w-[36rem] grid-cols-[repeat(7,1fr)_6.875rem]"}`}
@@ -180,12 +180,12 @@ function CalendarGrid({
       {WEEKDAYS.map((d) => (
         <div
           key={d}
-          className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.5rem]" : "text-[0.65rem]"}`}
+          className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.625rem]" : "text-[0.65rem]"}`}
         >
           {d}
         </div>
       ))}
-      <div className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.5rem]" : "text-[0.65rem]"}`}>
+      <div className={`pb-1.5 text-center text-muted-foreground ${compact ? "text-[0.625rem]" : "text-[0.65rem]"}`}>
         {compact ? "Week" : ""}
       </div>
 
@@ -203,7 +203,7 @@ function CalendarGrid({
                 }`}
               >
                 <span
-                  className={`absolute top-1.25 right-1.5 text-muted-foreground ${compact ? "text-[0.4rem]" : "text-[0.625rem]"}`}
+                  className={`absolute top-1.25 right-1.5 text-muted-foreground ${compact ? "text-[0.625rem]" : "text-[0.625rem]"}`}
                 >
                   {cell.day}
                 </span>
@@ -231,7 +231,7 @@ function CalendarGrid({
             data-share-item
           >
             <span
-              className={`flex items-center gap-1.25 ${compact ? "text-[0.5rem] font-semibold" : "text-[0.65rem]"}`}
+              className={`flex items-center gap-1.25 ${compact ? "text-[0.625rem] font-semibold" : "text-[0.65rem]"}`}
             >
               Week {wi + 1}
               {onShareWeek && week.activeDays > 0 && (
@@ -243,7 +243,7 @@ function CalendarGrid({
             >
               {money(week.total, currency, { digits: 2 })}
             </span>
-            <span className={`mt-0.5 text-muted-foreground ${compact ? "text-[0.4rem]" : "text-[0.55rem]"}`}>
+            <span className={`mt-0.5 text-muted-foreground ${compact ? "text-[0.5625rem]" : "text-[0.55rem]"}`}>
               {week.activeDays} day{week.activeDays === 1 ? "" : "s"}
             </span>
           </div>

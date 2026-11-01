@@ -160,11 +160,11 @@ export function ShareDialog({
                 <div className="pointer-events-none absolute inset-0" style={layer} />
                 <div className="relative">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.25 text-xs font-bold">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
                       <Logo height={14} />
                       Vexis
                     </span>
-                    <span className="text-[0.625rem] text-muted-foreground">DLMM portfolio</span>
+                    <span className="text-xs text-muted-foreground">DLMM portfolio</span>
                   </div>
                   {children}
                   <p className="mt-2.5 text-right text-[0.625rem] text-muted-foreground">
