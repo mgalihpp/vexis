@@ -1,16 +1,32 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { MonitorIcon, MoonIcon, StarIcon, SunIcon, XIcon } from "lucide-react";
+import { MenuIcon, MonitorIcon, MoonIcon, StarIcon, SunIcon, XIcon } from "lucide-react";
 import { type ReactNode, useEffect } from "react";
 import { BtcIcon, Logo, SolIcon } from "@/components/icons";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { type Theme, useTheme } from "@/features/theme/theme";
 import { shortAddr } from "@/lib/format";
+import { usePools } from "@/stores/pools";
 import { useWallets } from "@/stores/wallets";
 
 // Official icons as listed in Jupiter's token registry (MET and JUP).
 const DATA_SOURCES = [
   { name: "Meteora", href: "https://www.meteora.ag", icon: "https://assets.meteora.ag/met-token.svg" },
   { name: "Jupiter", href: "https://jup.ag", icon: "https://static.jup.ag/jup/icon.png" },
+];
+
+const MOBILE_LINKS: { to: "/portfolio" | "/analytics"; label: string; badge?: string }[] = [
+  { to: "/portfolio", label: "Portfolio", badge: "BETA" },
+  { to: "/analytics", label: "Analytics" },
 ];
 
 const THEMES: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
@@ -30,6 +46,7 @@ interface Prices {
 export function AppShell({ prices, children }: { prices: Prices; children: ReactNode }) {
   useEffect(() => {
     useWallets.persist.rehydrate();
+    usePools.persist.rehydrate();
   }, []);
 
   return (
@@ -61,12 +78,17 @@ function NavItem({ to, children, badge }: { to: "/portfolio" | "/analytics"; chi
 function AppHeader() {
   return (
     <header className="shrink-0 border-b">
-      <div className="flex h-[3rem] items-center gap-8 px-2">
-        <Link to="/portfolio" className="flex items-center gap-1.5 text-[1.3rem] font-bold tracking-tight">
+      <div className="flex h-[3rem] items-center gap-2 px-2 md:gap-8">
+        <MobileMenu />
+        <Link
+          to="/portfolio"
+          aria-label="Vexis"
+          className="flex items-center gap-1.5 text-[1.3rem] font-bold tracking-tight"
+        >
           <Logo height={22} />
-          Vexis
+          <span className="hidden md:inline">Vexis</span>
         </Link>
-        <nav className="flex items-center gap-9.5">
+        <nav className="hidden items-center gap-9.5 md:flex">
           <NavItem to="/portfolio" badge="BETA">
             Portfolio
           </NavItem>
@@ -77,39 +99,103 @@ function AppHeader() {
   );
 }
 
+function MobileMenu() {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Open menu" className="md:hidden">
+          <MenuIcon />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" showCloseButton={false} className="w-64 max-w-[80vw]">
+        <SheetHeader className="border-b">
+          <SheetTitle className="flex items-center gap-1.5 text-base font-bold">
+            <Logo height={18} />
+            Vexis
+          </SheetTitle>
+          <SheetDescription className="sr-only">Navigation</SheetDescription>
+        </SheetHeader>
+        <nav className="flex flex-col px-2">
+          {MOBILE_LINKS.map(({ to, label, badge }) => (
+            <SheetClose key={to} asChild>
+              <Link
+                to={to}
+                className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted data-[status=active]:text-brand"
+              >
+                {label}
+                {badge && (
+                  <span className="rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            </SheetClose>
+          ))}
+        </nav>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function FavoritesBar() {
   const favorites = useWallets((s) => s.favorites);
   const toggleFavorite = useWallets((s) => s.toggleFavorite);
+  const pools = usePools((s) => s.favorites);
+  const togglePool = usePools((s) => s.toggleFavorite);
   const navigate = useNavigate();
 
   return (
     <div className="flex h-8 shrink-0 items-center gap-2.5 overflow-x-auto border-b px-2 text-xs">
       <StarIcon className="size-3.25 shrink-0 fill-foreground text-foreground" />
-      {favorites.length === 0 ? (
-        <span className="text-muted-foreground">Add wallets to your favorites</span>
+      {favorites.length === 0 && pools.length === 0 ? (
+        <span className="text-muted-foreground">Add wallets or pools to your favorites</span>
       ) : (
-        favorites.map((wallet) => (
-          <span
-            key={wallet}
-            className="inline-flex shrink-0 items-center gap-0.75 rounded-md bg-card px-1.5 py-0.5 text-xs"
-          >
-            <button
-              type="button"
-              className="hover:text-brand"
-              onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet } })}
+        <>
+          {pools.map((pool) => (
+            <span
+              key={pool.address}
+              className="inline-flex shrink-0 items-center gap-0.75 rounded-md bg-card px-1.5 py-0.5 text-xs"
             >
-              {shortAddr(wallet)}
-            </button>
-            <button
-              type="button"
-              aria-label="Remove from favorites"
-              className="text-muted-foreground hover:text-foreground"
-              onClick={() => toggleFavorite(wallet)}
+              <button
+                type="button"
+                className="hover:text-brand"
+                onClick={() => navigate({ to: "/analytics", search: { pool: pool.address } })}
+              >
+                {pool.name} {pool.binStep}
+              </button>
+              <button
+                type="button"
+                aria-label="Remove pool from favorites"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => togglePool(pool)}
+              >
+                <XIcon className="size-2.5" />
+              </button>
+            </span>
+          ))}
+          {favorites.map((wallet) => (
+            <span
+              key={wallet}
+              className="inline-flex shrink-0 items-center gap-0.75 rounded-md bg-card px-1.5 py-0.5 text-xs"
             >
-              <XIcon className="size-2.5" />
-            </button>
-          </span>
-        ))
+              <button
+                type="button"
+                className="hover:text-brand"
+                onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet } })}
+              >
+                {shortAddr(wallet)}
+              </button>
+              <button
+                type="button"
+                aria-label="Remove from favorites"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => toggleFavorite(wallet)}
+              >
+                <XIcon className="size-2.5" />
+              </button>
+            </span>
+          ))}
+        </>
       )}
     </div>
   );

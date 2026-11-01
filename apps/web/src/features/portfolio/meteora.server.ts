@@ -139,7 +139,7 @@ const budget = { remaining: Number.POSITIVE_INFINITY, resetAt: 0 };
 const MAX_ATTEMPTS = 6;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function get<T>(path: string, schema: z.ZodType<T>, params: Record<string, string | number>): Promise<T> {
+export async function get<T>(path: string, schema: z.ZodType<T>, params: Record<string, string | number>): Promise<T> {
   const url = new URL(path, API);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   for (let attempt = 1; ; attempt++) {
