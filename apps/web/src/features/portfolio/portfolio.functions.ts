@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { loadBalances } from "./balances.server";
 import { loadActivity, loadPortfolio, loadTransactions } from "./meteora.server";
 import { loadPrices } from "./prices.server";
 
@@ -16,5 +17,9 @@ export const getPositionActivity = createServerFn({ method: "GET" })
 export const getTransactions = createServerFn({ method: "GET" })
   .validator(z.object({ wallet: WalletAddress }))
   .handler(({ data }) => loadTransactions(data.wallet));
+
+export const getBalances = createServerFn({ method: "GET" })
+  .validator(z.object({ wallet: WalletAddress }))
+  .handler(({ data }) => loadBalances(data.wallet));
 
 export const getPrices = createServerFn({ method: "GET" }).handler(() => loadPrices());
