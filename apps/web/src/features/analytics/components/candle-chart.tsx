@@ -61,7 +61,6 @@ export function CandleChart({
   tf,
   price,
   prefix,
-  unit,
   metric,
   onNeedOlder,
   loadingOlder,
@@ -71,7 +70,6 @@ export function CandleChart({
   /** Current pool price in the chart's currency. */
   price: number;
   prefix: string;
-  unit: string;
   metric: "volume" | "fees";
   onNeedOlder?: () => void;
   loadingOlder?: boolean;
@@ -220,7 +218,7 @@ export function CandleChart({
           viewBox={`0 0 ${W + AXIS} ${TOTAL_H}`}
           className={`absolute inset-0 h-full w-full touch-none select-none ${dragging ? "cursor-grabbing" : "cursor-crosshair"}`}
           role="img"
-          aria-label={`Candlestick chart, ${unit}`}
+          aria-label="Price chart"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
             drag.current = { x: toSvg(e).x, offset: off };
@@ -244,7 +242,6 @@ export function CandleChart({
           }}
           onPointerLeave={() => setCursor(null)}
         >
-          <title>{`Candlestick chart, ${unit}`}</title>
           {ticks(lo, hi, Math.max(3, Math.round(PRICE_H / 80))).map((t) => (
             <g key={t}>
               <line x1={0} x2={W} y1={y(t)} y2={y(t)} className="stroke-border" strokeWidth={1} />

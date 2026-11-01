@@ -59,16 +59,17 @@ export interface BinView {
   y: number;
 }
 
-export interface DistributionBucket {
-  from: number;
-  to: number;
+export interface DistributionBar {
+  id: number;
+  price: number;
   xUsd: number;
   yUsd: number;
+  active: boolean;
 }
 
 /**
- * Liquidity per price range, in USD, for the bins within `reach` of the active bin. Bins are grouped by count,
- * so every bar covers the same number of bins. Bins below the active price hold token Y, bins above hold X.
+ * Liquidity in USD of each bin within `reach` of the active bin, one bar per bin in price order. Bins below the
+ * active price hold token Y, bins above hold X, and the active bin holds both.
  */
 export function binDistribution(
   bins: BinView[],
@@ -76,22 +77,11 @@ export function binDistribution(
   reach: number,
   xUsd: number,
   yUsd: number,
-  buckets = 11,
-): DistributionBucket[] {
-  const near = bins.filter((b) => Math.abs(b.id - activeId) <= reach).sort((a, b) => a.id - b.id);
-  if (near.length === 0) return [];
-  const size = Math.ceil(near.length / buckets);
-  const out: DistributionBucket[] = [];
-  for (let i = 0; i < near.length; i += size) {
-    const group = near.slice(i, i + size);
-    out.push({
-      from: (group[0] as BinView).price,
-      to: (group[group.length - 1] as BinView).price,
-      xUsd: group.reduce((a, b) => a + b.x * xUsd, 0),
-      yUsd: group.reduce((a, b) => a + b.y * yUsd, 0),
-    });
-  }
-  return out;
+): DistributionBar[] {
+  return bins
+    .filter((b) => Math.abs(b.id - activeId) <= reach)
+    .sort((a, b) => a.id - b.id)
+    .map((b) => ({ id: b.id, price: b.price, xUsd: b.x * xUsd, yUsd: b.y * yUsd, active: b.id === activeId }));
 }
 
 /** `0` when the denominator is empty so a dead pool shows 0x, not Infinity. */

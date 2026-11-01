@@ -43,15 +43,19 @@ describe("binDistribution", () => {
     x: id > 0 ? 10 : 0,
     y: id < 0 ? 5 : 0,
   }));
-  test("prices each side in USD and groups bins by count", () => {
-    const d = binDistribution(bins, 0, 2, 2, 3, 5);
+  test("one bar per bin, each side priced in USD", () => {
+    const d = binDistribution(bins, 0, 2, 2, 3);
     expect(d).toHaveLength(5);
     expect(d[0]).toMatchObject({ yUsd: 15, xUsd: 0 });
     expect(d[4]).toMatchObject({ xUsd: 20, yUsd: 0 });
   });
-  test("reach drops the far bins", () => {
-    const d = binDistribution(bins, 0, 1, 1, 1, 11);
-    expect(d.map((b) => b.from)).toEqual([0.9, 1, 1.1]);
+  test("reach drops the far bins and the active bin is marked", () => {
+    const d = binDistribution(bins, 0, 1, 1, 1);
+    expect(d.map((b) => [b.price, b.active])).toEqual([
+      [0.9, false],
+      [1, true],
+      [1.1, false],
+    ]);
   });
   test("no bins, no distribution", () => {
     expect(binDistribution([], 0, 5, 1, 1)).toEqual([]);

@@ -284,30 +284,16 @@ export function PoolTokens({ pool }: { pool: PoolView }) {
   );
 }
 
-/** Horizontal share (0 to 1) of the bar row where `price` falls; bars are equal width, so it is placed inside its bucket. */
-function pricePosition(buckets: { from: number; to: number }[], price: number) {
-  const n = buckets.length;
-  if (n === 0) return null;
-  const i = buckets.findIndex((b) => price >= b.from && price <= b.to);
-  if (i >= 0) {
-    const b = buckets[i] as { from: number; to: number };
-    return (i + (b.to > b.from ? (price - b.from) / (b.to - b.from) : 0.5)) / n;
-  }
-  const gap = buckets.findIndex((b) => price < b.from);
-  if (gap > 0) return gap / n;
-  return null;
-}
-
 export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: ChainView | null }) {
   const [reach, setReach] = useState(20);
   const { tokenX: x, tokenY: y } = pool;
-  const buckets = chain ? binDistribution(chain.bins, chain.activeBinId, reach, x.price, y.price) : [];
-  const peak = Math.max(...buckets.map((b) => b.xUsd + b.yUsd), 1e-12);
-  const first = buckets[0];
-  const last = buckets[buckets.length - 1];
-  const labels = first && last ? [0, 1, 2, 3].map((i) => first.from + ((last.to - first.from) * i) / 3) : [];
+  const bars = chain ? binDistribution(chain.bins, chain.activeBinId, reach, x.price, y.price) : [];
+  const peak = Math.max(...bars.map((b) => b.xUsd + b.yUsd), 1e-12);
+  const first = bars[0];
+  const last = bars[bars.length - 1];
+  const labels = first && last ? [0, 1, 2, 3].map((i) => first.price + ((last.price - first.price) * i) / 3) : [];
   const zoom = "text-muted-foreground hover:text-foreground disabled:opacity-30";
-  const at = pricePosition(buckets, pool.price);
+  const at = bars.findIndex((b) => b.active) / Math.max(1, bars.length - 1);
   return (
     <Panel
       title="Liquidity Distribution"
@@ -344,37 +330,34 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
           {y.symbol}
         </span>
       </div>
-      {buckets.length === 0 ? (
+      {bars.length === 0 ? (
         <p className="py-10 text-center text-xs text-muted-foreground">Could not read the pool's bins.</p>
       ) : (
         <>
-          <div className="relative mt-9 flex h-28 items-end gap-1">
-            {at !== null && (
-              <div
-                className="pointer-events-none absolute -top-9 bottom-0 z-10 border-l-2 border-foreground"
-                style={{ left: `${at * 100}%` }}
-              >
-                <div
-                  className={`absolute top-0 flex flex-col items-center rounded-md bg-popover px-2.5 py-1 text-[11px] whitespace-nowrap shadow-md ring-1 ring-border ${
-                    at < 0.25 ? "left-0 items-start" : at > 0.75 ? "right-0 items-end" : "-translate-x-1/2"
-                  }`}
-                >
-                  <span className="text-muted-foreground">Pool Price</span>
-                  <span className="num font-semibold">
-                    {formatPrice(pool.price)} {y.symbol}/{x.symbol}
-                  </span>
-                </div>
-              </div>
-            )}
-            {buckets.map((b) => {
+          <div className="mt-9 flex h-28 items-end gap-0.5">
+            {bars.map((b) => {
               const total = b.xUsd + b.yUsd;
               return (
-                <Tooltip key={b.from}>
+                <Tooltip key={b.id}>
                   <TooltipTrigger asChild>
-                    <div className="flex h-full flex-1 flex-col justify-end">
+                    <div className="relative flex h-full flex-1 flex-col justify-end">
+                      {b.active && (
+                        <div className="pointer-events-none absolute -top-9 bottom-0 left-1/2 z-10 -translate-x-1/2 border-l-2 border-foreground">
+                          <div
+                            className={`absolute top-0 flex flex-col items-center rounded-md bg-popover px-2.5 py-1 text-[11px] whitespace-nowrap shadow-md ring-1 ring-border ${
+                              at < 0.25 ? "left-0 items-start" : at > 0.75 ? "right-0 items-end" : "-translate-x-1/2"
+                            }`}
+                          >
+                            <span className="text-muted-foreground">Pool Price</span>
+                            <span className="num font-semibold">
+                              {formatPrice(pool.price)} {y.symbol}/{x.symbol}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                       <div
                         className="flex flex-col overflow-hidden rounded-t-sm"
-                        style={{ height: `${Math.max(1, (total / peak) * 100)}%` }}
+                        style={{ height: `${Math.max(1, (total / peak) * 75)}%` }}
                       >
                         <div className="bg-brand" style={{ flex: b.xUsd }} />
                         <div style={{ flex: b.yUsd, background: "var(--sol)" }} />
@@ -383,7 +366,7 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
                   </TooltipTrigger>
                   <TooltipContent className="w-48 flex-col items-stretch gap-0 p-2.5 text-[11px]">
                     <div className="num text-muted-foreground">
-                      {formatPrice(b.from)} – {formatPrice(b.to)}
+                      Bin {b.id} · {formatPrice(b.price)}
                     </div>
                     <div className="num mt-0.5 text-sm font-semibold">{compactUsd(total)}</div>
                     <div className="mt-2 flex flex-col gap-1 border-t pt-2">

@@ -139,7 +139,6 @@ export function ChartPanel({
           onNeedOlder={onNeedOlder}
           loadingOlder={loadingOlder}
           prefix={currency === "usd" ? "$" : ""}
-          unit={currency === "usd" ? "USD" : quote}
         />
       </Panel>
       <button
