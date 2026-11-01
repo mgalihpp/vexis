@@ -5,7 +5,7 @@ import { shortAddr } from "@/lib/format";
 import { pct } from "../money";
 import type { PoolMeta, Token } from "../portfolio";
 
-export function TokenIcon({ token, className = "" }: { token: Token; className?: string }) {
+export function TokenIcon({ token, className = "" }: { token: Pick<Token, "symbol" | "icon">; className?: string }) {
   const [failed, setFailed] = useState(false);
   // An image that fails before hydration never reaches React's onError.
   const check = useCallback((img: HTMLImageElement | null) => {
@@ -74,15 +74,19 @@ export function PoolBadges({ pool }: { pool: PoolMeta }) {
   );
 }
 
+export function OrganicScore({ score }: { score: number }) {
+  return (
+    <Badge tone="green" title="Jupiter organic score (0-100)">
+      <LeafIcon className="size-3" />
+      {Math.round(score)}
+    </Badge>
+  );
+}
+
 function TokenScores({ token }: { token: Token }) {
   return (
     <>
-      {token.organicScore !== null && (
-        <Badge tone="green" title="Jupiter organic score (0-100)">
-          <LeafIcon className="size-3" />
-          {Math.round(token.organicScore)}
-        </Badge>
-      )}
+      {token.organicScore !== null && <OrganicScore score={token.organicScore} />}
       {token.risks !== null && (
         <Tooltip>
           <TooltipTrigger

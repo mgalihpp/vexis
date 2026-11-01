@@ -41,6 +41,7 @@ const TABS = [
   { to: "/portfolio/$wallet/active", label: "Active Positions", exact: false },
   { to: "/portfolio/$wallet/closed", label: "Closed Positions", exact: false },
   { to: "/portfolio/$wallet/transactions", label: "Transactions", exact: false },
+  { to: "/portfolio/$wallet/balances", label: "Balances", exact: false },
 ] as const;
 
 const tabClass =
@@ -57,7 +58,8 @@ function PortfolioLayout() {
   const onActive = Boolean(matchRoute({ to: "/portfolio/$wallet/active", params: { wallet } }));
   const onClosed = Boolean(matchRoute({ to: "/portfolio/$wallet/closed", params: { wallet } }));
   const onTransactions = Boolean(matchRoute({ to: "/portfolio/$wallet/transactions", params: { wallet } }));
-  const ownToolbar = onActive || onClosed || onTransactions;
+  const onBalances = Boolean(matchRoute({ to: "/portfolio/$wallet/balances", params: { wallet } }));
+  const ownToolbar = onActive || onClosed || onTransactions || onBalances;
   const pagedTable = onClosed || onTransactions;
 
   return (
@@ -77,9 +79,6 @@ function PortfolioLayout() {
             {tab.label}
           </Link>
         ))}
-        <span title="Coming soon" className={`${tabClass} cursor-not-allowed`}>
-          Balances
-        </span>
       </nav>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         {!ownToolbar && (
@@ -92,7 +91,7 @@ function PortfolioLayout() {
           </div>
         )}
         <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
-          {!onActive && portfolio.closed.length < portfolio.allTime.closedPositions && (
+          {!onActive && !onBalances && portfolio.closed.length < portfolio.allTime.closedPositions && (
             <p className="mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
               Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora
               reports for this wallet. Its portfolio API only lists pools with a position closed in the last 365 days.
