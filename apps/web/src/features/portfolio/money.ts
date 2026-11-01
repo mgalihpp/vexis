@@ -38,6 +38,11 @@ const largePrice = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
 /** Pool prices are often tiny (`0.000783`), so below 1 they keep three significant digits. */
 export const formatPrice = (value: number) => (value < 1 ? smallPrice : largePrice).format(value);
 
+const largeAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });
+
+/** Token amounts: `1,234.568` from 1 up, three significant digits below (`0.000543`). */
+export const formatAmount = (value: number) => (value < 1 ? smallPrice : largeAmount).format(value);
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** `21h 07m 57s`, or `2d 03h 04m` from a day up. */
