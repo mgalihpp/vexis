@@ -89,6 +89,22 @@ describe("balancesView", () => {
     expect(junkOnly.groups[1]?.rows).toHaveLength(1);
   });
 
+  test("merges native and wrapped SOL into one row", () => {
+    const sol = balancesView(
+      {
+        balances: [
+          { mint: SOL_MINT, amount: 1 },
+          { mint: SOL_MINT, amount: 0.5 },
+        ],
+        tokens: [token(SOL_MINT, { price: 200 })],
+      },
+      SOL_PRICE,
+    );
+    expect(sol.groups[0]?.rows).toHaveLength(1);
+    expect(sol.groups[0]?.rows[0]?.amount).toBe(1.5);
+    expect(sol.total).toEqual({ usd: 300, sol: 1.5 });
+  });
+
   test("an empty wallet has empty groups", () => {
     const empty = balancesView({ balances: [], tokens: [] }, SOL_PRICE);
     expect(empty.groups.map((g) => g.rows.length)).toEqual([0, 0]);

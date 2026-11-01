@@ -60,7 +60,8 @@ const GROUPS: { id: GroupId; label: string }[] = [
   { id: "other", label: "All Other Tokens" },
 ];
 
-function unknownToken(mint: string): BalanceToken {
+/** A mint Jupiter returned nothing for. */
+export function unknownToken(mint: string): BalanceToken {
   return {
     mint,
     symbol: mint.slice(0, 4),
@@ -86,13 +87,14 @@ function sumUsd(rows: BalanceRow[]) {
 /** Rows grouped verified first, each group sorted by value; unpriced rows sort last and stay out of totals. */
 export function balancesView(data: WalletBalances, solPrice: number | null): BalancesView {
   const tokens = new Map(data.tokens.map((t) => [t.mint, t]));
-  const rows = data.balances
-    .filter((b) => b.amount > 0)
-    .map((b): BalanceRow => {
-      const token = tokens.get(b.mint) ?? unknownToken(b.mint);
-      const usd = token.price === null ? null : b.amount * token.price;
-      return { token, amount: b.amount, value: { usd, sol: inSol(usd, solPrice) } };
-    });
+  // Native SOL and a wrapped SOL account share a mint; one row holds both.
+  const amounts = new Map<string, number>();
+  for (const b of data.balances) if (b.amount > 0) amounts.set(b.mint, (amounts.get(b.mint) ?? 0) + b.amount);
+  const rows = [...amounts].map(([mint, amount]): BalanceRow => {
+    const token = tokens.get(mint) ?? unknownToken(mint);
+    const usd = token.price === null ? null : amount * token.price;
+    return { token, amount, value: { usd, sol: inSol(usd, solPrice) } };
+  });
   const groups = GROUPS.map(({ id, label }): BalanceGroup => {
     const mine = rows.filter((r) => (r.token.verified ? "verified" : "other") === id).sort(byValue);
     const usd = sumUsd(mine);
