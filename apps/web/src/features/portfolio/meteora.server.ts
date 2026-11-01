@@ -16,10 +16,18 @@ import type {
   PoolMeta,
   Portfolio,
   PositionEvent,
-  PositionHistory,
   Token,
+  Transactions,
 } from "./portfolio";
 import { loadTokenInfo } from "./prices.server";
+import {
+  collectHistories,
+  type HistoryCache,
+  type HistoryRef,
+  historyQueue,
+  readHistoryCache,
+  writeHistoryCache,
+} from "./transaction-history.server";
 
 // Meteora DLMM data API. Schema: docs/meteora/dlmm-openapi.json
 const API = process.env.METEORA_DATAPI_URL ?? "https://dlmm.datapi.meteora.ag";
@@ -469,43 +477,107 @@ async function fetchActivity(position: string): Promise<PositionEvent[]> {
 export const loadActivity = (position: string): Promise<PositionEvent[]> =>
   cached(activities, position, () => fetchActivity(position));
 
-// A closed position's history is final, so it is kept for the life of the process.
-const closedActivities = new Map<string, Promise<PositionEvent[]>>();
+const HISTORY_SAVE_EVERY = 200;
+const HISTORY_IDLE_MS = 2000;
+const historyCaches = new Map<string, Promise<HistoryCache>>();
+const historyJobs = new Map<string, Promise<void>>();
+const historyStarted = new WeakSet<BaseSnapshot>();
+// Active positions keep changing, so their events stay in memory and every job refetches them.
+const activeHistories = new Map<string, Map<string, PositionEvent[]>>();
 
-function loadClosedActivity(position: string): Promise<PositionEvent[]> {
-  const hit = closedActivities.get(position);
-  if (hit) return hit;
-  const value = fetchActivity(position);
-  value.catch(() => closedActivities.delete(position));
-  closedActivities.set(position, value);
-  return value;
+function loadHistoryCache(wallet: string): Promise<HistoryCache> {
+  let cache = historyCaches.get(wallet);
+  if (!cache) {
+    cache = readHistoryCache(CACHE_DIR, wallet);
+    historyCaches.set(wallet, cache);
+  }
+  return cache;
 }
 
-const transactions = new Map<string, { at: number; value: Promise<PositionHistory[]> }>();
-
-/** Every position's history. Meteora has no wallet-wide endpoint, so this is one request per position. */
-export const loadTransactions = (wallet: string): Promise<PositionHistory[]> =>
-  cached(transactions, wallet, async () => {
-    const { base, cache, job } = await snapshot(wallet);
-    await job;
-    const { closed, active } = compose(base, cache);
-    const positions = [
-      ...closed.map((p) => ({
-        position: p.address,
-        pool: p.pool,
-        openedAt: p.openedAt,
-        closedAt: p.closedAt,
-        load: loadClosedActivity,
-      })),
-      ...active.flatMap((pool) =>
-        pool.positions.map((p) => ({
-          position: p.address,
-          pool: p.pool,
-          openedAt: p.openedAt,
-          closedAt: null,
-          load: loadActivity,
-        })),
+function historyRefs({ pools, active }: BaseSnapshot, cache: PoolCache) {
+  return {
+    active: active.flatMap((pool) =>
+      pool.positions.map(
+        (p): HistoryRef => ({ position: p.address, pool: p.pool, openedAt: p.openedAt, closedAt: null }),
       ),
-    ];
-    return mapLimit(positions, CONCURRENCY, async ({ load, ...p }) => ({ ...p, events: await load(p.position) }));
-  });
+    ),
+    closed: pools
+      .flatMap((p) => cache.get(p.pool)?.positions ?? [])
+      .map((p): HistoryRef => ({ position: p.address, pool: p.pool, openedAt: p.openedAt, closedAt: p.closedAt })),
+  };
+}
+
+/**
+ * Fetches position histories in the background, newest first. It keeps going while the closed job
+ * runs, picking up positions as that job discovers them; a failed position waits for the next job.
+ */
+function startHistoryJob(base: BaseSnapshot, pools: PoolCache, history: HistoryCache) {
+  const { wallet } = base;
+  if (historyJobs.has(wallet) || historyStarted.has(base)) return;
+  historyStarted.add(base);
+  const activeEvents = activeHistories.get(wallet) ?? new Map<string, PositionEvent[]>();
+  activeHistories.set(wallet, activeEvents);
+  let unsaved = 0;
+  let saving = Promise.resolve();
+  // Each save rewrites the whole file, so saving every 200 positions keeps a 2,600-position wallet to about 13 writes.
+  const save = () => {
+    unsaved = 0;
+    saving = saving
+      .then(() => writeHistoryCache(CACHE_DIR, wallet, history))
+      .catch((err) => console.error(`transaction history write failed for ${wallet}`, err));
+    return saving;
+  };
+  const tried = new Set<string>();
+  const fetchOne = async (ref: HistoryRef) => {
+    tried.add(ref.position);
+    try {
+      const events = await fetchActivity(ref.position);
+      if (ref.closedAt === null) activeEvents.set(ref.position, events);
+      else {
+        history.set(ref.position, events);
+        if (++unsaved >= HISTORY_SAVE_EVERY) void save();
+      }
+    } catch (err) {
+      console.error(`history failed for position ${ref.position}`, err);
+    }
+  };
+  const run = async () => {
+    for (;;) {
+      const refs = historyRefs(base, pools);
+      const queue = historyQueue(refs.active, refs.closed, history, tried);
+      if (queue.length > 0) {
+        await mapLimit(queue, CONCURRENCY, fetchOne);
+        continue;
+      }
+      const closedJob = closedJobs.get(wallet);
+      if (!closedJob) return;
+      await Promise.race([closedJob, sleep(HISTORY_IDLE_MS)]);
+    }
+  };
+  const job = run()
+    .catch((err) => console.error(`transaction history job failed for ${wallet}`, err))
+    .then(() => (unsaved > 0 ? save() : undefined))
+    .finally(() => historyJobs.delete(wallet));
+  historyJobs.set(wallet, job);
+}
+
+/**
+ * Returns at once with the histories fetched so far. Meteora has no wallet-wide endpoint, so a
+ * background job fetches one position at a time; closed pools the closed job has not reached yet
+ * are not counted in `total`.
+ */
+export async function loadTransactions(wallet: string): Promise<Transactions> {
+  const [{ base, cache }, history] = await Promise.all([snapshot(wallet), loadHistoryCache(wallet)]);
+  startHistoryJob(base, cache, history);
+  const refs = historyRefs(base, cache);
+  const { histories, total } = collectHistories(
+    refs.active,
+    refs.closed,
+    activeHistories.get(wallet) ?? new Map(),
+    history,
+  );
+  return {
+    histories,
+    progress: { loaded: histories.length, total, running: historyJobs.has(wallet) || closedJobs.has(wallet) },
+  };
+}

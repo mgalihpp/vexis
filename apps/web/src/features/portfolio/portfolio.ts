@@ -112,8 +112,15 @@ export interface Portfolio {
   active: ActivePool[];
   /** Meteora's own all-time total, which can include positions outside the loaded window. */
   allTime: { closedPositions: number; sol: number; usd: number };
-  /** Closed pools whose positions are loaded (`loaded`) out of `total`; `running` while a fetch is in flight. */
-  closedProgress: { loaded: number; total: number; running: boolean };
+  /** Closed pools whose positions are loaded. */
+  closedProgress: LoadProgress;
+}
+
+/** `loaded` of `total` items are in; `running` while a background fetch is in flight. */
+export interface LoadProgress {
+  loaded: number;
+  total: number;
+  running: boolean;
 }
 
 export const DAY_MS = 86_400_000;
@@ -598,6 +605,12 @@ export interface PositionHistory {
   /** Null while the position is open. */
   closedAt: number | null;
   events: PositionEvent[];
+}
+
+/** The histories fetched so far; `total` counts the positions known so far, which grows while closed pools load. */
+export interface Transactions {
+  histories: PositionHistory[];
+  progress: LoadProgress;
 }
 
 /** What a transaction row needs from its pool; a closed pool has no FDV. */
