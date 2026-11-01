@@ -16,7 +16,11 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart(),
     // analytics.server.ts loads the DLMM SDK through createRequire, which the bundler can't see, so trace it by name.
-    nitro({ preset: process.env.NITRO_PRESET ?? "bun", traceDeps: ["@meteora-ag/dlmm*", "@solana/web3.js*"] }),
+    nitro({
+      preset: process.env.NITRO_PRESET ?? "bun",
+      serverEntry: "./nitro.server.ts",
+      traceDeps: ["@meteora-ag/dlmm*", "@solana/web3.js*"],
+    }),
     viteReact(),
   ],
 });
