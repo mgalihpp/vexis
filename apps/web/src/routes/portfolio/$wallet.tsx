@@ -1,19 +1,13 @@
-import {
-  createFileRoute,
-  Link,
-  notFound,
-  Outlet,
-  stripSearchParams,
-  useMatchRoute,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, Outlet, stripSearchParams, useMatchRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { z } from "zod";
 import { CurrencyToggle } from "@/features/portfolio/components/currency-toggle";
+import { Notice } from "@/features/portfolio/components/notice";
 import { PairFilter, RangePicker } from "@/features/portfolio/components/range-picker";
 import { WalletBar } from "@/features/portfolio/components/wallet-bar";
 import { RANGE_PRESETS, type RangePreset } from "@/features/portfolio/portfolio";
 import { getPortfolio, WalletAddress } from "@/features/portfolio/portfolio.functions";
+import { usePollWhile } from "@/features/portfolio/use-poll-while";
 import { useWallets } from "@/stores/wallets";
 
 const RANGE_IDS = RANGE_PRESETS.map((p) => p.id) as [RangePreset, ...RangePreset[]];
@@ -52,10 +46,6 @@ const TABS = [
   { to: "/portfolio/$wallet/balances", label: "Balances", exact: false },
 ] as const;
 
-const CLOSED_POLL_MS = 2000;
-
-const noticeClass = "mb-2 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80";
-
 const tabClass =
   "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5";
 
@@ -74,12 +64,7 @@ function PortfolioLayout() {
   const ownToolbar = onActive || onClosed || onTransactions || onBalances;
   const pagedTable = onClosed || onTransactions;
   const { loaded, total, running } = portfolio.closedProgress;
-  const router = useRouter();
-  useEffect(() => {
-    if (!running) return;
-    const id = setInterval(() => router.invalidate(), CLOSED_POLL_MS);
-    return () => clearInterval(id);
-  }, [running, router]);
+  usePollWhile(running);
 
   return (
     <div className="flex h-full flex-col">
@@ -111,22 +96,22 @@ function PortfolioLayout() {
         )}
         <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
           {running ? (
-            <p className={noticeClass}>
+            <Notice>
               Loading closed positions: {loaded} of {total} pools. Totals are partial until this finishes.
-            </p>
+            </Notice>
           ) : (
             loaded < total && (
-              <p className={noticeClass}>
+              <Notice>
                 {total - loaded} {total - loaded === 1 ? "pool" : "pools"} failed to load and will retry on the next
                 refresh.
-              </p>
+              </Notice>
             )
           )}
           {!running && !onActive && !onBalances && portfolio.closed.length < portfolio.allTime.closedPositions && (
-            <p className={noticeClass}>
+            <Notice>
               Showing {portfolio.closed.length} of the {portfolio.allTime.closedPositions} closed positions Meteora
               reports for this wallet. Its portfolio API only lists pools with a position closed in the last 365 days.
-            </p>
+            </Notice>
           )}
           <Outlet />
         </div>

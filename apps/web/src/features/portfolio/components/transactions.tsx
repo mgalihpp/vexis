@@ -1,5 +1,4 @@
-import { Await } from "@tanstack/react-router";
-import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { solscanAccount, solscanTx } from "@/lib/format";
 import { utcStamp } from "../money";
@@ -8,36 +7,44 @@ import {
   type Portfolio,
   type PositionHistory,
   type TransactionPool,
+  type Transactions as TransactionsData,
   transactionPools,
   transactionRows,
 } from "../portfolio";
 import { CurrencyToggle } from "./currency-toggle";
+import { Notice } from "./notice";
 import { PoolBadges, SolscanLink, TokenIcon } from "./pool-identity";
 import { EventBadge, FdvChip, TokenLines, value } from "./position-activity";
 import { Pagination, PoolFilter } from "./table-controls";
-
-/** The loader settles to this instead of rejecting, so a failure shows inside the table. */
-export type TransactionsResult = { ok: true; histories: PositionHistory[] } | { ok: false; message: string };
 
 const PAGE_SIZES = [25, 50, 100];
 const COLUMNS = 6;
 
 export function Transactions({
-  result,
+  transactions: { histories, progress },
   portfolio,
   currency,
 }: {
-  result: Promise<TransactionsResult>;
+  transactions: TransactionsData;
   portfolio: Portfolio;
   currency: Currency;
 }) {
   const [query, setQuery] = useState("");
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0] ?? 25);
   const [page, setPage] = useState(0);
-  // The live refresh hands over a new promise every 15 s; keep the settled one on screen until it resolves.
-  const deferred = useDeferredValue(result);
+  const missing = progress.total - progress.loaded;
   return (
     <div className="flex flex-1 flex-col gap-2">
+      {progress.running && missing > 0 && (
+        <Notice>
+          Loading transaction history: {progress.loaded} of {progress.total} positions. Older rows appear as they load.
+        </Notice>
+      )}
+      {!progress.running && missing > 0 && (
+        <Notice>
+          {missing} {missing === 1 ? "position" : "positions"} failed to load and will retry on the next refresh.
+        </Notice>
+      )}
       <div className="flex min-w-0 items-center gap-2.5">
         <CurrencyToggle />
         <PoolFilter
@@ -49,33 +56,23 @@ export function Transactions({
         />
       </div>
       <div className="-mx-2 flex flex-1 flex-col">
-        <Await promise={deferred} fallback={<TransactionsSkeleton rows={pageSize} />}>
-          {(r) =>
-            r.ok ? (
-              <TransactionsTable
-                histories={r.histories}
-                portfolio={portfolio}
-                currency={currency}
-                query={query}
-                page={page}
-                pageSize={pageSize}
-                onPage={setPage}
-                onPageSize={(size) => {
-                  setPageSize(size);
-                  setPage(0);
-                }}
-              />
-            ) : (
-              <Frame>
-                <TableRow>
-                  <TableCell colSpan={COLUMNS} className="py-10 text-center text-loss">
-                    Could not load transactions: {r.message}
-                  </TableCell>
-                </TableRow>
-              </Frame>
-            )
-          }
-        </Await>
+        {histories.length === 0 && progress.running ? (
+          <TransactionsSkeleton rows={pageSize} />
+        ) : (
+          <TransactionsTable
+            histories={histories}
+            portfolio={portfolio}
+            currency={currency}
+            query={query}
+            page={page}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -197,22 +194,17 @@ const SKELETON_CELLS = ["w-3.5", "w-24", "w-32", "w-36", "w-60", "ml-auto w-14"]
 
 function TransactionsSkeleton({ rows }: { rows: number }) {
   return (
-    <>
-      <Frame>
-        {Array.from({ length: rows }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
-          <TableRow key={i} className="hover:bg-transparent">
-            {SKELETON_CELLS.map((width) => (
-              <TableCell key={width} className="last:pr-3">
-                <div className={`h-4 animate-pulse rounded bg-muted ${width}`} />
-              </TableCell>
-            ))}
-          </TableRow>
-        ))}
-      </Frame>
-      <p className="sticky bottom-0 border-t bg-background px-3 py-2.5 text-xs text-muted-foreground">
-        Loading every position's history from Meteora…
-      </p>
-    </>
+    <Frame>
+      {Array.from({ length: rows }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: placeholder rows have no identity
+        <TableRow key={i} className="hover:bg-transparent">
+          {SKELETON_CELLS.map((width) => (
+            <TableCell key={width} className="last:pr-3">
+              <div className={`h-4 animate-pulse rounded bg-muted ${width}`} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </Frame>
   );
 }
