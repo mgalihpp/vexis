@@ -11,6 +11,7 @@ import {
   ZoomOutIcon,
 } from "lucide-react";
 import { type PointerEvent, useRef, useState } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { TIP_CLASS } from "@/components/info-tip";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
@@ -230,11 +231,13 @@ export function PoolHeader({
   siblings,
   price,
   priceUnit,
+  usd,
 }: {
   pool: PoolView;
   siblings: SiblingPool[];
-  price: string;
+  price: number;
   priceUnit: string;
+  usd: boolean;
 }) {
   return (
     <Panel className="gap-3">
@@ -247,12 +250,15 @@ export function PoolHeader({
         <div>
           <Label>Current Pool Price</Label>
           <div className="num text-sm font-semibold">
-            {price} <span className="text-[11px] font-normal text-muted-foreground">{priceUnit}</span>
+            <AnimatedNumber value={price} format={(v) => `${usd ? "$" : ""}${formatPrice(v)}`} />{" "}
+            <span className="text-[11px] font-normal text-muted-foreground">{priceUnit}</span>
           </div>
         </div>
         <div>
           <Label>Total Value Locked</Label>
-          <div className="num text-sm font-semibold">{compactUsd(pool.tvl)}</div>
+          <div className="num text-sm font-semibold">
+            <AnimatedNumber value={pool.tvl} format={compactUsd} />
+          </div>
         </div>
       </div>
     </Panel>
@@ -266,7 +272,9 @@ function TokenRow({ token, share, color }: { token: PoolTokenView; share: number
         <TokenIcon token={token} className="size-4.5 text-[10px]" />
         <span className="text-[13px] font-semibold">{token.symbol}</span>
         <CopyAddress address={token.address} />
-        <span className="num ml-auto text-[13px] font-semibold">{formatAmount(token.amount)}</span>
+        <span className="num ml-auto text-[13px] font-semibold">
+          <AnimatedNumber value={token.amount} format={formatAmount} />
+        </span>
       </div>
       <div className="h-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full" style={{ width: `${share * 100}%`, background: color }} />
@@ -444,26 +452,27 @@ const signedUsd = (v: number) => `${v < 0 ? "-" : "+"}${compactUsd(Math.abs(v))}
 
 export function AdvancedMetrics({ pool, now }: { pool: PoolView; now: number }) {
   const s = pool.stats;
-  const n = (v: number | undefined, f: (v: number) => string) => (v === undefined ? NA : f(v));
+  const n = (v: number | undefined) => v ?? NA;
   return (
     <Panel title="Advanced Metrics" className="gap-2">
       <Row label="Pool Age" value={age(pool.createdAt, now)} />
-      <Row label="Volatility" value={n(s?.volatility, (v) => v.toFixed(2))} />
-      <Row label="Active TVL" value={n(s?.activeTvl, compactUsd)} />
-      <Row label="Fees / Active TVL" value={n(s?.feeActiveTvl, (v) => pct(v))} />
-      <Row label="Volume / Active TVL" value={n(s?.volumeActiveTvl, (v) => `${v.toFixed(2)}x`)} />
-      <Row label="Total LPs" value={n(s?.totalLps, compact)} />
-      <Row label="Unique LPs" value={n(s?.uniqueLps, compact)} />
-      <Row label="Positions Created" value={n(s?.positionsCreated, compact)} />
-      <Row label="Open Positions" value={n(s?.openPositions, compact)} />
-      <Row label="In Range Positions" value={n(s?.inRangePositions, compact)} />
-      <Row label="Avg Fees/Min" value={compactUsd(perMinute(pool.fees24h))} />
-      <Row label="Avg Vol/Min" value={compactUsd(perMinute(pool.volume24h))} />
-      <Row label="Traders" value={n(s?.traders, compact)} />
-      <Row label="Swaps" value={n(s?.swaps, compact)} />
+      <Row label="Volatility" value={n(s?.volatility)} format={(v) => v.toFixed(2)} />
+      <Row label="Active TVL" value={n(s?.activeTvl)} format={compactUsd} />
+      <Row label="Fees / Active TVL" value={n(s?.feeActiveTvl)} format={pct} />
+      <Row label="Volume / Active TVL" value={n(s?.volumeActiveTvl)} format={(v) => `${v.toFixed(2)}x`} />
+      <Row label="Total LPs" value={n(s?.totalLps)} format={compact} />
+      <Row label="Unique LPs" value={n(s?.uniqueLps)} format={compact} />
+      <Row label="Positions Created" value={n(s?.positionsCreated)} format={compact} />
+      <Row label="Open Positions" value={n(s?.openPositions)} format={compact} />
+      <Row label="In Range Positions" value={n(s?.inRangePositions)} format={compact} />
+      <Row label="Avg Fees/Min" value={perMinute(pool.fees24h)} format={compactUsd} />
+      <Row label="Avg Vol/Min" value={perMinute(pool.volume24h)} format={compactUsd} />
+      <Row label="Traders" value={n(s?.traders)} format={compact} />
+      <Row label="Swaps" value={n(s?.swaps)} format={compact} />
       <Row
         label="Net Deposits"
-        value={n(s?.netDeposits, signedUsd)}
+        value={n(s?.netDeposits)}
+        format={signedUsd}
         className={s ? (s.netDeposits >= 0 ? "text-profit" : "text-loss") : ""}
       />
     </Panel>

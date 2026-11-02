@@ -1,5 +1,6 @@
 import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { InfoTip } from "@/components/info-tip";
 import { money, pct, tone } from "../money";
 import type { Currency, Stats } from "../portfolio";
@@ -42,8 +43,12 @@ function Gauge({ good, bad }: { good: number; bad: number }) {
         {share < 1 && total > 0 && <path d={arc(share + gap, 1)} className="fill-none stroke-loss" strokeWidth="9" />}
       </svg>
       <div className="-mt-0.75 flex justify-between text-[0.625rem] tabular-nums">
-        <span className="text-profit">{good}</span>
-        <span className="text-loss">{bad}</span>
+        <span className="text-profit">
+          <AnimatedNumber value={good} />
+        </span>
+        <span className="text-loss">
+          <AnimatedNumber value={bad} />
+        </span>
       </div>
     </div>
   );
@@ -70,7 +75,8 @@ function Ring({ good, bad }: { good: number; bad: number }) {
 
 export function StatCards({ stats, currency }: { stats: Stats; currency: Currency }) {
   const winShare = stats.avgWin + stats.avgLoss ? stats.avgWin / (stats.avgWin + stats.avgLoss) : 0.5;
-  const fmtRatio = (v: number | null) => (v === null ? "∞" : v.toFixed(2));
+  const ratio = (value: number | null) =>
+    value === null ? "∞" : <AnimatedNumber value={value} format={(v) => v.toFixed(2)} />;
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-5">
       <Card>
@@ -78,10 +84,12 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
           <div className="flex items-center justify-between">
             <Label info="Realized profit and loss of every closed position in the selected range.">Net P&L</Label>
             <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] tabular-nums text-muted-foreground">
-              {stats.count}
+              <AnimatedNumber value={stats.count} />
             </span>
           </div>
-          <Big className={tone(stats.net)}>{money(stats.net, currency)}</Big>
+          <Big className={tone(stats.net)}>
+            <AnimatedNumber value={stats.net} format={(v) => money(v, currency)} />
+          </Big>
         </div>
       </Card>
 
@@ -89,7 +97,7 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
         <div className="flex w-full items-center justify-between gap-1.5">
           <div>
             <Label info="Share of closed positions that ended with a profit.">Position win %</Label>
-            <Big>{stats.count ? pct(stats.wins / stats.count) : "—"}</Big>
+            <Big>{stats.count ? <AnimatedNumber value={stats.wins / stats.count} format={pct} /> : "—"}</Big>
           </div>
           <Gauge good={stats.wins} bad={stats.losses} />
         </div>
@@ -99,13 +107,17 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
         <div className="flex w-full items-center justify-between gap-1.5">
           <div>
             <Label info="Gross profit divided by gross loss.">Profit factor</Label>
-            <Big>{fmtRatio(stats.profitFactor)}</Big>
+            <Big>{ratio(stats.profitFactor)}</Big>
           </div>
           <div className="flex flex-col items-center gap-1.5">
             <Ring good={stats.grossProfit} bad={stats.grossLoss} />
             <div className="flex gap-3.25 text-[0.625rem] tabular-nums">
-              <span className="text-profit">{money(stats.grossProfit, currency)}</span>
-              <span className="text-loss">{money(stats.grossLoss, currency)}</span>
+              <span className="text-profit">
+                <AnimatedNumber value={stats.grossProfit} format={(v) => money(v, currency)} />
+              </span>
+              <span className="text-loss">
+                <AnimatedNumber value={stats.grossLoss} format={(v) => money(v, currency)} />
+              </span>
             </div>
           </div>
         </div>
@@ -115,7 +127,13 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
         <div className="flex w-full items-center justify-between gap-1.5">
           <div>
             <Label info="Share of active days (UTC) whose closed positions added up to a profit.">Day win %</Label>
-            <Big>{stats.dayWins + stats.dayLosses ? pct(stats.dayWins / (stats.dayWins + stats.dayLosses)) : "—"}</Big>
+            <Big>
+              {stats.dayWins + stats.dayLosses ? (
+                <AnimatedNumber value={stats.dayWins / (stats.dayWins + stats.dayLosses)} format={pct} />
+              ) : (
+                "—"
+              )}
+            </Big>
           </div>
           <Gauge good={stats.dayWins} bad={stats.dayLosses} />
         </div>
@@ -125,7 +143,7 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
         <div className="flex w-full items-end gap-2.5">
           <div>
             <Label info="Average winning position divided by average losing position.">Avg win/loss position</Label>
-            <Big>{fmtRatio(stats.winLossRatio)}</Big>
+            <Big>{ratio(stats.winLossRatio)}</Big>
           </div>
           <div className="mb-0.5 flex-1">
             <div className="flex h-1.5 overflow-hidden rounded-full">
@@ -133,8 +151,12 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
               <div className="flex-1 bg-loss" />
             </div>
             <div className="mt-1.5 flex justify-between gap-1.5 text-[0.625rem] tabular-nums">
-              <span className="text-profit">{money(stats.avgWin, currency)}</span>
-              <span className="text-loss">{money(-stats.avgLoss, currency)}</span>
+              <span className="text-profit">
+                <AnimatedNumber value={stats.avgWin} format={(v) => money(v, currency)} />
+              </span>
+              <span className="text-loss">
+                <AnimatedNumber value={-stats.avgLoss} format={(v) => money(v, currency)} />
+              </span>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { money, pct, tone } from "../money";
 import { type ActivePool, type Currency, poolTotals, type Stats } from "../portfolio";
 
@@ -46,10 +47,12 @@ function ResultBar({
         {ratio !== undefined && (
           <span className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${positive ? "bg-profit/15" : "bg-loss/15"}`}>
             {ratio >= 0 ? "+" : ""}
-            {pct(ratio)}
+            <AnimatedNumber value={ratio} format={pct} />
           </span>
         )}
-        <span className="text-[1.15rem] font-bold tabular-nums">{money(value, currency, { signed: true })}</span>
+        <span className="text-[1.15rem] font-bold tabular-nums">
+          <AnimatedNumber value={value} format={(v) => money(v, currency, { signed: true })} />
+        </span>
       </span>
     </div>
   );
@@ -65,19 +68,31 @@ export function ActiveSummary({ active, currency }: { active: ActivePool[]; curr
       <h2 className="text-sm font-medium">Active Positions Summary</h2>
       <p className="mt-0.75 flex gap-2.5 text-xs text-muted-foreground">
         <span>
-          {positions.length} position{positions.length === 1 ? "" : "s"}
+          <AnimatedNumber value={positions.length} /> position{positions.length === 1 ? "" : "s"}
         </span>
         <span className="border-l pl-2.5">
-          {pools} pool{pools === 1 ? "" : "s"}
+          <AnimatedNumber value={pools} /> pool{pools === 1 ? "" : "s"}
         </span>
       </p>
       <dl className="mt-3.25 grid gap-x-4.75 gap-y-2 sm:grid-cols-2">
-        <Row label="Total Deposited">{m(t.deposit)}</Row>
-        <Row label="Current Position">{m(t.balance)}</Row>
-        <Row label="Total Withdrawn">{m(t.withdraw)}</Row>
-        <Row label="Pending Fees">{m(t.unclaimed)}</Row>
-        <Row label="Claimed Fees">{m(t.fees)}</Row>
-        <Row label="Current Position + Pending Fees">{m(t.balance + t.unclaimed)}</Row>
+        <Row label="Total Deposited">
+          <AnimatedNumber value={t.deposit} format={m} />
+        </Row>
+        <Row label="Current Position">
+          <AnimatedNumber value={t.balance} format={m} />
+        </Row>
+        <Row label="Total Withdrawn">
+          <AnimatedNumber value={t.withdraw} format={m} />
+        </Row>
+        <Row label="Pending Fees">
+          <AnimatedNumber value={t.unclaimed} format={m} />
+        </Row>
+        <Row label="Claimed Fees">
+          <AnimatedNumber value={t.fees} format={m} />
+        </Row>
+        <Row label="Current Position + Pending Fees">
+          <AnimatedNumber value={t.balance + t.unclaimed} format={m} />
+        </Row>
       </dl>
       <div className="mt-3.25 border-t" />
       <ResultBar label="P&L" value={t.pnl} ratio={t.deposit ? t.pnl / t.deposit : 0} currency={currency} />
@@ -95,19 +110,40 @@ export function Performance({ stats, active, currency }: { stats: Stats; active:
     <Panel>
       <h2 className="text-sm font-medium">Performance</h2>
       <p className="mt-0.75 flex gap-1.5 text-xs tabular-nums">
-        <span className="text-profit">{stats.wins}W</span>
+        <span className="text-profit">
+          <AnimatedNumber value={stats.wins} />W
+        </span>
         <span className="text-muted-foreground">/</span>
-        <span className="text-loss">{stats.losses}L</span>
-        <span className="border-l pl-2.5 text-muted-foreground">{stats.count} total</span>
+        <span className="text-loss">
+          <AnimatedNumber value={stats.losses} />L
+        </span>
+        <span className="border-l pl-2.5 text-muted-foreground">
+          <AnimatedNumber value={stats.count} /> total
+        </span>
       </p>
       <dl className="mt-3.25 grid gap-x-4.75 gap-y-2 sm:grid-cols-2">
-        <Row label="Total Deposits">{m(stats.deposits)}</Row>
-        <Row label="Net Worth">{m(t.balance + t.unclaimed)}</Row>
-        <Row label="Total Withdrawals">{m(stats.withdrawals)}</Row>
-        <Row label="Avg Invested">{m(stats.avgInvested)}</Row>
-        <Row label="Total Fees">{money(stats.fees, currency, { digits: currency === "sol" ? 3 : 2 })}</Row>
+        <Row label="Total Deposits">
+          <AnimatedNumber value={stats.deposits} format={m} />
+        </Row>
+        <Row label="Net Worth">
+          <AnimatedNumber value={t.balance + t.unclaimed} format={m} />
+        </Row>
+        <Row label="Total Withdrawals">
+          <AnimatedNumber value={stats.withdrawals} format={m} />
+        </Row>
+        <Row label="Avg Invested">
+          <AnimatedNumber value={stats.avgInvested} format={m} />
+        </Row>
+        <Row label="Total Fees">
+          <AnimatedNumber
+            value={stats.fees}
+            format={(v) => money(v, currency, { digits: currency === "sol" ? 3 : 2 })}
+          />
+        </Row>
         <Row label="Win Rate">
-          <span className="text-profit">{stats.count ? pct(stats.wins / stats.count, 1) : "—"}</span>
+          <span className="text-profit">
+            {stats.count ? <AnimatedNumber value={stats.wins / stats.count} format={(v) => pct(v, 1)} /> : "—"}
+          </span>
         </Row>
       </dl>
       <div className="mt-3.25 border-t" />

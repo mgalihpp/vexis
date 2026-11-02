@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { SpikeTimeframe } from "@/features/notifications/notifications";
+import type { SpikeMultiplier, SpikeTimeframe } from "@/features/notifications/notifications";
 import type { Currency } from "@/features/portfolio/portfolio";
+
+/** How numbers move when their value changes. `off` also covers the system's reduced-motion setting. */
+export type NumberMotion = "tween" | "roll" | "flash" | "off";
 
 export interface NotifySettings {
   outOfRange: boolean;
@@ -16,16 +19,18 @@ export interface NotifySettings {
 interface SettingsState {
   /** The currency a wallet opens in from the favorites bar, wallet bar and wallet list. */
   currency: Currency;
+  numberMotion: NumberMotion;
   notify: NotifySettings;
-  spikeMultiplier: number;
+  spikeMultiplier: SpikeMultiplier;
   spikeTimeframe: SpikeTimeframe;
   /** A candle under this volume never counts as a spike, in `spikeMinCurrency`. */
   spikeMin: number;
   spikeMinCurrency: Currency;
   intervalSec: number;
   setCurrency: (currency: Currency) => void;
+  setNumberMotion: (motion: NumberMotion) => void;
   setNotify: (key: keyof NotifySettings, value: boolean) => void;
-  setSpikeMultiplier: (value: number) => void;
+  setSpikeMultiplier: (value: SpikeMultiplier) => void;
   setSpikeTimeframe: (value: SpikeTimeframe) => void;
   setSpikeMin: (value: number) => void;
   setSpikeMinCurrency: (value: Currency) => void;
@@ -37,6 +42,7 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       currency: "sol",
+      numberMotion: "tween",
       notify: { outOfRange: true, positions: true, volumeSpike: true, browser: false, sound: true },
       spikeMultiplier: 3,
       spikeTimeframe: "1h",
@@ -44,6 +50,7 @@ export const useSettings = create<SettingsState>()(
       spikeMinCurrency: "usd",
       intervalSec: 15,
       setCurrency: (currency) => set({ currency }),
+      setNumberMotion: (numberMotion) => set({ numberMotion }),
       setNotify: (key, value) => set((s) => ({ notify: { ...s.notify, [key]: value } })),
       setSpikeMultiplier: (spikeMultiplier) => set({ spikeMultiplier }),
       setSpikeTimeframe: (spikeTimeframe) => set({ spikeTimeframe }),

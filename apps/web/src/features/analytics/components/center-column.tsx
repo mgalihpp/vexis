@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { type Currency, ratio, STAT_WINDOWS, TIMEFRAMES, type TimeframeId } from "../analytics";
@@ -8,45 +9,71 @@ import type { PoolView, SiblingPool } from "../analytics.types";
 import { CandleChart, type ChartBar } from "./candle-chart";
 import { Label, NA, Panel } from "./ui";
 
-const usdOrNa = (v: number | null) => (v === null ? NA : compactUsd(v));
-
-type StatItem = [label: string, value: string, color: string, tip?: string, sub?: string];
+interface StatItem {
+  label: string;
+  value: number | null;
+  format?: (value: number) => string;
+  color?: string;
+  tip?: string;
+  sub?: ReactNode;
+}
 
 export function VolumeStats({ pool, volume7d }: { pool: PoolView; volume7d: number | null }) {
   const x = pool.tokenX;
   const day = pool.windows["24h"];
   const items: StatItem[] = [
-    ["7d Volume", usdOrNa(volume7d), ""],
-    ["24h Vol / TVL", `${ratio(day.volume, pool.tvl).toFixed(2)}x`, ""],
-    [`${x.symbol} Buy Vol`, usdOrNa(x.flow["24h"]?.buy ?? null), "text-profit", TOKEN_WIDE],
-    [`${x.symbol} Sell Vol`, usdOrNa(x.flow["24h"]?.sell ?? null), "text-loss", TOKEN_WIDE],
+    { label: "7d Volume", value: volume7d, format: compactUsd },
+    { label: "24h Vol / TVL", value: ratio(day.volume, pool.tvl), format: (v) => `${v.toFixed(2)}x` },
+    {
+      label: `${x.symbol} Buy Vol`,
+      value: x.flow["24h"]?.buy ?? null,
+      format: compactUsd,
+      color: "text-profit",
+      tip: TOKEN_WIDE,
+    },
+    {
+      label: `${x.symbol} Sell Vol`,
+      value: x.flow["24h"]?.sell ?? null,
+      format: compactUsd,
+      color: "text-loss",
+      tip: TOKEN_WIDE,
+    },
     ...STAT_WINDOWS.filter((w) => w !== "24h").map((w): StatItem => {
       const { volume, fees } = pool.windows[w];
-      return [
-        `${w} Volume`,
-        compactUsd(volume),
-        "",
-        undefined,
-        `${compactUsd(fees)} fees (${pct(ratio(fees, pool.tvl))})`,
-      ];
+      return {
+        label: `${w} Volume`,
+        value: volume,
+        format: compactUsd,
+        sub: (
+          <>
+            <AnimatedNumber value={fees} format={compactUsd} /> fees (
+            <AnimatedNumber value={ratio(fees, pool.tvl)} format={pct} />)
+          </>
+        ),
+      };
     }),
   ];
   return (
     <Panel className="flex-row items-center gap-4 overflow-x-auto px-4 py-3 whitespace-nowrap">
       <div className="flex shrink-0 flex-col gap-0.5">
         <Label>24h Volume</Label>
-        <span className="num text-xl font-bold">{compactUsd(day.volume)}</span>
+        <span className="num text-xl font-bold">
+          <AnimatedNumber value={day.volume} format={compactUsd} />
+        </span>
         <span className="num text-[11px] text-muted-foreground">
-          {compactUsd(day.fees)} fees ({pct(ratio(day.fees, pool.tvl))})
+          <AnimatedNumber value={day.fees} format={compactUsd} /> fees (
+          <AnimatedNumber value={ratio(day.fees, pool.tvl)} format={pct} />)
         </span>
       </div>
-      {items.map(([label, value, color, tip, sub]) => (
-        <div key={label} className="flex shrink-0 items-center gap-4">
+      {items.map((item) => (
+        <div key={item.label} className="flex shrink-0 items-center gap-4">
           <span className="h-7.5 w-px bg-border" />
-          <div className="flex flex-col gap-0.5" title={tip}>
-            <Label>{label}</Label>
-            <span className={`num text-sm font-semibold ${color}`}>{value}</span>
-            {sub && <span className="num text-[11px] text-muted-foreground">{sub}</span>}
+          <div className="flex flex-col gap-0.5" title={item.tip}>
+            <Label>{item.label}</Label>
+            <span className={`num text-sm font-semibold ${item.color ?? ""}`}>
+              {item.value === null ? NA : <AnimatedNumber value={item.value} format={item.format} />}
+            </span>
+            {item.sub && <span className="num text-[11px] text-muted-foreground">{item.sub}</span>}
           </div>
         </div>
       ))}

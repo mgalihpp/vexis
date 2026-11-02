@@ -1,5 +1,6 @@
 import { CircleCheckIcon, CircleXIcon, ShareIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { useNow } from "@/hooks/use-now";
 import { compactUsd, duration, money, pct, tone, utcStamp } from "../money";
 import {
@@ -56,8 +57,12 @@ export const pnlRatio = (t: Amounts) => (t.deposit ? t.pnl / t.deposit : 0);
 export function Pnl({ totals, currency }: { totals: Amounts; currency: Currency }) {
   return (
     <div className={`font-medium tabular-nums ${tone(totals.pnl)}`}>
-      <div>{signedPct(pnlRatio(totals))}</div>
-      <div>{money(totals.pnl, currency, { signed: true })}</div>
+      <div>
+        <AnimatedNumber value={pnlRatio(totals)} format={signedPct} />
+      </div>
+      <div>
+        <AnimatedNumber value={totals.pnl} format={(v) => money(v, currency, { signed: true })} />
+      </div>
     </div>
   );
 }
@@ -65,21 +70,33 @@ export function Pnl({ totals, currency }: { totals: Amounts; currency: Currency 
 export function Deposits({ totals, currency }: { totals: ActiveAmounts; currency: Currency }) {
   return (
     <div className="tabular-nums">
-      <div className="text-muted-foreground">Total: {money(totals.deposit, currency)}</div>
-      <div className="font-semibold">{money(totals.balance, currency)}</div>
+      <div className="text-muted-foreground">
+        Total: <AnimatedNumber value={totals.deposit} format={(v) => money(v, currency)} />
+      </div>
+      <div className="font-semibold">
+        <AnimatedNumber value={totals.balance} format={(v) => money(v, currency)} />
+      </div>
     </div>
   );
 }
 
 export function Withdrawals({ totals, currency }: { totals: ActiveAmounts; currency: Currency }) {
-  return <div className="tabular-nums text-foreground/80">{money(totals.withdraw, currency)}</div>;
+  return (
+    <div className="tabular-nums text-foreground/80">
+      <AnimatedNumber value={totals.withdraw} format={(v) => money(v, currency)} />
+    </div>
+  );
 }
 
 export function Fees({ totals, currency }: { totals: ActiveAmounts; currency: Currency }) {
   return (
     <div className="tabular-nums">
-      <div className="text-muted-foreground">Claimed: {money(totals.fees, currency)}</div>
-      <div className="font-semibold">{money(totals.unclaimed, currency)}</div>
+      <div className="text-muted-foreground">
+        Claimed: <AnimatedNumber value={totals.fees} format={(v) => money(v, currency)} />
+      </div>
+      <div className="font-semibold">
+        <AnimatedNumber value={totals.unclaimed} format={(v) => money(v, currency)} />
+      </div>
     </div>
   );
 }
@@ -140,7 +157,9 @@ export function Offsets({ pool, positions }: { pool: ActivePool; positions: Acti
 export function RangeStatus({ pool, positions }: { pool: ActivePool; positions: ActivePosition[] }) {
   return (
     <div className="flex flex-col items-center gap-0.75">
-      <span className="font-semibold tabular-nums">{positions.length}</span>
+      <span className="font-semibold tabular-nums">
+        <AnimatedNumber value={positions.length} />
+      </span>
       <RangePill positions={positions} />
       <Offsets pool={pool} positions={positions} />
     </div>
@@ -152,11 +171,11 @@ export function FdvTvl({ pool }: { pool: ActivePool }) {
     <div className="text-[0.625rem] whitespace-nowrap tabular-nums">
       <div>
         <span className="text-muted-foreground">FDV: </span>
-        {pool.fdv === null ? "—" : compactUsd(pool.fdv)}
+        {pool.fdv === null ? "—" : <AnimatedNumber value={pool.fdv} format={compactUsd} />}
       </div>
       <div>
         <span className="text-muted-foreground">TVL: </span>
-        {pool.tvl === null ? "—" : compactUsd(pool.tvl)}
+        {pool.tvl === null ? "—" : <AnimatedNumber value={pool.tvl} format={compactUsd} />}
       </div>
     </div>
   );

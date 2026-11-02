@@ -9,6 +9,7 @@ import {
   CircleDollarSignIcon,
   ClockIcon,
   CoinsIcon,
+  HashIcon,
   MonitorIcon,
   MoonIcon,
   PaletteIcon,
@@ -155,6 +156,8 @@ function General() {
   const { theme, setTheme } = useTheme();
   const currency = useSettings((s) => s.currency);
   const setCurrency = useSettings((s) => s.setCurrency);
+  const numberMotion = useSettings((s) => s.numberMotion);
+  const setNumberMotion = useSettings((s) => s.setNumberMotion);
   return (
     <div className="flex flex-col gap-5">
       <Group title="Appearance">
@@ -233,6 +236,28 @@ function General() {
                   </>
                 ),
               },
+            ]}
+          />
+        </Row>
+      </Group>
+      <Group title="Motion">
+        <Row
+          icon={
+            <RowIcon>
+              <HashIcon />
+            </RowIcon>
+          }
+          label="Number animation"
+          description="P&L, volume, price and bins"
+        >
+          <SegmentedControl
+            value={numberMotion}
+            onChange={setNumberMotion}
+            options={[
+              { value: "tween", label: "Tween" },
+              { value: "roll", label: "Roll" },
+              { value: "flash", label: "Flash" },
+              { value: "off", label: "Off" },
             ]}
           />
         </Row>
@@ -358,7 +383,10 @@ function Notifications() {
           <SegmentedControl
             value={spikeMultiplier}
             onChange={setSpikeMultiplier}
-            options={[2, 3, 5, 10].map((m) => ({ value: m, label: `${m}x` }))}
+            options={[
+              { value: "off", label: "Off" },
+              ...([2, 3, 5, 10] as const).map((m) => ({ value: m, label: `${m}x` })),
+            ]}
           />
         </Row>
         <Row

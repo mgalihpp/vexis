@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { formatPrice } from "@/features/portfolio/money";
 import { type Bar, type Currency, convertBars, sumVolume, type TimeframeId, type VolumePoint } from "../analytics";
 import { getOlderBars } from "../analytics.functions";
 import type { loadAnalytics } from "../analytics.server";
@@ -77,7 +76,6 @@ export function AnalyticsPage({
   }));
   const price = view.cur === "usd" ? pool.price * yUsd : pool.price;
   const quote = pool.tokenY.symbol;
-  const priceText = view.cur === "usd" ? `$${formatPrice(price)}` : formatPrice(price);
   const priceUnit = view.cur === "usd" ? "USD" : `${quote}/${pool.tokenX.symbol}`;
 
   return (
@@ -86,7 +84,7 @@ export function AnalyticsPage({
     <div className="grid grid-cols-[minmax(0,1fr)] gap-2 p-2 xl:h-full xl:grid-cols-[312px_minmax(0,1fr)_300px] xl:grid-rows-[minmax(0,1fr)] xl:overflow-hidden">
       <div className="flex flex-col gap-2 max-xl:contents xl:min-h-0 xl:overflow-y-auto">
         <div className="max-xl:order-1">
-          <PoolHeader pool={pool} siblings={siblings} price={priceText} priceUnit={priceUnit} />
+          <PoolHeader pool={pool} siblings={siblings} price={price} priceUnit={priceUnit} usd={view.cur === "usd"} />
         </div>
         <div className="max-xl:order-5">
           <PoolTokens pool={pool} />

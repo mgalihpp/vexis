@@ -1,11 +1,12 @@
 import { ExternalLinkIcon } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import { AnimatedNumber } from "@/components/animated-number";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, formatAmount, pct } from "@/features/portfolio/money";
 import { age, protocolFeePct, ratio, sumVolume, type VolumePoint } from "../analytics";
 import type { PoolTokenView, PoolView } from "../analytics.types";
-import { compact, Label, NA, Panel, Row, signedPct } from "./ui";
+import { compact, Label, NA, Num, Panel, Row, signedPct } from "./ui";
 
 const dateFmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
@@ -29,7 +30,9 @@ export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
   return (
     <Panel className="gap-1.5">
       <Label>Volume (7d)</Label>
-      <span className="num text-lg font-bold">{compactUsd(sumVolume(points))}</span>
+      <span className="num text-lg font-bold">
+        <AnimatedNumber value={sumVolume(points)} format={compactUsd} />
+      </span>
       {points.length < 2 ? (
         <div className="h-19 text-xs text-muted-foreground">No history yet.</div>
       ) : (
@@ -118,23 +121,43 @@ export function TvlDistribution({ pool }: { pool: PoolView }) {
       </div>
       <div className="num flex justify-between text-[11px]">
         <span>
-          <span className="font-semibold">{compactUsd(x.usd)}</span>{" "}
-          <span className="text-muted-foreground">{pct(xs)}</span>
+          <span className="font-semibold">
+            <AnimatedNumber value={x.usd} format={compactUsd} />
+          </span>{" "}
+          <span className="text-muted-foreground">
+            <AnimatedNumber value={xs} format={pct} />
+          </span>
         </span>
         <span>
-          <span className="font-semibold">{compactUsd(y.usd)}</span>{" "}
-          <span className="text-muted-foreground">{pct(1 - xs)}</span>
+          <span className="font-semibold">
+            <AnimatedNumber value={y.usd} format={compactUsd} />
+          </span>{" "}
+          <span className="text-muted-foreground">
+            <AnimatedNumber value={1 - xs} format={pct} />
+          </span>
         </span>
       </div>
     </Panel>
   );
 }
 
-function Cell({ label, value, tone = "" }: { label: string; value: string; tone?: string }) {
+function Cell({
+  label,
+  value,
+  format,
+  tone = "",
+}: {
+  label: string;
+  value: ReactNode | number;
+  format?: (value: number) => string;
+  tone?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <Label>{label}</Label>
-      <span className={`num text-xs font-semibold ${tone}`}>{value}</span>
+      <span className={`num text-xs font-semibold ${tone}`}>
+        <Num value={value} format={format} />
+      </span>
     </div>
   );
 }
@@ -151,7 +174,6 @@ export function TokenInfo({
   now: number;
 }) {
   const t: PoolTokenView = side === "x" ? pool.tokenX : pool.tokenY;
-  const cap = (v: number | null) => (v === null ? NA : compactUsd(v));
   return (
     <Panel
       title="Token Info"
@@ -170,14 +192,14 @@ export function TokenInfo({
     >
       <div className="grid grid-cols-3 gap-y-3">
         <Cell label="Age" value={t.createdAt === null ? NA : age(t.createdAt, now)} />
-        <Cell label="Market Cap" value={cap(t.marketCap)} />
-        <Cell label="FDV" value={cap(t.fdv)} />
-        <Cell label="Holders" value={compact(t.holders)} />
-        <Cell label="Top 10 H." value={t.topHoldersPct === null ? NA : `${t.topHoldersPct.toFixed(2)}%`} />
-        <Cell label="Dev Mints" value={t.devMints === null ? NA : String(t.devMints)} />
+        <Cell label="Market Cap" value={t.marketCap ?? NA} format={compactUsd} />
+        <Cell label="FDV" value={t.fdv ?? NA} format={compactUsd} />
+        <Cell label="Holders" value={t.holders ?? NA} format={compact} />
+        <Cell label="Top 10 H." value={t.topHoldersPct ?? NA} format={(v) => `${v.toFixed(2)}%`} />
+        <Cell label="Dev Mints" value={t.devMints ?? NA} />
         <Cell label="Freeze Auth." value={t.freezeAuthorityDisabled ? "Disabled" : "Enabled"} />
         <Cell label="Mint Auth." value={t.mintAuthority === null ? "Disabled" : "Enabled"} />
-        <Cell label="Total Supply" value={formatAmount(t.totalSupply)} />
+        <Cell label="Total Supply" value={t.totalSupply} format={formatAmount} />
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         {(["5m", "1h", "6h", "24h"] as const).map((k) => {
@@ -186,7 +208,7 @@ export function TokenInfo({
             <div key={k} className="flex flex-col gap-0.5 rounded-md bg-muted px-2 py-1.5">
               <Label>{k}</Label>
               <span className={`num text-xs font-semibold ${v === null ? "" : v >= 0 ? "text-profit" : "text-loss"}`}>
-                {v === null ? NA : signedPct(v)}
+                <Num value={v ?? NA} format={signedPct} />
               </span>
             </div>
           );
@@ -206,11 +228,15 @@ export function FeesPanel({ pool }: { pool: PoolView }) {
   return (
     <Panel title="Fees">
       <Row label="Bin Step" value={pool.binStep} />
-      <Row label="Base Fee" value={pct(pool.baseFeePct / 100)} />
-      <Row label="Dynamic Fee" value={pct(pool.dynamicFeePct / 100, 3)} />
-      <Row label="Total Trading Fee" value={pct((pool.baseFeePct + pool.dynamicFeePct) / 100)} />
-      <Row label="Max Fee" value={pool.maxFeePct > 0 ? pct(pool.maxFeePct / 100) : NA} />
-      <Row label="Protocol Fee" value={pct(protocolFeePct(pool.baseFeePct, pool.protocolCutPct) / 100, 3)} />
+      <Row label="Base Fee" value={pool.baseFeePct / 100} format={pct} />
+      <Row label="Dynamic Fee" value={pool.dynamicFeePct / 100} format={(v) => pct(v, 3)} />
+      <Row label="Total Trading Fee" value={(pool.baseFeePct + pool.dynamicFeePct) / 100} format={pct} />
+      <Row label="Max Fee" value={pool.maxFeePct > 0 ? pool.maxFeePct / 100 : NA} format={pct} />
+      <Row
+        label="Protocol Fee"
+        value={protocolFeePct(pool.baseFeePct, pool.protocolCutPct) / 100}
+        format={(v) => pct(v, 3)}
+      />
       <Row label="Limit Order Bonus" value={NA} />
       <Label>Fee Collection Token</Label>
       <div className="flex gap-1.5">
