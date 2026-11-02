@@ -10,7 +10,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react";
-import { type PointerEvent, useRef, useState } from "react";
+import { type PointerEvent, useEffect, useRef, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { TIP_CLASS } from "@/components/info-tip";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -214,12 +214,35 @@ function PoolDialog({ pool, siblings }: { pool: PoolView; siblings: SiblingPool[
 function FavoriteStar({ pool }: { pool: PoolView }) {
   const isFavorite = usePools((s) => s.favorites.some((p) => p.address === pool.address));
   const toggle = usePools((s) => s.toggleFavorite);
+  const updateFavoriteMetadata = usePools((s) => s.updateFavoriteMetadata);
+  useEffect(() => {
+    if (isFavorite)
+      updateFavoriteMetadata({
+        address: pool.address,
+        name: pool.name,
+        binStep: pool.binStep,
+        tokenXSymbol: pool.tokenX.symbol,
+        tokenXIcon: pool.tokenX.icon,
+        tokenYSymbol: pool.tokenY.symbol,
+        tokenYIcon: pool.tokenY.icon,
+      });
+  }, [isFavorite, pool, updateFavoriteMetadata]);
   return (
     <button
       type="button"
       aria-label={isFavorite ? "Remove pool from favorites" : "Add pool to favorites"}
       aria-pressed={isFavorite}
-      onClick={() => toggle({ address: pool.address, name: pool.name, binStep: pool.binStep })}
+      onClick={() =>
+        toggle({
+          address: pool.address,
+          name: pool.name,
+          binStep: pool.binStep,
+          tokenXSymbol: pool.tokenX.symbol,
+          tokenXIcon: pool.tokenX.icon,
+          tokenYSymbol: pool.tokenY.symbol,
+          tokenYIcon: pool.tokenY.icon,
+        })
+      }
       className="absolute top-1/2 right-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
     >
       <StarIcon className={`size-4 ${isFavorite ? "fill-brand text-brand" : ""}`} />

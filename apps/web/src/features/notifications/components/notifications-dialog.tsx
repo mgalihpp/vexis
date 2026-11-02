@@ -7,6 +7,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/compone
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ago } from "@/lib/format";
 import { useNotifications } from "@/stores/notifications";
+import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
 import type { Notice, NoticeKind } from "../notifications";
 
@@ -44,6 +45,13 @@ export function NotificationsDialog({
 }) {
   const { items, markRead, markAllRead, clear } = useNotifications();
   const currency = useSettings((s) => s.currency);
+  const favoritePools = usePools((s) => s.favorites);
+  const tokenIcons = new Map(
+    favoritePools.flatMap((pool) => [
+      ...(pool.tokenXSymbol && pool.tokenXIcon ? [[pool.tokenXSymbol, pool.tokenXIcon] as const] : []),
+      ...(pool.tokenYSymbol && pool.tokenYIcon ? [[pool.tokenYSymbol, pool.tokenYIcon] as const] : []),
+    ]),
+  );
   const navigate = useNavigate();
   const now = Date.now();
   const today = items.filter((n) => now - n.at < DAY_MS);
@@ -90,8 +98,12 @@ export function NotificationsDialog({
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {today.length > 0 && <Section title="Today" items={today} now={now} onSelect={select} />}
-            {earlier.length > 0 && <Section title="Earlier" items={earlier} now={now} onSelect={select} />}
+            {today.length > 0 && (
+              <Section title="Today" items={today} now={now} onSelect={select} tokenIcons={tokenIcons} />
+            )}
+            {earlier.length > 0 && (
+              <Section title="Earlier" items={earlier} now={now} onSelect={select} tokenIcons={tokenIcons} />
+            )}
           </div>
         )}
       </div>
@@ -119,11 +131,13 @@ function Section({
   items,
   now,
   onSelect,
+  tokenIcons,
 }: {
   title: string;
   items: Notice[];
   now: number;
   onSelect: (n: Notice) => void;
+  tokenIcons: Map<string, string>;
 }) {
   return (
     <section className="flex flex-col gap-1.5">
@@ -135,7 +149,7 @@ function Section({
           onClick={() => onSelect(n)}
           className="flex items-start gap-2.5 rounded-xl bg-muted/50 p-2.5 text-left ring-1 ring-foreground/5 transition-colors hover:bg-muted"
         >
-          <PairIcons pair={noticePair(n)} />
+          <PairIcons pair={noticePair(n)} tokenIcons={tokenIcons} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline gap-2">
               <span className={`flex-1 truncate text-xs ${n.read ? "font-medium" : "font-semibold"}`}>{n.title}</span>
@@ -167,14 +181,14 @@ function noticePair(n: Notice) {
   return `${n.title} ${n.body}`.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}\b/)?.[0] ?? null;
 }
 
-function PairIcons({ pair }: { pair: string | null }) {
+function PairIcons({ pair, tokenIcons }: { pair: string | null; tokenIcons: Map<string, string> }) {
   const tokens = pair?.split("-").slice(0, 2) ?? [];
   return (
     <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center">
       {tokens.length ? (
         <span className="flex -space-x-2">
           {tokens.map((token) => (
-            <TokenMark key={token} token={token} />
+            <TokenMark key={token} token={token} logo={tokenIcons.get(token)} />
           ))}
         </span>
       ) : (
@@ -186,8 +200,7 @@ function PairIcons({ pair }: { pair: string | null }) {
   );
 }
 
-function TokenMark({ token }: { token: string }) {
-  const logo = token === "SOL" ? "/Solana_logo.png" : token === "USDC" ? "/usd-coin-usdc-logo.png" : null;
+function TokenMark({ token, logo }: { token: string; logo?: string }) {
   return logo ? (
     <img src={logo} alt={token} className="size-6 rounded-full border-2 border-background bg-background object-cover" />
   ) : (

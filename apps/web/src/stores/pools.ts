@@ -6,12 +6,17 @@ export interface FavoritePool {
   address: string;
   name: string;
   binStep: number;
+  tokenXSymbol?: string;
+  tokenXIcon?: string | null;
+  tokenYSymbol?: string;
+  tokenYIcon?: string | null;
 }
 
 interface PoolState {
   favorites: FavoritePool[];
   alertOverrides: Record<string, PoolAlertOverride>;
   toggleFavorite: (pool: FavoritePool) => void;
+  updateFavoriteMetadata: (pool: FavoritePool) => void;
   setAlertOverride: (address: string, override: PoolAlertOverride | null) => void;
 }
 
@@ -29,6 +34,12 @@ export const usePools = create<PoolState>()(
           alertOverrides: s.favorites.some((p) => p.address === pool.address)
             ? Object.fromEntries(Object.entries(s.alertOverrides).filter(([address]) => address !== pool.address))
             : s.alertOverrides,
+        })),
+      updateFavoriteMetadata: (pool) =>
+        set((s) => ({
+          favorites: s.favorites.map((favorite) =>
+            favorite.address === pool.address ? { ...favorite, ...pool } : favorite,
+          ),
         })),
       setAlertOverride: (address, override) =>
         set((s) => {
