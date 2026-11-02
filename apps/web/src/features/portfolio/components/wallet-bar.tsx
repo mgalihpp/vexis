@@ -3,6 +3,7 @@ import { ChevronDownIcon, CopyIcon, ExternalLinkIcon, SaveIcon, SearchIcon, Star
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { shortAddr } from "@/lib/format";
+import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
 import { WalletAddress } from "../portfolio.functions";
 
@@ -16,6 +17,7 @@ export function WalletSearch({
   action?: ReactNode;
 }) {
   const navigate = useNavigate();
+  const currency = useSettings((s) => s.currency);
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const submit = (e: FormEvent) => {
@@ -27,7 +29,7 @@ export function WalletSearch({
     }
     setError(null);
     setValue("");
-    navigate({ to: "/portfolio/$wallet", params: { wallet: parsed.data } });
+    navigate({ to: "/portfolio/$wallet", params: { wallet: parsed.data }, search: { currency } });
   };
   return (
     <form
@@ -52,6 +54,7 @@ export function WalletSearch({
 
 export function WalletBar({ wallet }: { wallet: string }) {
   const navigate = useNavigate();
+  const currency = useSettings((s) => s.currency);
   const { favorites, recent, toggleFavorite } = useWallets();
   const isFavorite = favorites.includes(wallet);
   const others = [...new Set([...favorites, ...recent])].filter((w) => w !== wallet);
@@ -91,7 +94,7 @@ export function WalletBar({ wallet }: { wallet: string }) {
             <button
               key={w}
               type="button"
-              onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet: w } })}
+              onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet: w }, search: { currency } })}
               className="flex w-full items-center justify-between rounded px-0.75 py-1.25 text-xs hover:bg-muted"
             >
               {shortAddr(w)}

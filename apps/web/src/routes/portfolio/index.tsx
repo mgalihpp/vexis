@@ -3,6 +3,7 @@ import { ArrowRightIcon, StarIcon } from "lucide-react";
 import { Logo } from "@/components/icons";
 import { WalletSearch } from "@/features/portfolio/components/wallet-bar";
 import { shortAddr } from "@/lib/format";
+import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
 
 export const Route = createFileRoute("/portfolio/")({
@@ -12,6 +13,7 @@ export const Route = createFileRoute("/portfolio/")({
 
 function PortfolioHome() {
   const { favorites, recent } = useWallets();
+  const currency = useSettings((s) => s.currency);
   const wallets = [...new Set([...favorites, ...recent])];
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-3.25 pt-19.25 text-center">
@@ -40,6 +42,7 @@ function PortfolioHome() {
                 key={w}
                 to="/portfolio/$wallet"
                 params={{ wallet: w }}
+                search={{ currency }}
                 className="inline-flex items-center gap-1.25 rounded-md bg-card px-2 py-0.75 text-xs hover:text-brand"
               >
                 {favorites.includes(w) && <StarIcon className="size-2.75 fill-brand text-brand" />}

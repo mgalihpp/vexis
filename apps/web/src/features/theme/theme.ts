@@ -24,10 +24,19 @@ const stored = (): Theme => {
   }
 };
 
+// The footer and the settings dialog each hold the hook; a change in one updates the other.
+const listeners = new Set<(theme: Theme) => void>();
+
 export function useTheme() {
   // The server cannot know the stored theme; the real value is read after mount.
   const [theme, setThemeState] = useState<Theme>(DEFAULT);
-  useEffect(() => setThemeState(stored()), []);
+  useEffect(() => {
+    setThemeState(stored());
+    listeners.add(setThemeState);
+    return () => {
+      listeners.delete(setThemeState);
+    };
+  }, []);
 
   // Follow the OS while "system" is selected.
   useEffect(() => {
@@ -43,7 +52,7 @@ export function useTheme() {
     try {
       localStorage.setItem(KEY, next);
     } catch {}
-    setThemeState(next);
+    for (const listener of listeners) listener(next);
   };
 
   return { theme, setTheme };

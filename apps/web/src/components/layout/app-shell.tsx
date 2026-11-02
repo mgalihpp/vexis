@@ -13,10 +13,14 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NotificationWatcher } from "@/features/notifications/components/notification-watcher";
 import { type Theme, useTheme } from "@/features/theme/theme";
 import { shortAddr } from "@/lib/format";
+import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
+import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
+import { HeaderActions } from "./header-actions";
 
 // Official icons as listed in Jupiter's token registry (MET and JUP).
 const DATA_SOURCES = [
@@ -47,11 +51,14 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
   useEffect(() => {
     useWallets.persist.rehydrate();
     usePools.persist.rehydrate();
+    useSettings.persist.rehydrate();
+    useNotifications.persist.rehydrate();
   }, []);
 
   return (
     <div className="flex h-dvh flex-col">
       <AppHeader />
+      <NotificationWatcher />
       <FavoritesBar />
       <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       <AppFooter prices={prices} />
@@ -94,6 +101,7 @@ function AppHeader() {
           </NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
         </nav>
+        <HeaderActions />
       </div>
     </header>
   );
@@ -142,6 +150,7 @@ function FavoritesBar() {
   const toggleFavorite = useWallets((s) => s.toggleFavorite);
   const pools = usePools((s) => s.favorites);
   const togglePool = usePools((s) => s.toggleFavorite);
+  const currency = useSettings((s) => s.currency);
   const navigate = useNavigate();
 
   return (
@@ -181,7 +190,7 @@ function FavoritesBar() {
               <button
                 type="button"
                 className="hover:text-brand"
-                onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet } })}
+                onClick={() => navigate({ to: "/portfolio/$wallet", params: { wallet }, search: { currency } })}
               >
                 {shortAddr(wallet)}
               </button>

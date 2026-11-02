@@ -402,3 +402,17 @@ export async function searchPools(query: string): Promise<PoolSearchHit[]> {
     volume24h: p.volume["24h"],
   }));
 }
+
+const VOLUME_BARS = 25;
+
+/** Volume for the last 25 bars of a timeframe, with the current, still open bar last. */
+export async function loadRecentVolume(pool: string, tf: TimeframeId): Promise<VolumePoint[]> {
+  const { seconds } = timeframe(tf);
+  const end = Math.floor(Date.now() / 1000 / seconds) * seconds + seconds;
+  const r = await get(`/pools/${pool}/volume/history`, VolumeHistory, {
+    timeframe: tf,
+    start_time: end - VOLUME_BARS * seconds,
+    end_time: end,
+  });
+  return toVolume(r.data.filter((row) => row.timestamp * 1000 <= Date.now()));
+}
