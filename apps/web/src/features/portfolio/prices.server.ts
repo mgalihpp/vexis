@@ -9,7 +9,25 @@ const CACHE_MS = 30_000;
 const key = process.env.JUPITER_API_KEY;
 const API = key ? "https://api.jup.ag" : "https://lite-api.jup.ag";
 
-export const jupiter = (path: string) => fetch(`${API}${path}`, { headers: key ? { "x-api-key": key } : {} });
+// Keyless calls get about 5 requests per 10 s window per IP, shared by lite-api and api.jup.ag. Like the
+// Meteora client, every call shares the budget from x-ratelimit-* and a 429 waits out the window.
+const budget = { remaining: Number.POSITIVE_INFINITY, resetAt: 0 };
+const MAX_ATTEMPTS = 4;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function jupiter(path: string): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    if (budget.remaining <= 0 && Date.now() < budget.resetAt) await sleep(budget.resetAt - Date.now() + 100);
+    const res = await fetch(`${API}${path}`, { headers: key ? { "x-api-key": key } : {} });
+    const remaining = res.headers.get("x-ratelimit-remaining");
+    const reset = res.headers.get("x-ratelimit-reset");
+    if (remaining !== null) budget.remaining = Number(remaining);
+    if (reset !== null) budget.resetAt = Number(reset) * 1000;
+    if (res.status !== 429 || attempt === MAX_ATTEMPTS) return res;
+    budget.remaining = 0;
+    if (budget.resetAt <= Date.now()) budget.resetAt = Date.now() + 1000 * attempt;
+  }
+}
 
 const Prices = z.record(z.string(), z.object({ usdPrice: z.number() }).nullable());
 
