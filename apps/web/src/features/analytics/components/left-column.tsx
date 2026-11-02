@@ -10,10 +10,11 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { type PointerEvent, useRef, useState } from "react";
+import { TIP_CLASS } from "@/components/info-tip";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, formatAmount, formatPrice, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
@@ -294,6 +295,15 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
   const labels = first && last ? [0, 1, 2, 3].map((i) => first.price + ((last.price - first.price) * i) / 3) : [];
   const zoom = "text-muted-foreground hover:text-foreground disabled:opacity-30";
   const at = bars.findIndex((b) => b.active) / Math.max(1, bars.length - 1);
+  const [selected, setSelected] = useState<number | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
+  const sel = selected === null ? undefined : bars[selected];
+  // The bar under the pointer, from its x position, so a finger can drag across bars without lifting.
+  const pick = (e: PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const i = Math.floor(((e.clientX - rect.left) / rect.width) * bars.length);
+    setSelected(Math.min(bars.length - 1, Math.max(0, i)));
+  };
   return (
     <Panel
       title="Liquidity Distribution"
@@ -334,61 +344,91 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
         <p className="py-10 text-center text-xs text-muted-foreground">Could not read the pool's bins.</p>
       ) : (
         <>
-          <div className="mt-9 flex h-28 items-end gap-0.5">
-            {bars.map((b) => {
-              const total = b.xUsd + b.yUsd;
-              return (
-                <Tooltip key={b.id}>
-                  <TooltipTrigger asChild>
-                    <div className="relative flex h-full flex-1 flex-col justify-end">
-                      {b.active && (
-                        <div className="pointer-events-none absolute -top-9 bottom-0 left-1/2 z-10 -translate-x-1/2 border-l-2 border-foreground">
-                          <div
-                            className={`absolute top-0 flex flex-col items-center rounded-md bg-popover px-2.5 py-1 text-[11px] whitespace-nowrap shadow-md ring-1 ring-border ${
-                              at < 0.25 ? "left-0 items-start" : at > 0.75 ? "right-0 items-end" : "-translate-x-1/2"
-                            }`}
-                          >
-                            <span className="text-muted-foreground">Pool Price</span>
-                            <span className="num font-semibold">
-                              {formatPrice(pool.price)} {y.symbol}/{x.symbol}
-                            </span>
-                          </div>
+          <Popover open={sel !== undefined} onOpenChange={(open) => !open && setSelected(null)}>
+            <div
+              ref={chartRef}
+              className="mt-9 flex h-28 touch-pan-y items-end gap-0.5"
+              onPointerDown={(e) => {
+                if (e.pointerType === "mouse") return;
+                pick(e);
+                e.currentTarget.setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => (e.pointerType === "mouse" || e.buttons) && pick(e)}
+              onPointerLeave={(e) => e.pointerType === "mouse" && setSelected(null)}
+            >
+              {bars.map((b, i) => {
+                const total = b.xUsd + b.yUsd;
+                const bar = (
+                  <div
+                    key={b.id}
+                    className={`relative flex h-full flex-1 flex-col justify-end transition-opacity ${
+                      sel && i !== selected ? "opacity-50" : ""
+                    }`}
+                  >
+                    {b.active && (
+                      <div className="pointer-events-none absolute -top-9 bottom-0 left-1/2 z-10 -translate-x-1/2 border-l-2 border-foreground">
+                        <div
+                          className={`absolute top-0 flex flex-col items-center rounded-md bg-popover px-2.5 py-1 text-[11px] whitespace-nowrap shadow-md ring-1 ring-border ${
+                            at < 0.25 ? "left-0 items-start" : at > 0.75 ? "right-0 items-end" : "-translate-x-1/2"
+                          }`}
+                        >
+                          <span className="text-muted-foreground">Pool Price</span>
+                          <span className="num font-semibold">
+                            {formatPrice(pool.price)} {y.symbol}/{x.symbol}
+                          </span>
                         </div>
-                      )}
-                      <div
-                        className="flex flex-col overflow-hidden rounded-t-sm"
-                        style={{ height: `${Math.max(1, (total / peak) * 75)}%` }}
-                      >
-                        <div className="bg-brand" style={{ flex: b.xUsd }} />
-                        <div style={{ flex: b.yUsd, background: "var(--sol)" }} />
                       </div>
+                    )}
+                    <div
+                      className="flex flex-col overflow-hidden rounded-t-sm"
+                      style={{ height: `${Math.max(1, (total / peak) * 75)}%` }}
+                    >
+                      <div className="bg-brand" style={{ flex: b.xUsd }} />
+                      <div style={{ flex: b.yUsd, background: "var(--sol)" }} />
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent className="w-48 flex-col items-stretch gap-0 p-2.5 text-[11px]">
-                    <div className="num text-muted-foreground">
-                      Bin {b.id} · {formatPrice(b.price)}
+                  </div>
+                );
+                return i === selected ? (
+                  <PopoverAnchor key={b.id} asChild>
+                    {bar}
+                  </PopoverAnchor>
+                ) : (
+                  bar
+                );
+              })}
+            </div>
+            {sel && (
+              <PopoverContent
+                side="top"
+                className={`${TIP_CLASS} w-48 flex-col items-stretch p-2.5 text-[11px]`}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                // A tap on another bar moves the selection; only a tap off the chart closes it.
+                onPointerDownOutside={(e) => chartRef.current?.contains(e.target as Node) && e.preventDefault()}
+              >
+                <div className="num text-muted-foreground">
+                  Bin {sel.id} · {formatPrice(sel.price)}
+                </div>
+                <div className="num mt-0.5 text-sm font-semibold">{compactUsd(sel.xUsd + sel.yUsd)}</div>
+                <div className="mt-2 flex flex-col gap-1 border-t pt-2">
+                  {(
+                    [
+                      [x.symbol, sel.xUsd, "var(--brand)"],
+                      [y.symbol, sel.yUsd, "var(--sol)"],
+                    ] as const
+                  ).map(([symbol, usd, color]) => (
+                    <div key={symbol} className="num flex items-center gap-1.5">
+                      <i className="size-1.5 rounded-full" style={{ background: color }} />
+                      <span className="text-muted-foreground">{symbol}</span>
+                      <span className="ml-auto font-semibold">{compactUsd(usd)}</span>
+                      <span className="w-9 text-right text-muted-foreground">
+                        {pct(ratio(usd, sel.xUsd + sel.yUsd), 0)}
+                      </span>
                     </div>
-                    <div className="num mt-0.5 text-sm font-semibold">{compactUsd(total)}</div>
-                    <div className="mt-2 flex flex-col gap-1 border-t pt-2">
-                      {(
-                        [
-                          [x.symbol, b.xUsd, "var(--brand)"],
-                          [y.symbol, b.yUsd, "var(--sol)"],
-                        ] as const
-                      ).map(([symbol, usd, color]) => (
-                        <div key={symbol} className="num flex items-center gap-1.5">
-                          <i className="size-1.5 rounded-full" style={{ background: color }} />
-                          <span className="text-muted-foreground">{symbol}</span>
-                          <span className="ml-auto font-semibold">{compactUsd(usd)}</span>
-                          <span className="w-9 text-right text-muted-foreground">{pct(ratio(usd, total), 0)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            )}
+          </Popover>
           <div className="num flex justify-between text-[10px] text-muted-foreground">
             {labels.map((l) => (
               <span key={l}>{formatPrice(l)}</span>

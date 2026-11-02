@@ -1,6 +1,6 @@
 import { ActivityIcon, BadgeCheckIcon, CircleDollarSignIcon, FootprintsIcon, LeafIcon, ShieldIcon } from "lucide-react";
 import { type ReactNode, useCallback, useState } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTip } from "@/components/info-tip";
 import { shortAddr } from "@/lib/format";
 import { pct } from "../money";
 import type { PoolMeta, Token } from "../portfolio";
@@ -88,18 +88,15 @@ function TokenScores({ token }: { token: Token }) {
     <>
       {token.organicScore !== null && <OrganicScore score={token.organicScore} />}
       {token.risks !== null && (
-        <Tooltip>
-          <TooltipTrigger
-            aria-label={`${token.risks.length} audit warnings`}
-            className={`${badge} ${token.risks.length ? TONES.red : TONES.green}`}
-          >
-            <ShieldIcon className="size-3" />
-            {token.risks.length}
-          </TooltipTrigger>
-          <TooltipContent className="max-w-48">
-            {token.risks.length ? token.risks.join(" · ") : "No audit warnings from Jupiter"}
-          </TooltipContent>
-        </Tooltip>
+        <InfoTip
+          aria-label={`${token.risks.length} audit warnings`}
+          className={`${badge} ${token.risks.length ? TONES.red : TONES.green}`}
+          content={token.risks.length ? token.risks.join(" · ") : "No audit warnings from Jupiter"}
+          contentClassName="max-w-48"
+        >
+          <ShieldIcon className="size-3" />
+          {token.risks.length}
+        </InfoTip>
       )}
     </>
   );

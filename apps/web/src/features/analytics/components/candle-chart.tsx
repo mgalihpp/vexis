@@ -16,6 +16,9 @@ const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, M
 const MIN_VISIBLE = 15;
 const MAX_VISIBLE = 200;
 const NEAR_START = 5;
+// Touch: a finger that moves less than this is a tap, and one held this long switches from panning to scrubbing.
+const TAP_SLOP_PX = 8;
+const LONG_PRESS_MS = 350;
 
 const utc = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-US", { ...opts, timeZone: "UTC" });
 const timeFmt = utc({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
@@ -54,7 +57,8 @@ function useSize() {
 
 /**
  * Candles and a bar series in one SVG so the axes share a coordinate system. Drag to pan through history
- * (older bars are requested as the left edge nears), scroll to zoom, hover for a tooltip. Times are UTC.
+ * (older bars are requested as the left edge nears), scroll to zoom, hover for a tooltip. On touch, tap a candle
+ * to pin its tooltip, or hold and drag to scrub. Times are UTC.
  */
 export function CandleChart({
   bars,
@@ -77,6 +81,14 @@ export function CandleChart({
   const svgRef = useRef<SVGSVGElement>(null);
   const { ref: boxRef, size } = useSize();
   const drag = useRef<{ x: number; offset: number } | null>(null);
+  const touch = useRef<{
+    x: number;
+    y: number;
+    at: { x: number; y: number };
+    moved: boolean;
+    scrubbing: boolean;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
   const [offset, setOffset] = useState(0);
   const [count, setCount] = useState(60);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
@@ -216,31 +228,70 @@ export function CandleChart({
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W + AXIS} ${TOTAL_H}`}
-          className={`absolute inset-0 h-full w-full touch-none select-none ${dragging ? "cursor-grabbing" : "cursor-crosshair"}`}
+          className={`absolute inset-0 h-full w-full touch-pan-y select-none ${dragging ? "cursor-grabbing" : "cursor-crosshair"}`}
           role="img"
           aria-label="Price chart"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
-            drag.current = { x: toSvg(e).x, offset: off };
+            const p = toSvg(e);
+            drag.current = { x: p.x, offset: off };
             setDragging(true);
+            if (e.pointerType === "mouse") return;
+            // A finger pans by default; holding still first turns the drag into a crosshair scrub.
+            const t = {
+              x: e.clientX,
+              y: e.clientY,
+              at: p,
+              moved: false,
+              scrubbing: false,
+              timer: setTimeout(() => {
+                t.scrubbing = true;
+                drag.current = null;
+                setDragging(false);
+                setCursor(t.at);
+              }, LONG_PRESS_MS),
+            };
+            touch.current = t;
           }}
           onPointerMove={(e) => {
             const p = toSvg(e);
-            setCursor(p);
+            const t = touch.current;
+            if (t) {
+              t.at = p;
+              if (t.scrubbing) return setCursor(p);
+              if (!t.moved && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP_PX) {
+                t.moved = true;
+                clearTimeout(t.timer);
+                setCursor(null);
+              }
+            } else setCursor(p);
             if (drag.current) {
               const moved = Math.round((p.x - drag.current.x) / step);
               setOffset(Math.min(maxOffset, Math.max(0, drag.current.offset + moved)));
             }
           }}
-          onPointerUp={() => {
+          onPointerUp={(e) => {
+            const t = touch.current;
+            if (t) {
+              clearTimeout(t.timer);
+              // A tap pins the crosshair on that candle; tapping the same candle again clears it.
+              if (!t.moved && !t.scrubbing) {
+                const p = toSvg(e);
+                setCursor(hover !== null && Math.floor(p.x / step) === hover ? null : p);
+              }
+              touch.current = null;
+            }
             drag.current = null;
             setDragging(false);
           }}
           onPointerCancel={() => {
+            if (touch.current) clearTimeout(touch.current.timer);
+            touch.current = null;
             drag.current = null;
             setDragging(false);
           }}
-          onPointerLeave={() => setCursor(null)}
+          // A lifted finger also leaves; only a mouse leaving should hide the crosshair a tap pinned.
+          onPointerLeave={(e) => e.pointerType === "mouse" && setCursor(null)}
         >
           {ticks(lo, hi, Math.max(3, Math.round(PRICE_H / 80))).map((t) => (
             <g key={t}>

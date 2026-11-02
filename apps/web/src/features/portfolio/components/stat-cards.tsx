@@ -1,6 +1,6 @@
 import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { InfoTip } from "@/components/info-tip";
 import { money, pct, tone } from "../money";
 import type { Currency, Stats } from "../portfolio";
 
@@ -12,12 +12,9 @@ function Label({ children, info }: { children: ReactNode; info: string }) {
   return (
     <div className="flex items-center gap-1.25 text-xs text-muted-foreground">
       {children}
-      <Tooltip>
-        <TooltipTrigger aria-label={info}>
-          <InfoIcon className="size-2.75 text-muted-foreground" />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-48">{info}</TooltipContent>
-      </Tooltip>
+      <InfoTip aria-label={info} content={info} contentClassName="max-w-48">
+        <InfoIcon className="size-2.75 text-muted-foreground" />
+      </InfoTip>
     </div>
   );
 }
