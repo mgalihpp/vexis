@@ -29,7 +29,7 @@ const DATA_SOURCES = [
 ];
 
 const MOBILE_LINKS: { to: "/portfolio" | "/analytics"; label: string; badge?: string }[] = [
-  { to: "/portfolio", label: "Portfolio", badge: "BETA" },
+  { to: "/portfolio", label: "Portfolio" },
   { to: "/analytics", label: "Analytics" },
 ];
 
@@ -96,10 +96,16 @@ function AppHeader() {
           <span className="hidden md:inline">Vexis</span>
         </Link>
         <nav className="hidden items-center gap-9.5 md:flex">
-          <NavItem to="/portfolio" badge="BETA">
+          <NavItem to="/portfolio">
             Portfolio
           </NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
+          <span className="relative text-sm font-medium text-muted-foreground">
+            Agents
+            <span className="absolute -top-1.5 -right-0.75 translate-x-full rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
+              SOON
+            </span>
+          </span>
         </nav>
         <HeaderActions />
       </div>
@@ -139,6 +145,12 @@ function MobileMenu() {
               </Link>
             </SheetClose>
           ))}
+          <span className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium text-muted-foreground">
+            Agents
+            <span className="rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
+              SOON
+            </span>
+          </span>
         </nav>
       </SheetContent>
     </Sheet>
