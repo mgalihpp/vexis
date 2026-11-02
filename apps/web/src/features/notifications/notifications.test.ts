@@ -63,7 +63,7 @@ describe("diffWatch positions", () => {
 describe("volumeSpike", () => {
   test("flags a candle at the multiplier over the average", () => {
     const spike = volumeSpike(hours([...Array(24).fill(1000), 3000]), 3, 1000);
-    expect(spike).toEqual({ t: 24 * 3_600_000, volume: 3000, average: 1000 });
+    expect(spike).toEqual({ kind: "multiple", t: 24 * 3_600_000, volume: 3000, average: 1000 });
     expect(volumeSpike(hours([...Array(24).fill(1000), 2999]), 3, 1000)).toBeNull();
   });
 
@@ -74,6 +74,15 @@ describe("volumeSpike", () => {
     expect(volumeSpike(hours([1000, 1000, 9000]), 3, 1000)).toBeNull();
   });
 
+  test("Off reports candles over the minimum without requiring a baseline", () => {
+    expect(volumeSpike(hours([1500]), "off", 1000)).toEqual({
+      kind: "minimum-volume",
+      t: 0,
+      volume: 1500,
+    });
+    expect(volumeSpike(hours([999]), "off", 1000)).toBeNull();
+  });
+
   const watch = { wallets: [], pools: [{ pool: POOL, bars: hours([...Array(24).fill(1000), 5000]) }] };
 
   test("diffWatch reports a spike once per candle", () => {
@@ -81,6 +90,22 @@ describe("volumeSpike", () => {
     expect(first.notices.map((n) => n.title)).toEqual(["Volume spike · SOL-USDC 10"]);
     expect(first.notices[0]?.body).toBe("$5K in the current 1h candle, 5.0× the average");
     expect(diffWatch(first.seen, watch, prefs, {}, 2).notices).toEqual([]);
+  });
+
+  test("Off reports the minimum-volume condition without a multiplier", () => {
+    const singleBar = { wallets: [], pools: [{ pool: POOL, bars: hours([1500]) }] };
+    const result = diffWatch(EMPTY_SEEN, singleBar, { ...prefs, spikeMultiplier: "off" }, {}, 1);
+    expect(result.notices[0]?.body).toBe("$1.5K in the current 1h candle, minimum volume reached");
+  });
+
+  test("pool-specific alert settings override global timeframe, level and minimum", () => {
+    const bars = hours([...Array(24).fill(100), 250]);
+    const watch = { wallets: [], pools: [{ pool: POOL, bars }] };
+    const override = {
+      [POOL]: { timeframe: "5m" as const, multiplier: 2 as const, minVolume: 200, minCurrency: "usd" as const },
+    };
+    const result = diffWatch(EMPTY_SEEN, watch, { ...prefs, spikeMinUsd: 1000, spikeMultiplier: 10 }, {}, 1, override);
+    expect(result.notices[0]?.body).toBe("$250 in the current 5m candle, 2.5× the average");
   });
 
   test("a SOL minimum shows the amount in SOL and needs a SOL price", () => {

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { TimeframeId } from "@/features/analytics/analytics";
 import type { SpikeMultiplier, SpikeTimeframe } from "@/features/notifications/notifications";
 import type { Currency } from "@/features/portfolio/portfolio";
 
@@ -19,6 +20,7 @@ export interface NotifySettings {
 interface SettingsState {
   /** The currency a wallet opens in from the favorites bar, wallet bar and wallet list. */
   currency: Currency;
+  analyticsTimeframe: TimeframeId;
   numberMotion: NumberMotion;
   notify: NotifySettings;
   spikeMultiplier: SpikeMultiplier;
@@ -28,6 +30,7 @@ interface SettingsState {
   spikeMinCurrency: Currency;
   intervalSec: number;
   setCurrency: (currency: Currency) => void;
+  setAnalyticsTimeframe: (timeframe: TimeframeId) => void;
   setNumberMotion: (motion: NumberMotion) => void;
   setNotify: (key: keyof NotifySettings, value: boolean) => void;
   setSpikeMultiplier: (value: SpikeMultiplier) => void;
@@ -42,6 +45,7 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       currency: "sol",
+      analyticsTimeframe: "1h",
       numberMotion: "tween",
       notify: { outOfRange: true, positions: true, volumeSpike: true, browser: false, sound: true },
       spikeMultiplier: 3,
@@ -50,6 +54,7 @@ export const useSettings = create<SettingsState>()(
       spikeMinCurrency: "usd",
       intervalSec: 15,
       setCurrency: (currency) => set({ currency }),
+      setAnalyticsTimeframe: (analyticsTimeframe) => set({ analyticsTimeframe }),
       setNumberMotion: (numberMotion) => set({ numberMotion }),
       setNotify: (key, value) => set((s) => ({ notify: { ...s.notify, [key]: value } })),
       setSpikeMultiplier: (spikeMultiplier) => set({ spikeMultiplier }),

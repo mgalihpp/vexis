@@ -17,6 +17,20 @@ const ICON: Record<NoticeKind, ReactNode> = {
   "volume-spike": <TrendingUpIcon />,
 };
 
+const NOTICE_LABEL: Record<NoticeKind, string> = {
+  "out-of-range": "Out of range",
+  opened: "Opened",
+  closed: "Closed",
+  "volume-spike": "Volume spike",
+};
+
+const NOTICE_TONE: Record<NoticeKind, string> = {
+  "out-of-range": "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  opened: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  closed: "bg-muted text-muted-foreground",
+  "volume-spike": "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+};
+
 const DAY_MS = 86_400_000;
 
 export function NotificationsDialog({
@@ -52,12 +66,12 @@ export function NotificationsDialog({
         <Title className="flex-1 text-sm font-semibold">Notifications</Title>
         <Description className="sr-only">Alerts for your favorite wallets and pools</Description>
         {unread && (
-          <Button variant="ghost" size="sm" onClick={markAllRead}>
+          <Button variant="ghost" size="sm" onClick={markAllRead} className="hover:bg-brand/10 hover:text-brand">
             Mark all as read
           </Button>
         )}
         {items.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clear}>
+          <Button variant="ghost" size="sm" onClick={clear} className="hover:bg-destructive/10 hover:text-destructive">
             Clear all
           </Button>
         )}
@@ -113,7 +127,7 @@ function Section({
 }) {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="px-1 text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
+      <h3 className="px-1 text-xs font-medium text-muted-foreground">{title}</h3>
       {items.map((n) => (
         <button
           key={n.id}
@@ -121,15 +135,20 @@ function Section({
           onClick={() => onSelect(n)}
           className="flex items-start gap-2.5 rounded-xl bg-muted/50 p-2.5 text-left ring-1 ring-foreground/5 transition-colors hover:bg-muted"
         >
-          <span
-            className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.08] text-foreground [&>svg]:size-3.5`}
-          >
-            {ICON[n.kind]}
-          </span>
+          <PairIcons pair={noticePair(n)} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline gap-2">
               <span className={`flex-1 truncate text-xs ${n.read ? "font-medium" : "font-semibold"}`}>{n.title}</span>
               <span className="shrink-0 text-[0.65rem] text-muted-foreground tabular-nums">{ago(now - n.at)}</span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] font-medium ${NOTICE_TONE[n.kind]} [&>svg]:size-3`}
+              >
+                {ICON[n.kind]}
+                {NOTICE_LABEL[n.kind]}
+              </span>
+              {noticePair(n) && <span className="text-[0.65rem] font-medium text-foreground/75">{noticePair(n)}</span>}
             </span>
             <span className="text-[0.7rem] text-muted-foreground">{n.body}</span>
           </span>
@@ -141,5 +160,42 @@ function Section({
         </button>
       ))}
     </section>
+  );
+}
+
+function noticePair(n: Notice) {
+  return `${n.title} ${n.body}`.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}\b/)?.[0] ?? null;
+}
+
+function PairIcons({ pair }: { pair: string | null }) {
+  const tokens = pair?.split("-").slice(0, 2) ?? [];
+  return (
+    <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center">
+      {tokens.length ? (
+        <span className="flex -space-x-2">
+          {tokens.map((token) => (
+            <TokenMark key={token} token={token} />
+          ))}
+        </span>
+      ) : (
+        <span className="flex size-7 items-center justify-center rounded-lg bg-foreground/[0.08] text-foreground [&>svg]:size-3.5">
+          {ICON["volume-spike"]}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function TokenMark({ token }: { token: string }) {
+  const logo = token === "SOL" ? "/Solana_logo.png" : token === "USDC" ? "/usd-coin-usdc-logo.png" : null;
+  return logo ? (
+    <img src={logo} alt={token} className="size-6 rounded-full border-2 border-background bg-background object-cover" />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="flex size-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[0.6rem] font-bold text-foreground"
+    >
+      {token.slice(0, 1)}
+    </span>
   );
 }

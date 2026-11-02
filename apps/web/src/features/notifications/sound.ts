@@ -1,3 +1,4 @@
+import { playCustomSound } from "./custom-sound";
 import type { NoticeKind } from "./notifications";
 
 // Alert sounds are synthesized with Web Audio, so there is no audio file to ship or load.
@@ -53,6 +54,7 @@ function play(notes: Note[], type: OscillatorType) {
 /** One sound per poll, the urgent one if any notice in it is an out-of-range position. */
 export function playAlert(kinds: NoticeKind[]) {
   if (kinds.length === 0) return;
+  if (playCustomSound()) return;
   if (kinds.includes("out-of-range")) play(ALERT, "triangle");
   else play(CHIME, "sine");
 }

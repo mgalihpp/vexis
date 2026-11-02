@@ -12,6 +12,7 @@ import {
   HashIcon,
   MonitorIcon,
   MoonIcon,
+  MusicIcon,
   PaletteIcon,
   SettingsIcon,
   StarIcon,
@@ -28,6 +29,12 @@ import { SolIcon, UsdcIcon } from "@/components/icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Switch } from "@/components/ui/switch";
+import {
+  clearCustomSound,
+  getCustomSound,
+  playCustomSound,
+  saveCustomSound,
+} from "@/features/notifications/custom-sound";
 import { BASELINE_BARS, SPIKE_TIMEFRAMES } from "@/features/notifications/notifications";
 import { playAlert } from "@/features/notifications/sound";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
@@ -247,14 +254,14 @@ function General() {
               <HashIcon />
             </RowIcon>
           }
-          label="Number animation"
-          description="P&L, volume, price and bins"
+          label="Animate numbers"
+          description="When a number changes"
         >
           <SegmentedControl
             value={numberMotion}
             onChange={setNumberMotion}
             options={[
-              { value: "tween", label: "Tween" },
+              { value: "tween", label: "Count" },
               { value: "roll", label: "Roll" },
               { value: "flash", label: "Flash" },
               { value: "off", label: "Off" },
@@ -284,13 +291,17 @@ function Notifications() {
     setIntervalSec,
   } = useSettings();
   const wallets = useWallets((s) => s.favorites.length);
-  const pools = usePools((s) => s.favorites.length);
+  const favoritePools = usePools((s) => s.favorites);
+  const poolOverrides = usePools((s) => s.alertOverrides);
+  const pools = favoritePools.length;
   const [permission, setPermission] = useState<Permission>("default");
   useEffect(() => setPermission(browserPermission()), []);
 
   const blocked = permission === "denied" || permission === "unsupported";
   const solPrice = useQuery(pricesQuery).data?.sol ?? null;
-  const spikesPaused = notify.volumeSpike && spikeMinCurrency === "sol" && solPrice === null;
+  const hasSolMinimum =
+    spikeMinCurrency === "sol" || favoritePools.some((pool) => poolOverrides[pool.address]?.minCurrency === "sol");
+  const spikesPaused = notify.volumeSpike && hasSolMinimum && solPrice === null;
 
   const toggleBrowser = async (on: boolean) => {
     if (!on || permission === "granted") return setNotify("browser", on);
@@ -342,7 +353,7 @@ function Notifications() {
             ? "The SOL price is unavailable, so a SOL minimum cannot be checked. Volume spikes are paused."
             : pools === 0
               ? "Star a pool on Analytics to get these alerts."
-              : `For your ${pools} favorite pool${pools === 1 ? "" : "s"}.`
+              : "Applies to all your starred pools. Change it for one pool with the bell on its card."
         }
       >
         <Row
@@ -439,6 +450,7 @@ function Notifications() {
             }}
           />
         </Row>
+        <CustomSoundRow />
       </Group>
 
       <Group
@@ -468,6 +480,68 @@ function Notifications() {
         </Row>
       </Group>
     </div>
+  );
+}
+
+function CustomSoundRow() {
+  const [sound, setSound] = useState<{ name: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Read after mount: localStorage does not exist on the server.
+  useEffect(() => setSound(getCustomSound()), []);
+
+  const button = "h-6.5 rounded-md bg-foreground/[0.07] px-2.5 text-xs hover:bg-foreground/[0.12]";
+
+  return (
+    <Row
+      icon={
+        <RowIcon>
+          <MusicIcon />
+        </RowIcon>
+      }
+      label="Custom sound"
+      description={error ?? (sound ? sound.name : "Replace the built-in chimes with your own audio file")}
+    >
+      <div className="flex shrink-0 items-center gap-1.5">
+        {sound && (
+          <>
+            <button type="button" className={button} onClick={() => playCustomSound()}>
+              Test
+            </button>
+            <button
+              type="button"
+              className={button}
+              onClick={() => {
+                clearCustomSound();
+                setSound(null);
+                setError(null);
+              }}
+            >
+              Remove
+            </button>
+          </>
+        )}
+        {/* relative keeps the visually hidden input inside the label; otherwise focusing it scrolls the dialog. */}
+        <label className={`${button} relative inline-flex cursor-pointer items-center`}>
+          {sound ? "Change" : "Choose file"}
+          <input
+            type="file"
+            accept="audio/*"
+            className="sr-only"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              const problem = await saveCustomSound(file);
+              setError(problem);
+              if (!problem) {
+                setSound(getCustomSound());
+                playCustomSound();
+              }
+            }}
+          />
+        </label>
+      </div>
+    </Row>
   );
 }
 

@@ -5,6 +5,7 @@ import {
   EMPTY_SEEN,
   type Notice,
   type NotifyPrefs,
+  type PoolAlertOverride,
   type Seen,
   type Watch,
 } from "@/features/notifications/notifications";
@@ -15,7 +16,12 @@ interface NotificationState {
   items: Notice[];
   seen: Seen;
   /** Applies one poll and returns the notices it added, newest first. */
-  ingest: (watch: Watch, prefs: NotifyPrefs, poolNames: Record<string, string>) => Notice[];
+  ingest: (
+    watch: Watch,
+    prefs: NotifyPrefs,
+    poolNames: Record<string, string>,
+    poolOverrides?: Record<string, PoolAlertOverride>,
+  ) => Notice[];
   markRead: (id: string) => void;
   markAllRead: () => void;
   clear: () => void;
@@ -27,8 +33,8 @@ export const useNotifications = create<NotificationState>()(
     (set, get) => ({
       items: [],
       seen: EMPTY_SEEN,
-      ingest: (watch, prefs, poolNames) => {
-        const { seen, notices } = diffWatch(get().seen, watch, prefs, poolNames, Date.now());
+      ingest: (watch, prefs, poolNames, poolOverrides) => {
+        const { seen, notices } = diffWatch(get().seen, watch, prefs, poolNames, Date.now(), poolOverrides);
         const known = new Set(get().items.map((n) => n.id));
         const added = notices.filter((n) => !known.has(n.id)).reverse();
         set((s) => ({ seen, items: [...added, ...s.items].slice(0, MAX_NOTICES) }));

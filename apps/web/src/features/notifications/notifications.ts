@@ -23,6 +23,13 @@ export interface Watch {
 }
 
 export type NoticeKind = "out-of-range" | "opened" | "closed" | "volume-spike";
+export type SpikeMultiplier = 2 | 3 | 5 | 10 | "off";
+export interface PoolAlertOverride {
+  timeframe: SpikeTimeframe;
+  multiplier: SpikeMultiplier;
+  minVolume: number;
+  minCurrency: Currency;
+}
 
 export interface Notice {
   id: string;
@@ -45,7 +52,7 @@ export interface NotifyPrefs {
   outOfRange: boolean;
   positions: boolean;
   volumeSpike: boolean;
-  spikeMultiplier: number;
+  spikeMultiplier: SpikeMultiplier;
   spikeTimeframe: SpikeTimeframe;
   /** The smallest candle volume that can count, in USD; null when a SOL minimum has no SOL price to convert at. */
   spikeMinUsd: number | null;
@@ -63,20 +70,30 @@ export const EMPTY_SEEN: Seen = { positions: {}, spikes: {} };
 export const BASELINE_BARS = 24;
 const MIN_BASELINE_BARS = 6;
 
-export interface Spike {
-  t: number;
-  volume: number;
-  average: number;
-}
+export type Spike =
+  | {
+      kind: "minimum-volume";
+      t: number;
+      volume: number;
+    }
+  | {
+      kind: "multiple";
+      t: number;
+      volume: number;
+      average: number;
+    };
 
 /** The current candle's USD volume against the average of the candles before it, oldest first. */
-export function volumeSpike(bars: VolumeBar[], multiplier: number, minUsd: number): Spike | null {
+export function volumeSpike(bars: VolumeBar[], multiplier: SpikeMultiplier, minUsd: number): Spike | null {
   const current = bars.at(-1);
+  if (!current || current.volume < minUsd) return null;
+  if (multiplier === "off") return { kind: "minimum-volume", t: current.t, volume: current.volume };
+
   const baseline = bars.slice(0, -1).slice(-BASELINE_BARS);
-  if (!current || baseline.length < MIN_BASELINE_BARS) return null;
+  if (baseline.length < MIN_BASELINE_BARS) return null;
   const average = baseline.reduce((sum, b) => sum + b.volume, 0) / baseline.length;
-  if (average <= 0 || current.volume < minUsd || current.volume < average * multiplier) return null;
-  return { t: current.t, volume: current.volume, average };
+  if (average <= 0 || current.volume < average * multiplier) return null;
+  return { kind: "multiple", t: current.t, volume: current.volume, average };
 }
 
 const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact" });
@@ -95,6 +112,7 @@ export function diffWatch(
   prefs: NotifyPrefs,
   poolNames: Record<string, string>,
   now: number,
+  poolOverrides: Record<string, PoolAlertOverride> = {},
 ): { seen: Seen; notices: Notice[] } {
   const notices: Notice[] = [];
   const add = (n: Omit<Notice, "at" | "read">) => notices.push({ ...n, at: now, read: false });
@@ -143,16 +161,32 @@ export function diffWatch(
   for (const { pool, bars } of watch.pools) {
     const last = seen.spikes[pool];
     if (last !== undefined) next.spikes[pool] = last;
-    if (!bars || !prefs.volumeSpike || prefs.spikeMinUsd === null) continue;
-    const spike = volumeSpike(bars, prefs.spikeMultiplier, prefs.spikeMinUsd);
+    if (!bars || !prefs.volumeSpike) continue;
+    const override = poolOverrides[pool];
+    const multiplier = override?.multiplier ?? prefs.spikeMultiplier;
+    const timeframe = override?.timeframe ?? prefs.spikeTimeframe;
+    const currency = override?.minCurrency ?? prefs.currency;
+    const minUsd = override
+      ? currency === "usd"
+        ? override.minVolume
+        : prefs.solPrice === null
+          ? null
+          : override.minVolume * prefs.solPrice
+      : prefs.spikeMinUsd;
+    if (minUsd === null) continue;
+    const spike = volumeSpike(bars, multiplier, minUsd);
     if (!spike || spike.t === last) continue;
     next.spikes[pool] = spike.t;
-    const ratio = spike.volume / spike.average;
+    const amount = volumeIn(spike.volume, currency, prefs.solPrice);
+    const detail =
+      spike.kind === "minimum-volume"
+        ? `${amount} in the current ${timeframe} candle, minimum volume reached`
+        : `${amount} in the current ${timeframe} candle, ${(spike.volume / spike.average).toFixed(1)}× the average`;
     add({
       id: `volume-spike:${pool}:${spike.t}`,
       kind: "volume-spike",
       title: `Volume spike · ${poolNames[pool] ?? shortAddr(pool)}`,
-      body: `${volumeIn(spike.volume, prefs.currency, prefs.solPrice)} in the current ${prefs.spikeTimeframe} candle, ${ratio.toFixed(1)}× the average`,
+      body: detail,
       pool,
     });
   }

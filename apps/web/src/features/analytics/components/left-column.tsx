@@ -16,6 +16,7 @@ import { TIP_CLASS } from "@/components/info-tip";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { PoolAlertSettings } from "@/features/notifications/components/pool-alert-settings";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, formatAmount, formatPrice, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
@@ -244,6 +245,7 @@ export function PoolHeader({
       <div className="relative">
         <PoolSheet pool={pool} siblings={siblings} />
         <PoolDialog pool={pool} siblings={siblings} />
+        <PoolAlertSettings pool={pool} />
         <FavoriteStar pool={pool} />
       </div>
       <div className="grid grid-cols-2 gap-3">

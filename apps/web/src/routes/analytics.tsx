@@ -1,18 +1,20 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { z } from "zod";
 import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { analyticsQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
+import { useSettings } from "@/stores/settings";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
 
-const defaults = { tf: "1h", cur: "native", metric: "volume", token: "x" } as const;
+const defaults = { cur: "native", metric: "volume", token: "x" } as const;
 
 const AnalyticsSearch = z.object({
   pool: PoolAddress.optional().catch(undefined),
-  tf: z.enum(TF_IDS).default(defaults.tf).catch(defaults.tf),
+  tf: z.enum(TF_IDS).optional().catch(undefined),
   cur: z.enum(["native", "usd"]).default(defaults.cur).catch(defaults.cur),
   metric: z.enum(["volume", "fees"]).default(defaults.metric).catch(defaults.metric),
   token: z.enum(["x", "y"]).default(defaults.token).catch(defaults.token),
@@ -20,8 +22,11 @@ const AnalyticsSearch = z.object({
 
 export const Route = createFileRoute("/analytics")({
   validateSearch: AnalyticsSearch,
-  search: { middlewares: [stripSearchParams(defaults)] },
-  loaderDeps: ({ search }) => ({ pool: search.pool, tf: search.tf }),
+  search: { middlewares: [stripSearchParams({ ...defaults, tf: "1h" })] },
+  loaderDeps: ({ search }) => ({
+    pool: search.pool,
+    tf: search.tf ?? useSettings.getState().analyticsTimeframe,
+  }),
   loader: async ({ deps, context }) => {
     await context.queryClient.ensureQueryData(analyticsQuery(deps));
   },
@@ -31,9 +36,15 @@ export const Route = createFileRoute("/analytics")({
 });
 
 function Analytics() {
-  const { pool, tf, cur, metric, token } = Route.useSearch();
+  const { pool, tf: searchTf, cur, metric, token } = Route.useSearch();
+  const savedTf = useSettings((s) => s.analyticsTimeframe);
+  const setAnalyticsTimeframe = useSettings((s) => s.setAnalyticsTimeframe);
+  const tf = searchTf ?? savedTf;
   const { data } = useSuspenseQuery(analyticsQuery({ pool, tf }));
   const navigate = Route.useNavigate();
+  useEffect(() => {
+    if (searchTf) setAnalyticsTimeframe(searchTf);
+  }, [searchTf, setAnalyticsTimeframe]);
   return (
     <AnalyticsPage
       // Panned-back history belongs to one pool and timeframe, so a change of either starts fresh.
@@ -41,7 +52,10 @@ function Analytics() {
       data={data}
       view={{ cur, metric, token }}
       onView={(patch) => navigate({ search: (prev) => ({ ...prev, ...patch }) })}
-      onTimeframe={(tf) => navigate({ search: (prev) => ({ ...prev, tf }) })}
+      onTimeframe={(timeframe) => {
+        setAnalyticsTimeframe(timeframe);
+        navigate({ search: (prev) => ({ ...prev, tf: timeframe }) });
+      }}
     />
   );
 }

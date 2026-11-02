@@ -16,9 +16,7 @@ export function Group({
 }) {
   return (
     <section className="flex flex-col gap-1.5">
-      {title && (
-        <h3 className="px-3 text-[0.65rem] font-medium tracking-wide text-muted-foreground uppercase">{title}</h3>
-      )}
+      {title && <h3 className="px-3 text-xs font-medium text-muted-foreground">{title}</h3>}
       <div
         className={`divide-y divide-border/60 overflow-hidden rounded-xl bg-muted/50 ring-1 ${error ? "ring-loss" : "ring-foreground/5"}`}
       >
