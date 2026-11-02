@@ -6,6 +6,7 @@ import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { analyticsQuery, chartQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
+import { AnalyticsSkeleton } from "@/features/analytics/components/analytics-skeleton";
 import { useSettings } from "@/stores/settings";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/analytics")({
     if (typeof window === "undefined") await chart;
   },
   head: () => ({ meta: [{ title: "Analytics · Vexis" }] }),
-  pendingComponent: () => <div className="h-96 animate-pulse rounded-lg bg-card m-2" />,
+  pendingComponent: AnalyticsSkeleton,
   component: Analytics,
 });
 
