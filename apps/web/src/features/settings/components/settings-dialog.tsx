@@ -129,8 +129,8 @@ export function SettingsDialog({
   const active = section ?? "general";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(34rem,85dvh)] flex-row gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <nav className="flex w-44 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
+      <DialogContent className="flex h-[min(46rem,90dvh)] flex-row gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <nav className="flex w-52 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
           <DialogTitle className="px-2 pt-1 pb-3 text-sm font-semibold">Settings</DialogTitle>
           <DialogDescription className="sr-only">App preferences, notifications and favorites</DialogDescription>
           {SECTIONS.map(({ value, label, Icon }) => (

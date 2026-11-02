@@ -81,7 +81,7 @@ export function NotificationsDialog({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 py-12 text-center">
             <span className="flex size-10 items-center justify-center rounded-full bg-muted">
               <BellIcon className="size-4.5 text-muted-foreground" />
             </span>
@@ -107,7 +107,7 @@ export function NotificationsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="flex max-h-[min(36rem,85dvh)] flex-col gap-0 p-0 sm:max-w-md">
+      <DialogContent showCloseButton={false} className="flex h-[min(44rem,90dvh)] flex-col gap-0 p-0 sm:max-w-xl">
         {content}
       </DialogContent>
     </Dialog>

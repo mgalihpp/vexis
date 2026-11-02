@@ -54,7 +54,7 @@ export function PoolAlertSettings({ pool }: { pool: PoolView }) {
       >
         <BellRingIcon />
       </Button>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="p-6 sm:max-w-lg">
         <DialogTitle>Volume alert</DialogTitle>
         <DialogDescription>{pool.name} · Set a pool-specific alert or use global defaults.</DialogDescription>
         <div className="mt-4 flex items-center justify-between gap-4 rounded-lg bg-muted/50 px-3 py-2.5">

@@ -24,7 +24,7 @@ export function ActiveDetailDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[min(40rem,calc(100vw-1.6rem))] gap-0 overflow-y-auto p-0 sm:max-w-[40rem]">
+      <DialogContent className="max-h-[92dvh] max-w-[min(52rem,calc(100vw-1.6rem))] gap-0 overflow-y-auto p-0 sm:max-w-[52rem]">
         {pool && (
           <>
             <div className="border-b p-3.25 pr-8">
