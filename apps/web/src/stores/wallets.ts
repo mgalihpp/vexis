@@ -8,6 +8,7 @@ interface WalletState {
   recent: string[];
   toggleFavorite: (wallet: string) => void;
   visit: (wallet: string) => void;
+  clearRecent: () => void;
 }
 
 // skipHydration keeps the server render and the first client render identical;
@@ -23,6 +24,7 @@ export const useWallets = create<WalletState>()(
         })),
       visit: (wallet) =>
         set((s) => ({ recent: [wallet, ...s.recent.filter((w) => w !== wallet)].slice(0, MAX_RECENT) })),
+      clearRecent: () => set({ recent: [] }),
     }),
     { name: "vexis-wallets", skipHydration: true },
   ),

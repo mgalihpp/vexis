@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { WatchPosition } from "@/features/notifications/notifications";
 import {
   type ClosedPoolRef,
   freshCount,
@@ -354,14 +355,48 @@ async function addTokenInfo(pools: PoolMeta[]) {
 // /portfolio only lists pools with a close in the last 365 days; this total covers every closed position.
 const AllTime = z.object({ totalClosedPositions: z.number(), totalPnlSol: num, totalPnlUsd: num });
 
-function cached<T>(store: Map<string, { at: number; value: Promise<T> }>, key: string, load: () => Promise<T>) {
+function cached<T>(
+  store: Map<string, { at: number; value: Promise<T> }>,
+  key: string,
+  load: () => Promise<T>,
+  ttl = CACHE_MS,
+) {
   const hit = store.get(key);
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+  if (hit && Date.now() - hit.at < ttl) return hit.value;
   const value = load();
   value.catch(() => store.delete(key));
   store.set(key, { at: Date.now(), value });
   return value;
 }
+
+// Notifications poll as often as every 15 s; several tabs watching one wallet still share a read.
+const WATCH_CACHE_MS = 10_000;
+const openPositions = new Map<string, { at: number; value: Promise<WatchPosition[]> }>();
+
+/** Open positions with their range status only, without the per-pool stats `loadPortfolio` adds. */
+export const loadOpenPositions = (wallet: string): Promise<WatchPosition[]> =>
+  cached(
+    openPositions,
+    wallet,
+    async () => {
+      const pools = await allPages(async (page) => {
+        const r = await get("/portfolio/open", OpenPage, { user: wallet, page, page_size: 50 });
+        return { hasNext: r.hasNext, items: r.pools };
+      });
+      const perPool = await mapLimit(pools, CONCURRENCY, async (pool) =>
+        (await poolPositions(pool.poolAddress, wallet, "open")).map(
+          (p): WatchPosition => ({
+            address: p.positionAddress,
+            pool: pool.poolAddress,
+            pair: `${pool.tokenX}-${pool.tokenY}`,
+            inRange: p.isOutOfRange == null ? null : !p.isOutOfRange,
+          }),
+        ),
+      );
+      return perPool.flat();
+    },
+    WATCH_CACHE_MS,
+  );
 
 /** Everything on the page except the closed positions themselves. */
 type BaseSnapshot = Omit<Portfolio, "closed" | "closedProgress"> & { pools: ClosedPoolInfo[] };
