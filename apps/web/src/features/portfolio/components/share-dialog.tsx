@@ -3,7 +3,9 @@ import { CopyIcon, DownloadIcon, PaletteIcon, RotateCcwIcon } from "lucide-react
 import { type CSSProperties, type MouseEvent, type ReactNode, useRef, useState } from "react";
 import { Logo } from "@/components/icons";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Slider } from "@/components/ui/slider";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CurrencyToggle } from "./currency-toggle";
 
 const BACKGROUNDS = [null, "#0f3b3a", "#2b1846", "#13233f", "#0f3a1c", "#3a2a0a", "#1c2433"] as const;
@@ -94,6 +96,7 @@ export function ShareDialog({
   const [opacity, setOpacity] = useState(DEFAULT_OPACITY);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [busy, setBusy] = useState<"copy" | "download" | null>(null);
+  const mobile = useIsMobile();
 
   const tex = TEXTURES.find((t) => t.id === texture);
   const layer: CSSProperties = tex
@@ -140,135 +143,156 @@ export function ShareDialog({
     }
   };
 
+  const editor = (
+    <div className="grid gap-8 p-4 md:grid-cols-[1fr_11.5rem] md:p-9">
+      <div className="min-w-0">
+        <CurrencyToggle />
+        <p className="mt-1.5 mb-2.5 text-[0.65rem] text-muted-foreground">{hint}</p>
+        {/* Fixed width so the exported image looks the same whatever the dialog size. */}
+        <div data-vaul-no-drag className="overflow-x-auto">
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: pointer-only editing aid; the image renders without it */}
+          <div
+            ref={card}
+            onClick={toggleItem}
+            className={`${scope} relative w-[36.75rem] overflow-hidden bg-card p-6 text-card-foreground [&_[data-hidden]]:opacity-0 [&_[data-share-item]]:cursor-pointer`}
+            style={{ backgroundColor: background ?? undefined }}
+          >
+            <div className="pointer-events-none absolute inset-0" style={layer} />
+            <div className="relative">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Logo height={14} />
+                  Vexis
+                </span>
+                <span className="text-xs text-muted-foreground">DLMM portfolio</span>
+              </div>
+              {children}
+              <p className="mt-2.5 text-right text-[0.625rem] text-muted-foreground">
+                {new Date().toISOString().slice(0, 19).replace("T", " ")} UTC
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4.75">
+        <div>
+          <h3 className="mb-2.5 font-semibold">Background</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {BACKGROUNDS.map((color) => (
+              <button
+                key={color ?? "none"}
+                type="button"
+                aria-label={color ?? "No background"}
+                onClick={() => setBackground(color)}
+                className={`relative size-5.5 overflow-hidden rounded-md border bg-card ${background === color ? "ring-2 ring-foreground" : ""}`}
+                style={color ? { backgroundColor: color } : undefined}
+              >
+                {color === null && <span className="absolute inset-0 m-auto h-px w-7.25 -rotate-45 bg-loss" />}
+              </button>
+            ))}
+            <label className="relative flex size-5.5 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground">
+              <PaletteIcon className="size-3.25" />
+              <input
+                type="color"
+                className="absolute inset-0 cursor-pointer opacity-0"
+                onChange={(e) => setBackground(e.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-2.5 font-semibold">Texture</h3>
+          <div className="grid grid-cols-8 gap-1.25">
+            {TEXTURES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-label={t.id}
+                onClick={() => setTexture(t.id)}
+                className={`relative size-4.75 overflow-hidden rounded border bg-card text-foreground [--texture-ink:1] ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
+              >
+                <span className="absolute inset-0 opacity-80" style={t.style(`${t.size}px ${t.size}px`)} />
+              </button>
+            ))}
+            <button
+              type="button"
+              aria-label="No texture"
+              onClick={() => setTexture(null)}
+              className={`relative size-4.75 overflow-hidden rounded border bg-card ${texture === null ? "ring-2 ring-foreground" : ""}`}
+            >
+              <span className="absolute inset-0 m-auto h-px w-6.5 -rotate-45 bg-loss" />
+            </button>
+          </div>
+        </div>
+
+        <SliderRow
+          label="Opacity"
+          value={opacity}
+          display={`${opacity}%`}
+          min={0}
+          max={100}
+          step={1}
+          onChange={setOpacity}
+          onReset={() => setOpacity(DEFAULT_OPACITY)}
+        />
+        <SliderRow
+          label="Zoom"
+          value={zoom}
+          display={zoom.toFixed(1)}
+          min={0.5}
+          max={2}
+          step={0.1}
+          onChange={setZoom}
+          onReset={() => setZoom(DEFAULT_ZOOM)}
+        />
+      </div>
+    </div>
+  );
+
+  const actions = (
+    <div className="flex shrink-0 justify-end gap-2.5 border-t px-4 py-4 md:px-9">
+      <button
+        type="button"
+        onClick={copy}
+        disabled={busy !== null}
+        className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md md:flex-none border px-3.25 text-xs font-medium hover:bg-muted disabled:opacity-60"
+      >
+        <CopyIcon className="size-3.25" />
+        {busy === "copy" ? "Copying…" : "Copy to Clipboard"}
+      </button>
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy !== null}
+        className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md md:flex-none bg-brand px-3.25 text-xs font-medium text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
+      >
+        <DownloadIcon className="size-3.25" />
+        {busy === "download" ? "Rendering…" : "Download Image"}
+      </button>
+    </div>
+  );
+
+  // On a phone the editor scrolls under a pinned action bar, so Copy and Download stay in reach.
+  if (mobile) {
+    return (
+      <Drawer open={open} onOpenChange={onOpenChange}>
+        <DrawerContent className="data-[vaul-drawer-direction=bottom]:max-h-[92dvh]">
+          <DrawerTitle className="sr-only">Share {title}</DrawerTitle>
+          <div className="overflow-y-auto">{editor}</div>
+          {actions}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(55rem,calc(100vw-2rem))] gap-0 p-0 sm:max-w-[55rem]">
+      <DialogContent className="max-h-[92dvh] max-w-[min(64rem,calc(100vw-2rem))] gap-0 overflow-y-auto p-0 sm:max-w-[64rem]">
         <DialogTitle className="sr-only">Share {title}</DialogTitle>
-        <div className="grid gap-8 p-9 md:grid-cols-[1fr_11.5rem]">
-          <div className="min-w-0">
-            <CurrencyToggle />
-            <p className="mt-1.5 mb-2.5 text-[0.65rem] text-muted-foreground">{hint}</p>
-            {/* Fixed width so the exported image looks the same whatever the dialog size. */}
-            <div className="overflow-x-auto">
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: pointer-only editing aid; the image renders without it */}
-              <div
-                ref={card}
-                onClick={toggleItem}
-                className={`${scope} relative w-[36.75rem] overflow-hidden bg-card p-6 text-card-foreground [&_[data-hidden]]:opacity-0 [&_[data-share-item]]:cursor-pointer`}
-                style={{ backgroundColor: background ?? undefined }}
-              >
-                <div className="pointer-events-none absolute inset-0" style={layer} />
-                <div className="relative">
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-sm font-semibold">
-                      <Logo height={14} />
-                      Vexis
-                    </span>
-                    <span className="text-xs text-muted-foreground">DLMM portfolio</span>
-                  </div>
-                  {children}
-                  <p className="mt-2.5 text-right text-[0.625rem] text-muted-foreground">
-                    {new Date().toISOString().slice(0, 19).replace("T", " ")} UTC
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4.75">
-            <div>
-              <h3 className="mb-2.5 font-semibold">Background</h3>
-              <div className="flex flex-wrap gap-1.5">
-                {BACKGROUNDS.map((color) => (
-                  <button
-                    key={color ?? "none"}
-                    type="button"
-                    aria-label={color ?? "No background"}
-                    onClick={() => setBackground(color)}
-                    className={`relative size-5.5 overflow-hidden rounded-md border bg-card ${background === color ? "ring-2 ring-foreground" : ""}`}
-                    style={color ? { backgroundColor: color } : undefined}
-                  >
-                    {color === null && <span className="absolute inset-0 m-auto h-px w-7.25 -rotate-45 bg-loss" />}
-                  </button>
-                ))}
-                <label className="relative flex size-5.5 cursor-pointer items-center justify-center text-muted-foreground hover:text-foreground">
-                  <PaletteIcon className="size-3.25" />
-                  <input
-                    type="color"
-                    className="absolute inset-0 cursor-pointer opacity-0"
-                    onChange={(e) => setBackground(e.target.value)}
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-2.5 font-semibold">Texture</h3>
-              <div className="grid grid-cols-8 gap-1.25">
-                {TEXTURES.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-label={t.id}
-                    onClick={() => setTexture(t.id)}
-                    className={`relative size-4.75 overflow-hidden rounded border bg-card text-foreground [--texture-ink:1] ${texture === t.id ? "ring-2 ring-foreground" : ""}`}
-                  >
-                    <span className="absolute inset-0 opacity-80" style={t.style(`${t.size}px ${t.size}px`)} />
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  aria-label="No texture"
-                  onClick={() => setTexture(null)}
-                  className={`relative size-4.75 overflow-hidden rounded border bg-card ${texture === null ? "ring-2 ring-foreground" : ""}`}
-                >
-                  <span className="absolute inset-0 m-auto h-px w-6.5 -rotate-45 bg-loss" />
-                </button>
-              </div>
-            </div>
-
-            <SliderRow
-              label="Opacity"
-              value={opacity}
-              display={`${opacity}%`}
-              min={0}
-              max={100}
-              step={1}
-              onChange={setOpacity}
-              onReset={() => setOpacity(DEFAULT_OPACITY)}
-            />
-            <SliderRow
-              label="Zoom"
-              value={zoom}
-              display={zoom.toFixed(1)}
-              min={0.5}
-              max={2}
-              step={0.1}
-              onChange={setZoom}
-              onReset={() => setZoom(DEFAULT_ZOOM)}
-            />
-          </div>
-        </div>
-        <div className="flex justify-end gap-2.5 border-t px-9 py-4">
-          <button
-            type="button"
-            onClick={copy}
-            disabled={busy !== null}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3.25 text-xs font-medium hover:bg-muted disabled:opacity-60"
-          >
-            <CopyIcon className="size-3.25" />
-            {busy === "copy" ? "Copying…" : "Copy to Clipboard"}
-          </button>
-          <button
-            type="button"
-            onClick={download}
-            disabled={busy !== null}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-brand px-3.25 text-xs font-medium text-brand-foreground hover:bg-brand/90 disabled:opacity-60"
-          >
-            <DownloadIcon className="size-3.25" />
-            {busy === "download" ? "Rendering…" : "Download Image"}
-          </button>
-        </div>
+        {editor}
+        {actions}
       </DialogContent>
     </Dialog>
   );
@@ -296,6 +320,7 @@ function SliderRow(props: {
         </span>
       </div>
       <Slider
+        data-vaul-no-drag
         value={[props.value]}
         min={props.min}
         max={props.max}
