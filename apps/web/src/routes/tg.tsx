@@ -1,5 +1,6 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { getFleet } from "@/features/bots/bots.functions";
+import { fleetQuery } from "@/features/bots/bots.queries";
 import { BotCard } from "@/features/bots/components/bot-card";
 import { loadTelegram } from "@/features/telegram/telegram";
 
@@ -9,18 +10,19 @@ import { loadTelegram } from "@/features/telegram/telegram";
 // server function the SSR routes use.
 export const Route = createFileRoute("/tg")({
   ssr: false,
-  loader: async () => {
-    const [app, fleet] = await Promise.all([loadTelegram(), getFleet()]);
+  loader: async ({ context }) => {
+    const [app] = await Promise.all([loadTelegram(), context.queryClient.ensureQueryData(fleetQuery)]);
     app.ready();
     app.expand();
-    return { fleet, user: app.initDataUnsafe.user?.first_name ?? null };
+    return { user: app.initDataUnsafe.user?.first_name ?? null };
   },
   pendingComponent: () => <p className="text-xs text-zinc-500">Connecting to Telegram…</p>,
   component: TelegramHome,
 });
 
 function TelegramHome() {
-  const { fleet, user } = Route.useLoaderData();
+  const { user } = Route.useLoaderData();
+  const { data: fleet } = useSuspenseQuery(fleetQuery);
   return (
     <section className="mx-auto max-w-5xl space-y-3.25 px-3.25 py-4.75">
       <p className="text-xs text-zinc-400">{user ? `Hi ${user}.` : "Open this page from the bot in Telegram."}</p>

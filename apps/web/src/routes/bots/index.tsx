@@ -1,19 +1,21 @@
-import { Await, createFileRoute } from "@tanstack/react-router";
-import { getFleet, getFleetActivity } from "@/features/bots/bots.functions";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { Suspense } from "react";
+import { fleetActivityQuery, fleetQuery } from "@/features/bots/bots.queries";
 import { ActivityLine, BotCard } from "@/features/bots/components/bot-card";
 
 // Full SSR: the fleet status is the first thing anyone opens, so it ships in
 // the document. The 24h tallies read whole journals and stream in after.
 export const Route = createFileRoute("/bots/")({
-  loader: async () => ({
-    fleet: await getFleet(),
-    activity: getFleetActivity(),
-  }),
+  loader: async ({ context }) => {
+    void context.queryClient.prefetchQuery(fleetActivityQuery);
+    await context.queryClient.ensureQueryData(fleetQuery);
+  },
   component: FleetPage,
 });
 
 function FleetPage() {
-  const { fleet, activity } = Route.useLoaderData();
+  const { data: fleet } = useSuspenseQuery(fleetQuery);
 
   if (fleet.bots.length === 0) {
     return (
@@ -31,12 +33,17 @@ function FleetPage() {
           bot={bot}
           now={fleet.now}
           activity={
-            <Await promise={activity} fallback={<span className="h-2.5 w-25.5 animate-pulse rounded bg-zinc-800" />}>
-              {(tallies) => <ActivityLine activity={tallies.find((t) => t.id === bot.id)} />}
-            </Await>
+            <Suspense fallback={<span className="h-2.5 w-25.5 animate-pulse rounded bg-zinc-800" />}>
+              <BotActivity id={bot.id} />
+            </Suspense>
           }
         />
       ))}
     </section>
   );
+}
+
+function BotActivity({ id }: { id: string }) {
+  const { data: tallies } = useSuspenseQuery(fleetActivityQuery);
+  return <ActivityLine activity={tallies.find((t) => t.id === id)} />;
 }

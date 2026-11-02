@@ -1,14 +1,15 @@
-import { Await } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { BadgeCheckIcon } from "lucide-react";
-import { type ReactNode, useDeferredValue, useMemo } from "react";
+import { type ReactNode, Suspense, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { type BalanceRow, type BalanceValue, balancesView, type WalletBalances } from "../balances";
 import { compactUsd, formatAmount, formatPrice, money, pct, tone } from "../money";
 import type { Currency } from "../portfolio";
+import { balancesQuery } from "../portfolio.queries";
 import { CurrencyToggle } from "./currency-toggle";
 import { OrganicScore, TokenIcon } from "./pool-identity";
 
-/** The loader settles to this instead of rejecting, so a failure shows inside the table. */
+/** The query settles to this instead of rejecting, so a failure shows inside the table. */
 export type BalancesResult = { ok: true; balances: WalletBalances } | { ok: false; message: string };
 
 const COLUMNS = 5;
@@ -19,40 +20,34 @@ const show = (v: BalanceValue, currency: Currency) => {
   return n === null ? NONE : money(n, currency);
 };
 
-export function Balances({
-  result,
-  solPrice,
-  currency,
-}: {
-  result: Promise<BalancesResult>;
-  solPrice: number | null;
-  currency: Currency;
-}) {
-  // The live refresh hands over a new promise every 15 s; keep the settled one on screen until it resolves.
-  const deferred = useDeferredValue(result);
+type BalancesProps = { wallet: string; solPrice: number | null; currency: Currency };
+
+export function Balances(props: BalancesProps) {
   return (
     <div className="flex flex-1 flex-col gap-2">
       <div className="flex items-center">
         <CurrencyToggle />
       </div>
       <div className="-mx-2 flex flex-1 flex-col">
-        <Await promise={deferred} fallback={<BalancesSkeleton />}>
-          {(r) =>
-            r.ok ? (
-              <BalancesTable balances={r.balances} solPrice={solPrice} currency={currency} />
-            ) : (
-              <Frame>
-                <TableRow>
-                  <TableCell colSpan={COLUMNS} className="py-10 text-center text-loss">
-                    Could not load balances: {r.message}
-                  </TableCell>
-                </TableRow>
-              </Frame>
-            )
-          }
-        </Await>
+        <Suspense fallback={<BalancesSkeleton />}>
+          <BalancesResultView {...props} />
+        </Suspense>
       </div>
     </div>
+  );
+}
+
+function BalancesResultView({ wallet, solPrice, currency }: BalancesProps) {
+  const { data: r } = useSuspenseQuery(balancesQuery(wallet));
+  if (r.ok) return <BalancesTable balances={r.balances} solPrice={solPrice} currency={currency} />;
+  return (
+    <Frame>
+      <TableRow>
+        <TableCell colSpan={COLUMNS} className="py-10 text-center text-loss">
+          Could not load balances: {r.message}
+        </TableCell>
+      </TableRow>
+    </Frame>
   );
 }
 

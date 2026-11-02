@@ -1,21 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Balances, type BalancesResult } from "@/features/portfolio/components/balances";
-import { getBalances } from "@/features/portfolio/portfolio.functions";
+import { Balances } from "@/features/portfolio/components/balances";
+import { balancesQuery } from "@/features/portfolio/portfolio.queries";
 import { usePortfolioView } from "@/features/portfolio/use-portfolio-view";
 
 export const Route = createFileRoute("/portfolio/$wallet/balances")({
-  // A wallet with thousands of tokens needs one token search per hundred, so the tab opens before they finish.
-  loader: ({ params }) => ({
-    balances: getBalances({ data: { wallet: params.wallet } }).then(
-      (balances): BalancesResult => ({ ok: true, balances }),
-      (e: unknown): BalancesResult => ({ ok: false, message: e instanceof Error ? e.message : String(e) }),
-    ),
-  }),
+  // A wallet with thousands of tokens needs one token search per hundred, so the tab opens before they finish
+  // and the result streams in.
+  loader: ({ params, context }) => {
+    void context.queryClient.prefetchQuery(balancesQuery(params.wallet));
+  },
   component: BalancesTab,
 });
 
 function BalancesTab() {
-  const { balances } = Route.useLoaderData();
+  const { wallet } = Route.useParams();
   const { portfolio, currency } = usePortfolioView();
-  return <Balances result={balances} solPrice={portfolio.solPrice} currency={currency} />;
+  return <Balances wallet={wallet} solPrice={portfolio.solPrice} currency={currency} />;
 }
