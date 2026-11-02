@@ -1,10 +1,10 @@
-import { getRouteApi } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { solscanAccount } from "@/lib/format";
 import { fullDuration, money, timeAgo, utcStamp } from "../money";
 import { type ClosedPoolRow, type ClosedPosition, type Currency, closedPoolRows, type PoolMeta } from "../portfolio";
+import { usePortfolio } from "../use-portfolio-view";
 import { Pnl, ShareButton, Tile } from "./active-figures";
 import { CurrencyToggle } from "./currency-toggle";
 import { PnlShareCard } from "./pnl-share-card";
@@ -12,8 +12,6 @@ import { PoolIdentity, SolscanLink } from "./pool-identity";
 import { ActivityList, useActivity } from "./position-activity";
 import { ShareDialog } from "./share-dialog";
 import { Expander, Pagination, PoolFilter, type Sort, SortHead, sortBy, type View, ViewToggle } from "./table-controls";
-
-const route = getRouteApi("/portfolio/$wallet");
 
 const SORTS = {
   positions: (r: ClosedPoolRow) => r.positions.length,
@@ -222,7 +220,7 @@ function ClosedGrid({
   onShare: (target: ShareTarget) => void;
   onOpen: (address: string) => void;
 }) {
-  const fetchedAt = route.useLoaderData({ select: (p) => p.fetchedAt });
+  const fetchedAt = usePortfolio().fetchedAt;
   if (rows.length === 0) return <p className="flex-1 py-10 text-center text-muted-foreground">{empty}</p>;
   return (
     <div className="grid flex-1 content-start gap-2 px-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -292,7 +290,7 @@ function PoolRows({
   currency: Currency;
   onShare: (target: ShareTarget) => void;
 }) {
-  const fetchedAt = route.useLoaderData({ select: (p) => p.fetchedAt });
+  const fetchedAt = usePortfolio().fetchedAt;
   const t = row[currency];
   return (
     <>

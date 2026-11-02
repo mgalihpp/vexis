@@ -1,4 +1,3 @@
-import { getRouteApi } from "@tanstack/react-router";
 import { CircleCheckIcon, CircleXIcon, ShareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNow } from "@/hooks/use-now";
@@ -13,8 +12,7 @@ import {
   openedAt,
   rangeOffsets,
 } from "../portfolio";
-
-const route = getRouteApi("/portfolio/$wallet");
+import { usePortfolio } from "../use-portfolio-view";
 
 export function Tile({
   label,
@@ -88,7 +86,7 @@ export function Fees({ totals, currency }: { totals: ActiveAmounts; currency: Cu
 
 /** Time since `since`, ticking every second once hydrated. */
 export function LiveDuration({ since }: { since: number }) {
-  const fetchedAt = route.useLoaderData({ select: (p) => p.fetchedAt });
+  const fetchedAt = usePortfolio().fetchedAt;
   return <>{duration(useNow(fetchedAt) - since)}</>;
 }
 

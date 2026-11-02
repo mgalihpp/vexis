@@ -1,4 +1,3 @@
-import { getRouteApi } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { solscanTx } from "@/lib/format";
 import { compactUsd, money, utcStamp } from "../money";
@@ -12,9 +11,8 @@ import {
   type Token,
 } from "../portfolio";
 import { getPositionActivity } from "../portfolio.functions";
+import { usePortfolio } from "../use-portfolio-view";
 import { SolscanLink, TokenIcon } from "./pool-identity";
-
-const route = getRouteApi("/portfolio/$wallet");
 
 /** What the activity lines need from a pool; a closed pool has no FDV. */
 export type ActivityPool = Pick<ActivePool, "tokenX" | "tokenY" | "fdv">;
@@ -126,7 +124,7 @@ export function ActivityList({
   currency: Currency;
   layout: "lines" | "cards";
 }) {
-  const solPrice = route.useLoaderData({ select: (p) => p.solPrice });
+  const solPrice = usePortfolio().solPrice;
   if (activity.status === "error") return <p className="p-2.5 text-xs text-loss">{activity.message}</p>;
   if (activity.status !== "ready") return <p className="p-2.5 text-xs text-muted-foreground">Loading activity…</p>;
   const rows = activityRows(activity.events, pool, solPrice);

@@ -1,17 +1,15 @@
 /// <reference types="vite/client" />
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { type QueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { getPrices } from "@/features/portfolio/portfolio.functions";
+import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useTelegramBackButton } from "@/features/telegram/use-telegram-back-button";
 import { themeScript } from "@/features/theme/theme";
-import { useLiveRefresh } from "@/hooks/use-live-refresh";
 import appCss from "@/styles.css?url";
 
-const REFRESH_MS = 15_000;
-
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -24,7 +22,7 @@ export const Route = createRootRoute({
     ],
     scripts: [{ children: themeScript }],
   }),
-  loader: () => getPrices(),
+  loader: ({ context }) => context.queryClient.ensureQueryData(pricesQuery),
   shellComponent: RootDocument,
   component: RootLayout,
 });
@@ -45,8 +43,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 }
 
 function RootLayout() {
-  const prices = Route.useLoaderData();
-  useLiveRefresh(REFRESH_MS);
+  const { data: prices } = useSuspenseQuery(pricesQuery);
   useTelegramBackButton();
   return (
     <AppShell prices={prices}>

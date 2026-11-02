@@ -1,10 +1,11 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
-import { getBot } from "@/features/bots/bots.functions";
+import { botQuery } from "@/features/bots/bots.queries";
 import { HealthBadge } from "@/features/bots/components/health-badge";
 import { PositionStats } from "@/features/bots/components/position-stats";
 
 export const Route = createFileRoute("/bots/$botId")({
-  loader: ({ params }) => getBot({ data: { botId: params.botId } }),
+  loader: ({ params, context }) => context.queryClient.ensureQueryData(botQuery(params.botId)),
   head: ({ loaderData }) => ({
     meta: [{ title: loaderData ? `${loaderData.bot.name} · Vexis` : "Vexis" }],
   }),
@@ -14,8 +15,8 @@ export const Route = createFileRoute("/bots/$botId")({
 const tab = "rounded-md px-2.5 py-1.25 text-xs text-zinc-400 hover:text-zinc-100";
 
 function BotLayout() {
-  const { bot } = Route.useLoaderData();
   const { botId } = Route.useParams();
+  const { bot } = useSuspenseQuery(botQuery(botId)).data;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4.75 px-3.25 py-4.75">

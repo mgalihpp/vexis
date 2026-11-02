@@ -6,8 +6,9 @@ import { Notice } from "@/features/portfolio/components/notice";
 import { PairFilter, RangePicker } from "@/features/portfolio/components/range-picker";
 import { WalletBar } from "@/features/portfolio/components/wallet-bar";
 import { RANGE_PRESETS, type RangePreset } from "@/features/portfolio/portfolio";
-import { getPortfolio, WalletAddress } from "@/features/portfolio/portfolio.functions";
-import { usePollWhile } from "@/features/portfolio/use-poll-while";
+import { WalletAddress } from "@/features/portfolio/portfolio.functions";
+import { portfolioQuery } from "@/features/portfolio/portfolio.queries";
+import { usePortfolio } from "@/features/portfolio/use-portfolio-view";
 import { useWallets } from "@/stores/wallets";
 
 const RANGE_IDS = RANGE_PRESETS.map((p) => p.id) as [RangePreset, ...RangePreset[]];
@@ -27,9 +28,9 @@ const PortfolioSearch = z.object({
 export const Route = createFileRoute("/portfolio/$wallet")({
   validateSearch: PortfolioSearch,
   search: { middlewares: [stripSearchParams(defaults)] },
-  loader: ({ params }) => {
+  loader: async ({ params, context }) => {
     if (!WalletAddress.safeParse(params.wallet).success) throw notFound();
-    return getPortfolio({ data: { wallet: params.wallet } });
+    await context.queryClient.ensureQueryData(portfolioQuery(params.wallet));
   },
   head: ({ params }) => ({
     meta: [{ title: `${params.wallet.slice(0, 4)}…${params.wallet.slice(-4)} · Portfolio · Vexis` }],
@@ -51,7 +52,7 @@ const tabClass =
 
 function PortfolioLayout() {
   const { wallet } = Route.useParams();
-  const portfolio = Route.useLoaderData();
+  const portfolio = usePortfolio();
   const visit = useWallets((s) => s.visit);
   useEffect(() => visit(wallet), [visit, wallet]);
   const pairs = [...new Set([...portfolio.closed, ...portfolio.active].map((p) => p.pair))].sort();
@@ -64,7 +65,6 @@ function PortfolioLayout() {
   const ownToolbar = onActive || onClosed || onTransactions || onBalances;
   const pagedTable = onClosed || onTransactions;
   const { loaded, total, running } = portfolio.closedProgress;
-  usePollWhile(running);
 
   return (
     <div className="flex h-full flex-col">

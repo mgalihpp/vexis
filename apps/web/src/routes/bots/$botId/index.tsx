@@ -1,7 +1,8 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { EVENT_KINDS, EventKind } from "@vexis/bot-state";
 import { z } from "zod";
-import { getBotEvents } from "@/features/bots/bots.functions";
+import { botEventsQuery } from "@/features/bots/bots.queries";
 import { EventDetail } from "@/features/bots/components/event-detail";
 import { kindTone } from "@/features/bots/event-tone";
 import { ago } from "@/lib/format";
@@ -15,13 +16,16 @@ const FeedSearch = z.object({
 export const Route = createFileRoute("/bots/$botId/")({
   validateSearch: FeedSearch,
   loaderDeps: ({ search }) => search,
-  loader: ({ params, deps }) => getBotEvents({ data: { botId: params.botId, ...deps } }),
+  loader: async ({ params, deps, context }) => {
+    await context.queryClient.ensureQueryData(botEventsQuery({ botId: params.botId, ...deps }));
+  },
   component: FeedPage,
 });
 
 function FeedPage() {
-  const { events, total, now } = Route.useLoaderData();
+  const { botId } = Route.useParams();
   const { kinds, limit } = Route.useSearch();
+  const { events, total, now } = useSuspenseQuery(botEventsQuery({ botId, kinds, limit })).data;
   const selected = new Set(kinds ?? []);
 
   const toggle = (kind: EventKind) => {

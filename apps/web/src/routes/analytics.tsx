@@ -1,7 +1,9 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { z } from "zod";
 import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
-import { getAnalytics, PoolAddress } from "@/features/analytics/analytics.functions";
+import { PoolAddress } from "@/features/analytics/analytics.functions";
+import { analyticsQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
@@ -20,15 +22,17 @@ export const Route = createFileRoute("/analytics")({
   validateSearch: AnalyticsSearch,
   search: { middlewares: [stripSearchParams(defaults)] },
   loaderDeps: ({ search }) => ({ pool: search.pool, tf: search.tf }),
-  loader: ({ deps }) => getAnalytics({ data: deps }),
+  loader: async ({ deps, context }) => {
+    await context.queryClient.ensureQueryData(analyticsQuery(deps));
+  },
   head: () => ({ meta: [{ title: "Analytics · Vexis" }] }),
   pendingComponent: () => <div className="h-96 animate-pulse rounded-lg bg-card m-2" />,
   component: Analytics,
 });
 
 function Analytics() {
-  const data = Route.useLoaderData();
-  const { cur, metric, token } = Route.useSearch();
+  const { pool, tf, cur, metric, token } = Route.useSearch();
+  const { data } = useSuspenseQuery(analyticsQuery({ pool, tf }));
   const navigate = Route.useNavigate();
   return (
     <AnalyticsPage

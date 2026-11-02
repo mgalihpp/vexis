@@ -1,6 +1,7 @@
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { z } from "zod";
-import { getBotEvents } from "@/features/bots/bots.functions";
+import { botEventsQuery } from "@/features/bots/bots.queries";
 import { EventDetail } from "@/features/bots/components/event-detail";
 
 const PAGE_SIZE = 100;
@@ -15,17 +16,22 @@ export const Route = createFileRoute("/bots/$botId/journal")({
   ssr: "data-only",
   validateSearch: JournalSearch,
   loaderDeps: ({ search }) => search,
-  loader: ({ params, deps }) =>
-    getBotEvents({ data: { botId: params.botId, limit: PAGE_SIZE, offset: (deps.page - 1) * PAGE_SIZE } }),
+  loader: async ({ params, deps, context }) => {
+    await context.queryClient.ensureQueryData(journalQuery(params.botId, deps.page));
+  },
   pendingComponent: () => <div className="panel h-51.25 animate-pulse" />,
   component: JournalPage,
 });
 
+const journalQuery = (botId: string, page: number) =>
+  botEventsQuery({ botId, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+
 const stamp = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" });
 
 function JournalPage() {
-  const { events, total } = Route.useLoaderData();
+  const { botId } = Route.useParams();
   const { page } = Route.useSearch();
+  const { events, total } = useSuspenseQuery(journalQuery(botId, page)).data;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
