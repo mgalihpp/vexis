@@ -1,6 +1,8 @@
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { type Bar, type Currency, convertBars, sumVolume, type TimeframeId, type VolumePoint } from "../analytics";
 import { getOlderBars } from "../analytics.functions";
+import { chartQuery } from "../analytics.queries";
 import type { loadAnalytics } from "../analytics.server";
 import type { ChartBar } from "./candle-chart";
 import { ChartPanel, VolumeStats } from "./center-column";
@@ -25,55 +27,19 @@ function mergeByTime<T extends { t: number }>(older: T[], latest: T[]): T[] {
 
 export function AnalyticsPage({
   data,
+  tf,
   view,
   onView,
   onTimeframe,
 }: {
   data: AnalyticsData;
+  tf: TimeframeId;
   view: AnalyticsView;
   onView: (patch: Partial<AnalyticsView>) => void;
   onTimeframe: (tf: TimeframeId) => void;
 }) {
-  const { pool, spark, siblings, now, tf, chain } = data;
+  const { pool, spark, siblings, now, chain } = data;
   const yUsd = pool.tokenY.price;
-  // Bars the user panned back to, kept apart from the loader's latest window, which refreshes every 15 s.
-  const [older, setOlder] = useState<{ bars: Bar[]; history: VolumePoint[] }>({ bars: [], history: [] });
-  const [loadingOlder, setLoadingOlder] = useState(false);
-  const olderState = useRef<"idle" | "loading" | "done">("idle");
-  const bars = useMemo(() => mergeByTime(older.bars, data.bars), [older.bars, data.bars]);
-  const history = useMemo(() => mergeByTime(older.history, data.history), [older.history, data.history]);
-  const oldest = bars[0]?.t;
-  const needOlder = useCallback(() => {
-    if (olderState.current !== "idle" || oldest === undefined) return;
-    olderState.current = "loading";
-    setLoadingOlder(true);
-    getOlderBars({ data: { pool: pool.address, tf, before: oldest } })
-      .then((r) => {
-        if (r.bars.length === 0) {
-          olderState.current = "done";
-          return;
-        }
-        setOlder((o) => ({ bars: [...r.bars, ...o.bars], history: [...r.history, ...o.history] }));
-        olderState.current = "idle";
-      })
-      .catch(() => {
-        olderState.current = "done";
-      })
-      .finally(() => setLoadingOlder(false));
-  }, [oldest, pool.address, tf]);
-
-  const shown = convertBars(bars, view.cur, yUsd);
-  const fees = new Map(
-    convertBars(
-      history.map((h) => ({ t: h.t, open: 0, high: 0, low: 0, close: 0, volume: h.fees })),
-      view.cur,
-      yUsd,
-    ).map((h) => [h.t, h.volume]),
-  );
-  const chartBars: ChartBar[] = shown.map((b) => ({
-    ...b,
-    value: view.metric === "fees" ? (fees.get(b.t) ?? 0) : b.volume,
-  }));
   const price = view.cur === "usd" ? pool.price * yUsd : pool.price;
   const quote = pool.tokenY.symbol;
   const priceUnit = view.cur === "usd" ? "USD" : `${quote}/${pool.tokenX.symbol}`;
@@ -101,17 +67,15 @@ export function AnalyticsPage({
           <VolumeStats pool={pool} volume7d={spark.length > 0 ? sumVolume(spark) : null} />
         </div>
         <div className="max-xl:order-3">
-          <ChartPanel
-            bars={chartBars}
+          <Chart
+            pool={pool.address}
             tf={tf}
-            metric={view.metric}
-            currency={view.cur}
+            view={view}
+            yUsd={yUsd}
             price={price}
             quote={quote}
-            onChange={onView}
+            onView={onView}
             onTimeframe={onTimeframe}
-            onNeedOlder={needOlder}
-            loadingOlder={loadingOlder}
           />
         </div>
       </div>
@@ -133,5 +97,89 @@ export function AnalyticsPage({
         </div>
       </div>
     </div>
+  );
+}
+
+const NO_OLDER = { bars: [] as Bar[], history: [] as VolumePoint[] };
+
+/** The chart reads its own query, so a timeframe change shows a skeleton here and leaves the rest of the page alone. */
+function Chart({
+  pool,
+  tf,
+  view,
+  yUsd,
+  price,
+  quote,
+  onView,
+  onTimeframe,
+}: {
+  pool: string;
+  tf: TimeframeId;
+  view: AnalyticsView;
+  yUsd: number;
+  price: number;
+  quote: string;
+  onView: (patch: Partial<AnalyticsView>) => void;
+  onTimeframe: (tf: TimeframeId) => void;
+}) {
+  const { data } = useQuery(chartQuery({ pool, tf }));
+  // Bars the user panned back to, kept apart from the latest window, which refreshes every 15 s. They belong to one
+  // timeframe, so a change of timeframe starts fresh.
+  const [older, setOlder] = useState({ tf, ...NO_OLDER });
+  const olderState = useRef<{ tf: TimeframeId; state: "idle" | "loading" | "done" }>({ tf, state: "idle" });
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  if (older.tf !== tf) setOlder({ tf, ...NO_OLDER });
+  if (olderState.current.tf !== tf) olderState.current = { tf, state: "idle" };
+  const kept = older.tf === tf ? older : NO_OLDER;
+  const bars = useMemo(() => mergeByTime(kept.bars, data?.bars ?? []), [kept.bars, data?.bars]);
+  const history = useMemo(() => mergeByTime(kept.history, data?.history ?? []), [kept.history, data?.history]);
+  const oldest = bars[0]?.t;
+  const needOlder = useCallback(() => {
+    const status = olderState.current;
+    if (status.state !== "idle" || oldest === undefined) return;
+    status.state = "loading";
+    setLoadingOlder(true);
+    getOlderBars({ data: { pool, tf, before: oldest } })
+      .then((r) => {
+        if (r.bars.length === 0) {
+          status.state = "done";
+          return;
+        }
+        setOlder((o) =>
+          o.tf === tf ? { tf, bars: [...r.bars, ...o.bars], history: [...r.history, ...o.history] } : o,
+        );
+        status.state = "idle";
+      })
+      .catch(() => {
+        status.state = "done";
+      })
+      .finally(() => setLoadingOlder(false));
+  }, [oldest, pool, tf]);
+
+  const shown = convertBars(bars, view.cur, yUsd);
+  const fees = new Map(
+    convertBars(
+      history.map((h) => ({ t: h.t, open: 0, high: 0, low: 0, close: 0, volume: h.fees })),
+      view.cur,
+      yUsd,
+    ).map((h) => [h.t, h.volume]),
+  );
+  const chartBars: ChartBar[] = shown.map((b) => ({
+    ...b,
+    value: view.metric === "fees" ? (fees.get(b.t) ?? 0) : b.volume,
+  }));
+  return (
+    <ChartPanel
+      bars={data ? chartBars : null}
+      tf={tf}
+      metric={view.metric}
+      currency={view.cur}
+      price={price}
+      quote={quote}
+      onChange={onView}
+      onTimeframe={onTimeframe}
+      onNeedOlder={needOlder}
+      loadingOlder={loadingOlder}
+    />
   );
 }

@@ -331,22 +331,14 @@ const toVolume = (rows: z.infer<typeof VolumeHistory>["data"]): VolumePoint[] =>
 
 export interface AnalyticsRequest {
   pool?: string | undefined;
-  tf: TimeframeId;
 }
 
-export async function loadAnalytics({ pool, tf }: AnalyticsRequest) {
+/** Everything on the page except the chart, which loads on its own so a timeframe change reloads only the chart. */
+export async function loadAnalytics({ pool }: AnalyticsRequest) {
   const raw = await resolvePool(pool);
-  const frame = timeframe(tf);
-  const end = Math.floor(Date.now() / 1000 / frame.seconds) * frame.seconds + frame.seconds;
   const sparkEnd = Math.floor(Date.now() / 1000 / SPARK_SECONDS) * SPARK_SECONDS + SPARK_SECONDS;
-  const span = { start_time: end - BAR_COUNT * frame.seconds, end_time: end };
-  const [siblings, ohlcv, history, spark, jupX, jupY, stats, chain] = await Promise.all([
+  const [siblings, spark, jupX, jupY, stats, chain] = await Promise.all([
     siblingPools(raw.token_x.address, raw.token_y.address).catch(() => []),
-    get(`/pools/${raw.address}/ohlcv`, Ohlcv, { timeframe: frame.id, ...span }),
-    // Candles carry no fees; the chart's Fees view reads them from here, matched by bar time.
-    get(`/pools/${raw.address}/volume/history`, VolumeHistory, { timeframe: frame.id, ...span }).catch(() => ({
-      data: [],
-    })),
     get(`/pools/${raw.address}/volume/history`, VolumeHistory, {
       timeframe: "4h",
       start_time: sparkEnd - SPARK_BARS * SPARK_SECONDS,
@@ -359,15 +351,30 @@ export async function loadAnalytics({ pool, tf }: AnalyticsRequest) {
   ]);
   return {
     now: Date.now(),
-    tf,
     pool: poolView(raw, jupX, jupY, stats, chain),
     chain,
     siblings,
-    bars: toBars(ohlcv.data),
-    history: toVolume(history.data),
     spark: toVolume(spark.data),
     quoteIsSol: raw.token_y.address === SOL,
   };
+}
+
+export interface ChartRequest {
+  pool: string;
+  tf: TimeframeId;
+}
+
+/** The latest 96 bars of a timeframe. */
+export async function loadChart({ pool, tf }: ChartRequest) {
+  const frame = timeframe(tf);
+  const end = Math.floor(Date.now() / 1000 / frame.seconds) * frame.seconds + frame.seconds;
+  const span = { start_time: end - BAR_COUNT * frame.seconds, end_time: end };
+  const [ohlcv, history] = await Promise.all([
+    get(`/pools/${pool}/ohlcv`, Ohlcv, { timeframe: frame.id, ...span }),
+    // Candles carry no fees; the chart's Fees view reads them from here, matched by bar time.
+    get(`/pools/${pool}/volume/history`, VolumeHistory, { timeframe: frame.id, ...span }).catch(() => ({ data: [] })),
+  ]);
+  return { bars: toBars(ohlcv.data), history: toVolume(history.data) };
 }
 
 export interface OlderRequest {

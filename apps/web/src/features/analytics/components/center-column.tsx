@@ -106,7 +106,8 @@ export function ChartPanel({
   onNeedOlder,
   loadingOlder,
 }: {
-  bars: ChartBar[];
+  /** Null while the timeframe's bars load. */
+  bars: ChartBar[] | null;
   tf: TimeframeId;
   metric: "volume" | "fees";
   currency: Currency;
@@ -158,15 +159,19 @@ export function ChartPanel({
             />
           </div>
         </div>
-        <CandleChart
-          bars={bars}
-          tf={tf}
-          price={price}
-          metric={metric}
-          onNeedOlder={onNeedOlder}
-          loadingOlder={loadingOlder}
-          prefix={currency === "usd" ? "$" : ""}
-        />
+        {bars === null ? (
+          <div className="min-h-0 flex-1 animate-pulse rounded-md bg-muted" />
+        ) : (
+          <CandleChart
+            bars={bars}
+            tf={tf}
+            price={price}
+            metric={metric}
+            onNeedOlder={onNeedOlder}
+            loadingOlder={loadingOlder}
+            prefix={currency === "usd" ? "$" : ""}
+          />
+        )}
       </Panel>
       <button
         type="button"

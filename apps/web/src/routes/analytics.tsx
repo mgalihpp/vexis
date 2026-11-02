@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { z } from "zod";
 import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
-import { analyticsQuery } from "@/features/analytics/analytics.queries";
+import { analyticsQuery, chartQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
 import { useSettings } from "@/stores/settings";
 
@@ -28,7 +28,11 @@ export const Route = createFileRoute("/analytics")({
     tf: search.tf ?? useSettings.getState().analyticsTimeframe,
   }),
   loader: async ({ deps, context }) => {
-    await context.queryClient.ensureQueryData(analyticsQuery(deps));
+    const { pool } = await context.queryClient.ensureQueryData(analyticsQuery({ pool: deps.pool }));
+    // The server sends the chart with the page. In the browser a timeframe change only starts the chart's fetch, so
+    // the page stays and the chart shows its own skeleton. prefetchQuery never throws; a failed chart retries there.
+    const chart = context.queryClient.prefetchQuery(chartQuery({ pool: pool.address, tf: deps.tf }));
+    if (typeof window === "undefined") await chart;
   },
   head: () => ({ meta: [{ title: "Analytics · Vexis" }] }),
   pendingComponent: () => <div className="h-96 animate-pulse rounded-lg bg-card m-2" />,
@@ -40,16 +44,17 @@ function Analytics() {
   const savedTf = useSettings((s) => s.analyticsTimeframe);
   const setAnalyticsTimeframe = useSettings((s) => s.setAnalyticsTimeframe);
   const tf = searchTf ?? savedTf;
-  const { data } = useSuspenseQuery(analyticsQuery({ pool, tf }));
+  const { data } = useSuspenseQuery(analyticsQuery({ pool }));
   const navigate = Route.useNavigate();
   useEffect(() => {
     if (searchTf) setAnalyticsTimeframe(searchTf);
   }, [searchTf, setAnalyticsTimeframe]);
   return (
     <AnalyticsPage
-      // Panned-back history belongs to one pool and timeframe, so a change of either starts fresh.
-      key={`${data.pool.address}-${data.tf}`}
+      // Panned-back history and the chart's height belong to one pool, so a new pool starts fresh.
+      key={data.pool.address}
       data={data}
+      tf={tf}
       view={{ cur, metric, token }}
       onView={(patch) => navigate({ search: (prev) => ({ ...prev, ...patch }) })}
       onTimeframe={(timeframe) => {
