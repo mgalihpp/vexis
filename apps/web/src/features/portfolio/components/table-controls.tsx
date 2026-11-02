@@ -93,7 +93,8 @@ export type View = (typeof VIEWS)[number]["value"];
 
 export function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
   return (
-    <>
+    // Joined segments: neighbours overlap by their 1px border, and the active one draws on top.
+    <div className="flex">
       {VIEWS.map(({ value, label, Icon }) => (
         <button
           key={value}
@@ -101,16 +102,16 @@ export function ViewToggle({ view, onChange }: { view: View; onChange: (view: Vi
           aria-label={label}
           aria-pressed={view === value}
           onClick={() => onChange(value)}
-          className={`flex size-6 items-center justify-center rounded-md border transition-colors ${
+          className={`flex size-6 items-center justify-center border transition-colors first:rounded-l-md last:rounded-r-md not-first:-ml-px ${
             view === value
-              ? "border-brand bg-brand text-brand-foreground"
+              ? "z-10 border-brand bg-brand text-brand-foreground"
               : "text-foreground/70 hover:bg-muted hover:text-foreground"
           }`}
         >
           <Icon className="size-3.25" />
         </button>
       ))}
-    </>
+    </div>
   );
 }
 
