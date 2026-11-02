@@ -34,18 +34,20 @@ const API = process.env.METEORA_DATAPI_URL ?? "https://dlmm.datapi.meteora.ag";
 const CACHE_MS = 60_000;
 const CONCURRENCY = 6;
 
-const num = z
+// Keeps a missing value as null, for the SOL fields Meteora drops for some pools.
+const maybeNum = z
   .union([z.string(), z.number()])
   .nullish()
-  .transform((v) => (v == null || v === "" ? 0 : Number(v)));
+  .transform((v) => (v == null || v === "" ? null : Number(v)));
+const num = maybeNum.transform((v) => v ?? 0);
 
 const Side = z.object({ sol: num, usd: num });
 const Total = z.object({ total: Side });
-const TokenAmount = z.object({ usd: num, amountSol: num });
+const TokenAmount = z.object({ usd: num, amountSol: maybeNum });
 
 const Unrealized = z.object({
   balances: num,
-  balancesSol: num,
+  balancesSol: maybeNum,
   unclaimedFeeTokenX: TokenAmount.nullish(),
   unclaimedFeeTokenY: TokenAmount.nullish(),
 });
@@ -64,7 +66,7 @@ const PositionPnl = z.object({
   allTimeDeposits: Total,
   allTimeWithdrawals: Total,
   allTimeFees: Total,
-  pnlSol: num,
+  pnlSol: maybeNum,
   pnlUsd: num,
   unrealizedPnl: Unrealized.nullish(),
 });
@@ -187,12 +189,13 @@ const poolPositions = (pool: string, user: string, status: "open" | "closed") =>
     return { hasNext: r.hasNext, items: r.positions };
   });
 
-const amounts = (p: PositionPnl, side: "sol" | "usd"): Amounts => ({
-  deposit: p.allTimeDeposits.total[side],
-  withdraw: p.allTimeWithdrawals.total[side],
-  fees: p.allTimeFees.total[side],
-  pnl: side === "sol" ? p.pnlSol : p.pnlUsd,
-});
+const amounts = (p: PositionPnl, side: "sol" | "usd"): Amounts => {
+  const deposit = p.allTimeDeposits.total[side];
+  const withdraw = p.allTimeWithdrawals.total[side];
+  const fees = p.allTimeFees.total[side];
+  // Meteora drops pnlSol for some pools; it equals what came out plus fees minus what went in.
+  return { deposit, withdraw, fees, pnl: side === "usd" ? p.pnlUsd : (p.pnlSol ?? withdraw + fees - deposit) };
+};
 
 interface ClosedPoolInfo extends ClosedPoolRef {
   pair: string;
@@ -250,14 +253,17 @@ async function fetchClosedPools(user: string): Promise<{ pools: ClosedPoolInfo[]
   };
 }
 
-const activeAmounts = (p: PositionPnl, side: "sol" | "usd"): ActiveAmounts => {
+const activeAmounts = (p: PositionPnl, side: "sol" | "usd", solPrice: number | null): ActiveAmounts => {
   const u = p.unrealizedPnl;
-  const fee = side === "sol" ? "amountSol" : "usd";
-  return {
-    ...amounts(p, side),
-    balance: (side === "sol" ? u?.balancesSol : u?.balances) ?? 0,
-    unclaimed: (u?.unclaimedFeeTokenX?.[fee] ?? 0) + (u?.unclaimedFeeTokenY?.[fee] ?? 0),
-  };
+  const total = amounts(p, side);
+  const { unclaimedFeeTokenX: x, unclaimedFeeTokenY: y } = u ?? {};
+  if (side === "usd") return { ...total, balance: u?.balances ?? 0, unclaimed: (x?.usd ?? 0) + (y?.usd ?? 0) };
+  // When Meteora drops the SOL amounts, convert the USD ones at the current SOL price.
+  const sol = (amount: number | null | undefined, usd = 0) => amount ?? (solPrice ? usd / solPrice : 0);
+  const balance = sol(u?.balancesSol, u?.balances);
+  const unclaimed = sol(x?.amountSol, x?.usd) + sol(y?.amountSol, y?.usd);
+  const pnl = p.pnlSol ?? total.withdraw + total.fees + balance + unclaimed - total.deposit;
+  return { ...total, balance, unclaimed, pnl };
 };
 
 async function fetchActive(user: string): Promise<{ active: ActivePool[]; solPrice: number | null }> {
@@ -317,8 +323,8 @@ async function fetchActive(user: string): Promise<{ active: ActivePool[]; solPri
               minPrice: p.minPrice,
               maxPrice: p.maxPrice,
               inRange: p.isOutOfRange == null ? null : !p.isOutOfRange,
-              sol: activeAmounts(p, "sol"),
-              usd: activeAmounts(p, "usd"),
+              sol: activeAmounts(p, "sol", solPrice),
+              usd: activeAmounts(p, "usd", solPrice),
             }),
           )
           .sort((a, b) => (a.openedAt ?? 0) - (b.openedAt ?? 0)),
@@ -338,7 +344,11 @@ async function addTokenInfo(pools: PoolMeta[]) {
     token.organicScore = t.organicScore;
     token.risks = t.risks;
     token.verified ||= t.verified === true;
+    // Meteora's portfolio endpoints send the mint as the symbol, and no icon, for tokens it hasn't indexed.
+    if (token.symbol === token.mint && t.symbol) token.symbol = t.symbol;
+    token.icon ||= t.icon;
   }
+  for (const pool of pools) pool.pair = `${pool.tokenX.symbol}-${pool.tokenY.symbol}`;
 }
 
 // /portfolio only lists pools with a close in the last 365 days; this total covers every closed position.
@@ -362,6 +372,9 @@ const fetchBase = (wallet: string): Promise<BaseSnapshot> =>
   Promise.all([fetchClosedPools(wallet), fetchActive(wallet), get("/portfolio/total", AllTime, { user: wallet })]).then(
     async ([{ pools, closedPools }, { active, solPrice }, allTime]) => {
       await addTokenInfo([...closedPools, ...active]);
+      const pairs = new Map(closedPools.map((p) => [p.address, p.pair]));
+      for (const p of pools) p.pair = pairs.get(p.pool) ?? p.pair;
+      for (const pool of active) for (const p of pool.positions) p.pair = pool.pair;
       return {
         wallet,
         fetchedAt: Date.now(),
@@ -441,7 +454,10 @@ async function snapshot(wallet: string) {
 function compose({ pools, ...base }: BaseSnapshot, cache: PoolCache): Portfolio {
   return {
     ...base,
-    closed: pools.flatMap((p) => cache.get(p.pool)?.positions ?? []).sort((a, b) => a.closedAt - b.closedAt),
+    // The pair comes from the pool, since positions cached on disk keep the name from when they were fetched.
+    closed: pools
+      .flatMap((p) => (cache.get(p.pool)?.positions ?? []).map((pos) => ({ ...pos, pair: p.pair })))
+      .sort((a, b) => a.closedAt - b.closedAt),
     closedProgress: {
       loaded: freshCount(pools, cache),
       total: pools.length,
