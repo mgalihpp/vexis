@@ -84,12 +84,15 @@
   }
   .num-delta {
     position: absolute;
-    top: 0.45em;
-    left: 100%;
-    margin-left: 0.3em;
+    /* Inside the number's own box, so no overflow-hidden/auto ancestor or neighbour can clip it. */
+    top: 50%;
+    right: 0;
+    z-index: 1;
+    margin-top: -0.65em;
     padding: 0 0.2em;
     border-radius: 0.25em;
-    background: color-mix(in oklab, currentColor 14%, transparent);
+    background: color-mix(in oklab, currentColor 16%, var(--card));
+    box-shadow: 0 0 0 1px var(--card);
     font-size: max(0.5625rem, 0.5em);
     font-weight: 600;
     white-space: nowrap;
@@ -113,7 +116,7 @@
     }
     100% {
       opacity: 0;
-      transform: translateY(-0.85em);
+      transform: translateY(-0.8em);
     }
   }
   @media (prefers-reduced-motion: reduce) {
