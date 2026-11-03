@@ -15,7 +15,7 @@ import { CurrencyToggle } from "./currency-toggle";
 import { Notice } from "./notice";
 import { PoolBadges, SolscanLink, TokenIcon } from "./pool-identity";
 import { EventBadge, FdvChip, TokenLines, value } from "./position-activity";
-import { Pagination, PoolFilter } from "./table-controls";
+import { Pagination, PoolFilter, SCROLL_TABLE } from "./table-controls";
 
 const PAGE_SIZES = [25, 50, 100];
 const COLUMNS = 6;
@@ -34,7 +34,7 @@ export function Transactions({
   const [page, setPage] = useState(0);
   const missing = progress.total - progress.loaded;
   return (
-    <div className="flex flex-1 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {progress.running && missing > 0 && (
         <Notice>
           Loading transaction history: {progress.loaded} of {progress.total} positions. Older rows appear as they load.
@@ -55,7 +55,7 @@ export function Transactions({
           }}
         />
       </div>
-      <div className="-mx-2 flex flex-1 flex-col">
+      <div className="-mx-2 flex min-h-0 flex-1 flex-col">
         {histories.length === 0 && progress.running ? (
           <TransactionsSkeleton rows={pageSize} />
         ) : (
@@ -172,7 +172,7 @@ function PoolCell({ pool }: { pool: TransactionPool }) {
 
 function Frame({ children }: { children: ReactNode }) {
   return (
-    <div className="flex-1 overflow-x-auto">
+    <div className={SCROLL_TABLE}>
       <Table className="min-w-[64rem]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">

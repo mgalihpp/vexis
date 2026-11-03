@@ -7,7 +7,7 @@ import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
 
 export const Route = createFileRoute("/portfolio/")({
-  head: () => ({ meta: [{ title: "Portfolio · Vexis" }] }),
+  head: () => ({ meta: [{ title: "Portfolio | Vexis" }] }),
   component: PortfolioHome,
 });
 

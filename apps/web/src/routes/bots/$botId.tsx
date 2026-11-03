@@ -7,7 +7,7 @@ import { PositionStats } from "@/features/bots/components/position-stats";
 export const Route = createFileRoute("/bots/$botId")({
   loader: ({ params, context }) => context.queryClient.ensureQueryData(botQuery(params.botId)),
   head: ({ loaderData }) => ({
-    meta: [{ title: loaderData ? `${loaderData.bot.name} · Vexis` : "Vexis" }],
+    meta: [{ title: loaderData ? `${loaderData.bot.name} | Vexis` : "Vexis" }],
   }),
   component: BotLayout,
 });

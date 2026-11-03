@@ -44,6 +44,12 @@ export const useNotifications = create<NotificationState>()(
       markAllRead: () => set((s) => ({ items: s.items.map((n) => ({ ...n, read: true })) })),
       clear: () => set({ items: [] }),
     }),
-    { name: "vexis-notifications", version: 1, skipHydration: true },
+    {
+      name: "vexis-notifications",
+      version: 2,
+      skipHydration: true,
+      // v1 titles carried the kind ("Position closed · DOGE-SOL"); keep the poll baseline, drop the stale list.
+      migrate: (persisted) => ({ ...(persisted as { seen: Seen }), items: [] }),
+    },
   ),
 );

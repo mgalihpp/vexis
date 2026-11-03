@@ -5,13 +5,49 @@ import { shortAddr } from "@/lib/format";
 import { pct } from "../money";
 import type { PoolMeta, Token } from "../portfolio";
 
+/**
+ * Rewrite IPFS gateway URLs to a more reliable public gateway.
+ *
+ * Many token icons are hosted on IPFS and referenced via `ipfs.io`, which
+ * aggressively rate-limits (429) or returns Cloudflare challenge pages whose
+ * `Cross-Origin-Resource-Policy: same-origin` header causes the browser to
+ * block the image with `ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`.
+ *
+ * Pinata's public gateway reliably serves these images with `ACAO: *` and no
+ * restrictive CORP header (verified 2026-11-02).
+ */
+const IPFS_GATEWAYS = ["https://gateway.pinata.cloud/ipfs/", "https://4everland.io/ipfs/"];
+
+const IPFS_PATH_RE = /^https?:\/\/[^/]+\/ipfs\/(.+)$/;
+const IPFS_PROTO_RE = /^ipfs:\/\/(.+)$/;
+
+function rewriteIpfs(url: string, gatewayIndex = 0): string {
+  const gw = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0]!;
+  const pathMatch = IPFS_PATH_RE.exec(url);
+  if (pathMatch) return `${gw}${pathMatch[1]}`;
+  const protoMatch = IPFS_PROTO_RE.exec(url);
+  if (protoMatch) return `${gw}${protoMatch[1]}`;
+  return url;
+}
+
+function isIpfsUrl(url: string): boolean {
+  return IPFS_PATH_RE.test(url) || IPFS_PROTO_RE.test(url);
+}
+
 export function TokenIcon({ token, className = "" }: { token: Pick<Token, "symbol" | "icon">; className?: string }) {
-  const [failed, setFailed] = useState(false);
+  const [failCount, setFailCount] = useState(0);
   // An image that fails before hydration never reaches React's onError.
   const check = useCallback((img: HTMLImageElement | null) => {
-    if (img?.complete && img.naturalWidth === 0) setFailed(true);
+    if (img?.complete && img.naturalWidth === 0) setFailCount((c) => c + 1);
   }, []);
-  if (!token.icon || failed) {
+
+  const icon = token.icon;
+  const ipfs = icon ? isIpfsUrl(icon) : false;
+  // For IPFS URLs we try each gateway before giving up; for normal URLs one failure is final.
+  const maxAttempts = ipfs ? IPFS_GATEWAYS.length : 1;
+  const exhausted = !icon || failCount >= maxAttempts;
+
+  if (exhausted) {
     return (
       <span
         className={`flex shrink-0 items-center justify-center rounded-full bg-muted font-semibold text-foreground/80 ${className}`}
@@ -20,12 +56,14 @@ export function TokenIcon({ token, className = "" }: { token: Pick<Token, "symbo
       </span>
     );
   }
+
+  const src = ipfs ? rewriteIpfs(icon, failCount) : icon;
   return (
     <img
       ref={check}
-      src={token.icon}
+      src={src}
       alt={token.symbol}
-      onError={() => setFailed(true)}
+      onError={() => setFailCount((c) => c + 1)}
       className={`shrink-0 rounded-full object-cover ${className}`}
     />
   );

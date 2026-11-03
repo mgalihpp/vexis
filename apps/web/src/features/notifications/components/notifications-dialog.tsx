@@ -9,20 +9,13 @@ import { ago } from "@/lib/format";
 import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
-import type { Notice, NoticeKind } from "../notifications";
+import { NOTICE_LABEL, type Notice, type NoticeKind } from "../notifications";
 
 const ICON: Record<NoticeKind, ReactNode> = {
   "out-of-range": <TriangleAlertIcon />,
   opened: <CircleCheckIcon />,
   closed: <CircleXIcon />,
   "volume-spike": <TrendingUpIcon />,
-};
-
-const NOTICE_LABEL: Record<NoticeKind, string> = {
-  "out-of-range": "Out of range",
-  opened: "Opened",
-  closed: "Closed",
-  "volume-spike": "Volume spike",
 };
 
 const NOTICE_TONE: Record<NoticeKind, string> = {
@@ -149,22 +142,21 @@ function Section({
           onClick={() => onSelect(n)}
           className="flex items-start gap-2.5 rounded-xl bg-muted/50 p-2.5 text-left ring-1 ring-foreground/5 transition-colors hover:bg-muted"
         >
-          <PairIcons pair={noticePair(n)} tokenIcons={tokenIcons} />
+          <PairIcons pair={pairOf(n.title)} tokenIcons={tokenIcons} />
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="flex items-baseline gap-2">
               <span className={`flex-1 truncate text-xs ${n.read ? "font-medium" : "font-semibold"}`}>{n.title}</span>
               <span className="shrink-0 text-[0.65rem] text-muted-foreground tabular-nums">{ago(now - n.at)}</span>
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <span
-                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] font-medium ${NOTICE_TONE[n.kind]} [&>svg]:size-3`}
+                className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] font-medium ${NOTICE_TONE[n.kind]} [&>svg]:size-3`}
               >
                 {ICON[n.kind]}
                 {NOTICE_LABEL[n.kind]}
               </span>
-              {noticePair(n) && <span className="text-[0.65rem] font-medium text-foreground/75">{noticePair(n)}</span>}
+              <span className="min-w-0 text-[0.7rem] text-muted-foreground">{n.body}</span>
             </span>
-            <span className="text-[0.7rem] text-muted-foreground">{n.body}</span>
           </span>
           {!n.read && (
             <span className="mt-1.5 size-1.75 shrink-0 rounded-full bg-brand">
@@ -177,8 +169,9 @@ function Section({
   );
 }
 
-function noticePair(n: Notice) {
-  return `${n.title} ${n.body}`.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}\b/)?.[0] ?? null;
+/** The token pair inside a title, e.g. "DOGE-SOL" in "DOGE-SOL 25". */
+function pairOf(title: string) {
+  return title.match(/\b[A-Z0-9]{2,}-[A-Z0-9]{2,}\b/)?.[0] ?? null;
 }
 
 function PairIcons({ pair, tokenIcons }: { pair: string | null; tokenIcons: Map<string, string> }) {

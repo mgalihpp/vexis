@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-import type { SpikeTimeframe, Watch } from "@/features/notifications/notifications";
+import { NOTICE_LABEL, type SpikeTimeframe, type Watch } from "@/features/notifications/notifications";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
@@ -41,9 +41,7 @@ export function NotificationWatcher() {
         ? await getWatch({ data: { wallets, pools: [], timeframe: spikeTimeframe } })
         : { wallets: [], pools: [] };
       const poolWatches = await Promise.all(
-        [...groups].map(([timeframe, group]) =>
-          getWatch({ data: { wallets: [], pools: group, timeframe } }),
-        ),
+        [...groups].map(([timeframe, group]) => getWatch({ data: { wallets: [], pools: group, timeframe } })),
       );
       return { wallets: walletWatch.wallets, pools: poolWatches.flatMap((watch) => watch.pools) };
     },
@@ -64,7 +62,8 @@ export function NotificationWatcher() {
     if (notify.sound) playAlert(added.map((n) => n.kind));
     if (!notify.browser || typeof Notification === "undefined" || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible") return;
-    for (const n of added) new Notification(n.title, { body: n.body, icon: "/logo.png", tag: n.id });
+    for (const n of added)
+      new Notification(`${NOTICE_LABEL[n.kind]} · ${n.title}`, { body: n.body, icon: "/logo.png", tag: n.id });
   }, [dataUpdatedAt]);
 
   return null;

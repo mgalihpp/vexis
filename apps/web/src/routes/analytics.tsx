@@ -35,7 +35,7 @@ export const Route = createFileRoute("/analytics")({
     const chart = context.queryClient.prefetchQuery(chartQuery({ pool: pool.address, tf: deps.tf }));
     if (typeof window === "undefined") await chart;
   },
-  head: () => ({ meta: [{ title: "Analytics · Vexis" }] }),
+  head: () => ({ meta: [{ title: "Analytics | Vexis" }] }),
   pendingComponent: AnalyticsSkeleton,
   component: Analytics,
 });

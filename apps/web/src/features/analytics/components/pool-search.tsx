@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd } from "@/features/portfolio/money";
 import { findPools } from "../analytics.functions";
 import type { PoolSearchHit } from "../analytics.types";
@@ -59,8 +60,14 @@ export function PoolHitList({ query, hits, onSelect }: { query: string; hits: Po
             onClick={onSelect}
             className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
           >
-            <span className="truncate font-medium">
-              {h.name} <span className="text-muted-foreground">bin {h.binStep}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="flex shrink-0 items-center">
+                <TokenIcon token={h.tokenX} className="relative z-10 size-4 text-[8px]" />
+                <TokenIcon token={h.tokenY} className="-ml-1.5 size-4 text-[8px]" />
+              </span>
+              <span className="truncate font-medium">
+                {h.name} <span className="text-muted-foreground">bin {h.binStep}</span>
+              </span>
             </span>
             <span className="num shrink-0 text-[11px] text-muted-foreground">
               TVL {compactUsd(h.tvl)}, Vol {compactUsd(h.volume24h)}

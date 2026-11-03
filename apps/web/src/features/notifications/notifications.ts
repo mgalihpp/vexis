@@ -23,6 +23,14 @@ export interface Watch {
 }
 
 export type NoticeKind = "out-of-range" | "opened" | "closed" | "volume-spike";
+
+export const NOTICE_LABEL: Record<NoticeKind, string> = {
+  "out-of-range": "Out of range",
+  opened: "Opened",
+  closed: "Closed",
+  "volume-spike": "Volume spike",
+};
+
 export type SpikeMultiplier = 2 | 3 | 5 | 10 | "off";
 export interface PoolAlertOverride {
   timeframe: SpikeTimeframe;
@@ -35,6 +43,7 @@ export interface Notice {
   id: string;
   kind: NoticeKind;
   at: number;
+  /** What the notice is about: the pair, or a pool with its bin step. The kind is not part of it. */
   title: string;
   body: string;
   wallet?: string;
@@ -132,13 +141,12 @@ export function diffWatch(
     const who = `Wallet ${shortAddr(wallet)}`;
     for (const p of positions) {
       if (!(p.address in before)) {
-        if (prefs.positions)
-          add({ id: `opened:${p.address}`, kind: "opened", title: `Position opened · ${p.pair}`, body: who, wallet });
+        if (prefs.positions) add({ id: `opened:${p.address}`, kind: "opened", title: p.pair, body: who, wallet });
       } else if (prefs.outOfRange && before[p.address]?.inRange !== false && p.inRange === false) {
         add({
           id: `out-of-range:${p.address}:${now}`,
           kind: "out-of-range",
-          title: `Out of range · ${p.pair}`,
+          title: p.pair,
           body: who,
           wallet,
         });
@@ -151,7 +159,7 @@ export function diffWatch(
           add({
             id: `closed:${address}`,
             kind: "closed",
-            title: `Position closed · ${pair}`,
+            title: pair,
             body: who,
             wallet,
           });
@@ -185,7 +193,7 @@ export function diffWatch(
     add({
       id: `volume-spike:${pool}:${spike.t}`,
       kind: "volume-spike",
-      title: `Volume spike · ${poolNames[pool] ?? shortAddr(pool)}`,
+      title: poolNames[pool] ?? shortAddr(pool),
       body: detail,
       pool,
     });

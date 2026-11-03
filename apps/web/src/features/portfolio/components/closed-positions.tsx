@@ -11,7 +11,17 @@ import { PnlShareCard } from "./pnl-share-card";
 import { PoolIdentity, SolscanLink } from "./pool-identity";
 import { ActivityList, useActivity } from "./position-activity";
 import { ShareDialog } from "./share-dialog";
-import { Expander, Pagination, PoolFilter, type Sort, SortHead, sortBy, type View, ViewToggle } from "./table-controls";
+import {
+  Expander,
+  Pagination,
+  PoolFilter,
+  SCROLL_TABLE,
+  type Sort,
+  SortHead,
+  sortBy,
+  type View,
+  ViewToggle,
+} from "./table-controls";
 
 const SORTS = {
   positions: (r: ClosedPoolRow) => r.positions.length,
@@ -78,7 +88,7 @@ export function ClosedPositions({
   const empty = closed.length === 0 ? "No closed positions." : `No pools match “${query.trim()}”.`;
 
   return (
-    <div className="flex flex-1 flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <CurrencyToggle />
@@ -94,11 +104,11 @@ export function ClosedPositions({
           <ViewToggle view={view} onChange={setView} />
         </div>
       </div>
-      <div className="-mx-2 flex flex-1 flex-col">
+      <div className="-mx-2 flex min-h-0 flex-1 flex-col">
         {view === "grid" ? (
           <ClosedGrid rows={shown} currency={currency} empty={empty} onShare={openShare} onOpen={openInTable} />
         ) : (
-          <div className="flex-1 overflow-x-auto">
+          <div className={SCROLL_TABLE}>
             <Table className="min-w-[64rem]">
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
@@ -223,7 +233,7 @@ function ClosedGrid({
   const fetchedAt = usePortfolio().fetchedAt;
   if (rows.length === 0) return <p className="flex-1 py-10 text-center text-muted-foreground">{empty}</p>;
   return (
-    <div className="grid flex-1 content-start gap-2 px-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+    <div className="grid min-h-0 flex-1 content-start gap-2 overflow-y-auto px-2 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {rows.map((row) => {
         const t = row[currency];
         const target = { pool: row.pool, positions: row.positions.map((p) => p.position) };

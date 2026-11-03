@@ -95,7 +95,7 @@ function AppHeader() {
           <Logo height={22} />
           <span className="hidden md:inline">Vexis</span>
         </Link>
-        <nav className="hidden items-center gap-9.5 md:flex">
+        <nav className="hidden items-center gap-5 md:flex">
           <NavItem to="/portfolio">
             Portfolio
           </NavItem>

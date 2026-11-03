@@ -33,7 +33,7 @@ export const Route = createFileRoute("/portfolio/$wallet")({
     await context.queryClient.ensureQueryData(portfolioQuery(params.wallet));
   },
   head: ({ params }) => ({
-    meta: [{ title: `${params.wallet.slice(0, 4)}…${params.wallet.slice(-4)} · Portfolio · Vexis` }],
+    meta: [{ title: `${params.wallet.slice(0, 4)}…${params.wallet.slice(-4)} | Portfolio | Vexis` }],
   }),
   pendingComponent: PortfolioSkeleton,
   component: PortfolioLayout,
@@ -64,6 +64,8 @@ function PortfolioLayout() {
   const onBalances = Boolean(matchRoute({ to: "/portfolio/$wallet/balances", params: { wallet } }));
   const ownToolbar = onActive || onClosed || onTransactions || onBalances;
   const pagedTable = onClosed || onTransactions;
+  // These tabs fill the viewport and scroll inside their table, with the toolbar and header pinned.
+  const fixedHeight = onActive || onClosed || onTransactions;
   const { loaded, total, running } = portfolio.closedProgress;
 
   return (
@@ -84,7 +86,7 @@ function PortfolioLayout() {
           </Link>
         ))}
       </nav>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+      <div className={`flex min-h-0 flex-1 flex-col ${fixedHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
         {!ownToolbar && (
           <div className="flex items-center justify-between gap-2.5 px-2 pt-1.5 pb-0.5">
             <CurrencyToggle />
@@ -94,7 +96,7 @@ function PortfolioLayout() {
             </div>
           </div>
         )}
-        <div className={`flex flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
+        <div className={`flex min-h-0 flex-1 flex-col px-2 ${ownToolbar ? "pt-2" : ""} ${pagedTable ? "" : "pb-3.25"}`}>
           {running ? (
             <Notice>
               Loading closed positions: {loaded} of {total} pools. Totals are partial until this finishes.

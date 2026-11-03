@@ -38,7 +38,7 @@ describe("diffWatch positions", () => {
     const seen: Seen = { positions: { [WALLET]: { a: seenAs(true), b: seenAs(true), c: seenAs(false) } }, spikes: {} };
     const r = diffWatch(seen, poll([pos("a", false), pos("c", false), pos("d")]), prefs, {}, 1);
     expect(r.notices.map((n) => n.kind).sort()).toEqual(["closed", "opened", "out-of-range"]);
-    expect(r.notices.find((n) => n.kind === "out-of-range")?.title).toBe("Out of range · SOL-USDC");
+    expect(r.notices.find((n) => n.kind === "out-of-range")?.title).toBe("SOL-USDC");
   });
 
   test("a position that stays out of range is reported once", () => {
@@ -87,7 +87,7 @@ describe("volumeSpike", () => {
 
   test("diffWatch reports a spike once per candle", () => {
     const first = diffWatch(EMPTY_SEEN, watch, prefs, { [POOL]: "SOL-USDC 10" }, 1);
-    expect(first.notices.map((n) => n.title)).toEqual(["Volume spike · SOL-USDC 10"]);
+    expect(first.notices.map((n) => n.title)).toEqual(["SOL-USDC 10"]);
     expect(first.notices[0]?.body).toBe("$5K in the current 1h candle, 5.0× the average");
     expect(diffWatch(first.seen, watch, prefs, {}, 2).notices).toEqual([]);
   });

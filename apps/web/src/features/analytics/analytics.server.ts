@@ -3,7 +3,7 @@ import type DLMMClass from "@meteora-ag/dlmm";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { get } from "../portfolio/meteora.server";
-import { jupiter } from "../portfolio/prices.server";
+import { jupiter, loadTokenInfo } from "../portfolio/prices.server";
 import {
   BAR_COUNT,
   type Bar,
@@ -401,12 +401,20 @@ export async function loadOlder({ pool, tf, before }: OlderRequest) {
 
 export async function searchPools(query: string): Promise<PoolSearchHit[]> {
   const pools = await listPools({ page_size: 8, query, sort_by: "volume_24h:desc", filter_by: "is_blacklisted=false" });
+  // One batched Jupiter call for both sides of every hit, so each row can show the pair icons.
+  const meta = await loadTokenInfo(pools.flatMap((p) => [p.token_x.address, p.token_y.address]));
+  const side = (t: RawPool["token_x"]): PoolSearchHit["tokenX"] => ({
+    symbol: t.symbol,
+    icon: meta.get(t.address)?.icon ?? null,
+  });
   return pools.map((p) => ({
     address: p.address,
     name: p.name,
     binStep: p.pool_config.bin_step,
     tvl: p.tvl,
     volume24h: p.volume["24h"],
+    tokenX: side(p.token_x),
+    tokenY: side(p.token_y),
   }));
 }
 

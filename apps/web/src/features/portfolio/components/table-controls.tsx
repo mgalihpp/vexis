@@ -15,6 +15,15 @@ import { TableHead } from "@/components/ui/table";
 
 export type Sort<K extends string> = { key: K; dir: "asc" | "desc" };
 
+/**
+ * Makes the wrapper of a shadcn `<Table>` the scroll container, so the table scrolls inside the page
+ * and its header stays pinned. The shadcn table-container is itself `overflow-x-auto`, which would
+ * capture the sticky header, so it is turned back to visible. The parent must be a flex column with a
+ * bounded height.
+ */
+export const SCROLL_TABLE =
+  "min-h-0 flex-1 overflow-auto [&>[data-slot=table-container]]:overflow-visible [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10 [&_thead]:bg-background [&_thead]:shadow-[inset_0_-1px_0_var(--border)]";
+
 export function sortBy<T, K extends string>(rows: T[], value: (row: T, key: K) => number, { key, dir }: Sort<K>) {
   const sign = dir === "asc" ? 1 : -1;
   return rows

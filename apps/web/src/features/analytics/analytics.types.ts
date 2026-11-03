@@ -91,4 +91,6 @@ export interface PoolSearchHit {
   binStep: number;
   tvl: number;
   volume24h: number;
+  tokenX: { symbol: string; icon: string | null };
+  tokenY: { symbol: string; icon: string | null };
 }

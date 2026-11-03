@@ -15,6 +15,7 @@ import { Panel } from "./summary-panels";
 import {
   Expander,
   PoolFilter,
+  SCROLL_TABLE,
   SortHead,
   sortBy,
   type Sort as TableSort,
@@ -73,7 +74,7 @@ export function ActivePositions({ pools, currency }: { pools: ActivePool[]; curr
   );
 
   return (
-    <div className="space-y-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <CurrencyToggle />
@@ -151,7 +152,7 @@ function PoolTable({
     setExpanded(next);
   };
   return (
-    <div className="-mx-2 overflow-x-auto">
+    <div className={`-mx-2 ${SCROLL_TABLE}`}>
       <Table className="min-w-[64rem]">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -397,7 +398,7 @@ function PoolGrid({
   const all = pools.flatMap((p) => p.positions);
   const t = poolTotals(all, currency);
   return (
-    <>
+    <div className="-mx-2 min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-3.25">
       <Panel>
         <div className="flex items-center justify-between gap-2.5">
           <h2 className="text-sm font-semibold">Portfolio totals</h2>
@@ -429,7 +430,7 @@ function PoolGrid({
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
