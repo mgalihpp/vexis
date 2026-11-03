@@ -456,3 +456,32 @@ test("closed-position time formatters", () => {
   expect(timeAgo(now - 30 * 3_600_000, now)).toBe("a day ago");
   expect(timeAgo(now - 9 * 86_400_000, now)).toBe("9 days ago");
 });
+
+describe("timezone offset", () => {
+  const WIB = 7 * 60;
+
+  test("a late-evening UTC close lands on the next day east of UTC", () => {
+    const closed = [pos("2026-10-30T20:00:00Z", 1)];
+    expect(dailyBuckets(closed, "sol", "pnl")[0]?.start).toBe(at("2026-10-30T00:00:00Z"));
+    expect(dailyBuckets(closed, "sol", "pnl", WIB)[0]?.start).toBe(at("2026-10-31T00:00:00Z"));
+  });
+
+  test("a day range is cut at local midnight", () => {
+    const now = at("2026-10-30T20:00:00Z");
+    const closed = [pos("2026-10-30T10:00:00Z", 1), pos("2026-10-30T18:00:00Z", 2)];
+    // In UTC+7 it is already Oct 31 at 20:00Z, so only the 18:00Z close (01:00 Oct 31) is today.
+    expect(inRange(closed, resolveRange("today", now, undefined, WIB), WIB)).toHaveLength(1);
+    // In UTC-7 it is still Oct 30 and both closes are today.
+    expect(inRange(closed, resolveRange("today", now, undefined, -WIB), -WIB)).toHaveLength(2);
+  });
+
+  test("a negative offset moves an early-morning close to the previous day", () => {
+    const closed = [pos("2026-10-30T02:00:00Z", 1)];
+    expect(dailyBuckets(closed, "sol", "pnl", -300)[0]?.start).toBe(at("2026-10-29T00:00:00Z"));
+  });
+
+  test("offset 0 matches the old UTC behaviour", () => {
+    const closed = [pos("2026-10-30T20:00:00Z", 1)];
+    expect(summarize(closed, "sol", 0)).toEqual(summarize(closed, "sol"));
+  });
+});

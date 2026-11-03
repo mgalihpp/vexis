@@ -4,6 +4,7 @@ import { AnimatedNumber } from "@/components/animated-number";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, formatAmount, pct } from "@/features/portfolio/money";
+import { offsetLabel, useTzOffset } from "@/features/timezone/timezone";
 import { age, protocolFeePct, ratio, sumVolume, type VolumePoint } from "../analytics";
 import type { PoolTokenView, PoolView } from "../analytics.types";
 import { compact, Label, NA, Num, Panel, Row, signedPct } from "./ui";
@@ -18,6 +19,8 @@ const timeFmt = new Intl.DateTimeFormat("en-US", {
 });
 
 export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
+  const offset = useTzOffset();
+  const local = (t: number) => t + offset * 60_000;
   const [hover, setHover] = useState<number | null>(null);
   const w = 276;
   const h = 76;
@@ -73,8 +76,10 @@ export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
                 transform: hover > points.length / 2 ? "translateX(calc(-100% - 10px))" : "translateX(10px)",
               }}
             >
-              <div className="font-semibold">{dateFmt.format(point.t)}</div>
-              <div className="num text-muted-foreground">{timeFmt.format(point.t)} UTC, 4h</div>
+              <div className="font-semibold">{dateFmt.format(local(point.t))}</div>
+              <div className="num text-muted-foreground">
+                {timeFmt.format(local(point.t))} {offsetLabel(offset)}, 4h
+              </div>
               <div className="num mt-2 flex items-center justify-between">
                 <span className="text-muted-foreground">Volume</span>
                 <span className="font-semibold">{compactUsd(point.volume)}</span>
@@ -89,7 +94,7 @@ export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
       )}
       <div className="flex justify-between text-[10px] text-muted-foreground">
         {labels.map((p) => (
-          <span key={p?.t ?? 0}>{p ? dateFmt.format(p.t) : ""}</span>
+          <span key={p?.t ?? 0}>{p ? dateFmt.format(local(p.t)) : ""}</span>
         ))}
       </div>
     </Panel>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/features/portfolio/money";
+import { offsetLabel, useTzOffset } from "@/features/timezone/timezone";
 import { type Bar, type TimeframeId, ticks } from "../analytics";
 import { compact, signedPct } from "./ui";
 
@@ -26,7 +27,8 @@ const dayFmt = utc({ month: "short", day: "numeric" });
 const longDayFmt = utc({ weekday: "short", month: "short", day: "numeric", year: "numeric" });
 
 /** Midnight bars and daily candles read better as a date than as `00:00`. */
-function axisLabel(t: number, tf: TimeframeId) {
+function axisLabel(t: number, tf: TimeframeId, tz: number) {
+  t += tz * 60_000;
   const d = new Date(t);
   const midnight = d.getUTCHours() === 0 && d.getUTCMinutes() === 0;
   return tf === "24h" || midnight ? dayFmt.format(t) : timeFmt.format(t);
@@ -58,7 +60,7 @@ function useSize() {
 /**
  * Candles and a bar series in one SVG so the axes share a coordinate system. Drag to pan through history
  * (older bars are requested as the left edge nears), scroll to zoom, hover for a tooltip. On touch, tap a candle
- * to pin its tooltip, or hold and drag to scrub. Times are UTC.
+ * to pin its tooltip, or hold and drag to scrub. Times follow the timezone setting.
  */
 export function CandleChart({
   bars,
@@ -80,6 +82,7 @@ export function CandleChart({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { ref: boxRef, size } = useSize();
+  const tz = useTzOffset();
   const drag = useRef<{ x: number; offset: number } | null>(null);
   const touch = useRef<{
     x: number;
@@ -156,6 +159,7 @@ export function CandleChart({
       ? Math.min(view.length - 1, Math.floor(cursor.x / step))
       : null;
   const shown = view[hover ?? view.length - 1] as ChartBar;
+  const local = shown.t + tz * 60_000;
   const change = shown.open > 0 ? ((shown.close - shown.open) / shown.open) * 100 : 0;
   const up = shown.close >= shown.open;
   const tone = up ? "text-profit" : "text-loss";
@@ -169,7 +173,7 @@ export function CandleChart({
     <div className="flex h-full min-h-0 flex-col gap-1.5">
       <div className="num flex flex-wrap items-center gap-x-3 text-[11px]">
         <span className="text-muted-foreground">
-          {tf === "24h" ? dayFmt.format(shown.t) : `${dayFmt.format(shown.t)} ${timeFmt.format(shown.t)}`}
+          {tf === "24h" ? dayFmt.format(local) : `${dayFmt.format(local)} ${timeFmt.format(local)}`}
         </span>
         {(
           [
@@ -364,7 +368,7 @@ export function CandleChart({
                 className="fill-muted-foreground"
                 fontSize={FONT}
               >
-                {axisLabel(b.t, tf)}
+                {axisLabel(b.t, tf, tz)}
               </text>
             ) : null,
           )}
@@ -407,8 +411,10 @@ export function CandleChart({
           >
             <div className="flex items-start justify-between gap-2">
               <div>
-                <div className="font-semibold">{longDayFmt.format(shown.t)}</div>
-                <div className="num text-muted-foreground">{timeFmt.format(shown.t)} UTC</div>
+                <div className="font-semibold">{longDayFmt.format(local)}</div>
+                <div className="num text-muted-foreground">
+                  {timeFmt.format(local)} {offsetLabel(tz)}
+                </div>
               </div>
               <span
                 className={`num rounded-md px-1.5 py-0.5 font-semibold ${up ? "bg-profit/15" : "bg-loss/15"} ${tone}`}

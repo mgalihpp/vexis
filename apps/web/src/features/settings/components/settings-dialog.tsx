@@ -39,6 +39,7 @@ import { BASELINE_BARS, SPIKE_TIMEFRAMES } from "@/features/notifications/notifi
 import { playAlert } from "@/features/notifications/sound";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useTheme } from "@/features/theme/theme";
+import { offsetLabel, UTC_OFFSETS } from "@/features/timezone/timezone";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { shortAddr } from "@/lib/format";
 import { usePools } from "@/stores/pools";
@@ -165,6 +166,8 @@ function General() {
   const setCurrency = useSettings((s) => s.setCurrency);
   const numberMotion = useSettings((s) => s.numberMotion);
   const setNumberMotion = useSettings((s) => s.setNumberMotion);
+  const timezoneOffset = useSettings((s) => s.timezoneOffset);
+  const setTimezoneOffset = useSettings((s) => s.setTimezoneOffset);
   return (
     <div className="flex flex-col gap-5">
       <Group title="Appearance">
@@ -245,6 +248,32 @@ function General() {
               },
             ]}
           />
+        </Row>
+      </Group>
+      <Group title="Time" footer="Sets where days start for ranges, the calendar, charts and every timestamp.">
+        <Row
+          icon={
+            <RowIcon>
+              <ClockIcon />
+            </RowIcon>
+          }
+          label="Timezone"
+          description="Offset from UTC"
+        >
+          <select
+            value={timezoneOffset}
+            onChange={(e) => setTimezoneOffset(e.target.value === "auto" ? "auto" : Number(e.target.value))}
+            className="h-7 rounded-md border bg-transparent px-2 text-xs text-foreground outline-none focus:border-brand"
+          >
+            <option value="auto" className="bg-popover text-popover-foreground">
+              Browser timezone
+            </option>
+            {UTC_OFFSETS.map((o) => (
+              <option key={o} value={o} className="bg-popover text-popover-foreground">
+                {offsetLabel(o)}
+              </option>
+            ))}
+          </select>
         </Row>
       </Group>
       <Group title="Motion">

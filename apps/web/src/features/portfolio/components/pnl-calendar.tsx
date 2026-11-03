@@ -1,5 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon, ShareIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useTzOffset } from "@/features/timezone/timezone";
 import { money, pct, tone } from "../money";
 import {
   type Bucket,
@@ -11,6 +12,7 @@ import {
   type Metric,
   type MonthCalendar,
   monthCalendar,
+  shifted,
 } from "../portfolio";
 import { METRIC_OPTIONS, Segmented } from "./segmented";
 import { ShareDialog } from "./share-dialog";
@@ -30,7 +32,9 @@ type Share =
 
 export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[]; currency: Currency; now: number }) {
   const [metric, setMetric] = useState<Metric>("pnl");
-  const nowDate = new Date(now);
+  const offset = useTzOffset();
+  const nowShifted = shifted(now, offset);
+  const nowDate = new Date(nowShifted);
   const [view, setView] = useState({ year: nowDate.getUTCFullYear(), month: nowDate.getUTCMonth() });
   // Content outlives `open` so the dialog keeps its card while the close animation plays.
   const [share, setShare] = useState<Share>(null);
@@ -40,7 +44,7 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
     setSharing(true);
   };
 
-  const days = useMemo(() => dailyBuckets(closed, currency, metric), [closed, currency, metric]);
+  const days = useMemo(() => dailyBuckets(closed, currency, metric, offset), [closed, currency, metric, offset]);
   const cal = monthCalendar(days, view.year, view.month);
   const shift = (by: number) => {
     const d = new Date(Date.UTC(view.year, view.month + by));
@@ -88,7 +92,7 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
         <CalendarGrid
           cal={cal}
           currency={currency}
-          today={dayStart(now)}
+          today={dayStart(nowShifted)}
           onShareDay={(bucket) => openShare({ kind: "day", bucket })}
           onShareWeek={(week, n) => openShare({ kind: "week", week, n })}
         />
@@ -106,7 +110,7 @@ export function PnlCalendar({ closed, currency, now }: { closed: ClosedPosition[
               <h3 className="text-3xl font-bold uppercase">{monthName(view.year, view.month)}</h3>
               <MonthStats cal={cal} currency={currency} />
             </div>
-            <CalendarGrid cal={cal} currency={currency} today={dayStart(now)} compact />
+            <CalendarGrid cal={cal} currency={currency} today={dayStart(nowShifted)} compact />
           </>
         )}
         {share?.kind === "day" && (

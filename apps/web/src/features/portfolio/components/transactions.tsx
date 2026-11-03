@@ -1,7 +1,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useStamp } from "@/features/timezone/timezone";
 import { solscanAccount, solscanTx } from "@/lib/format";
-import { utcStamp } from "../money";
 import {
   type Currency,
   type Portfolio,
@@ -97,6 +97,7 @@ function TransactionsTable({
   onPage: (page: number) => void;
   onPageSize: (size: number) => void;
 }) {
+  const stamp = useStamp();
   const pools = useMemo(() => transactionPools(portfolio), [portfolio]);
   const all = useMemo(() => transactionRows(histories, pools, portfolio.solPrice), [histories, pools, portfolio]);
   const q = query.trim().toLowerCase();
@@ -125,7 +126,7 @@ function TransactionsTable({
               <TableCell>
                 <EventBadge type={row.type} href={href} />
               </TableCell>
-              <TableCell className="text-muted-foreground">{utcStamp(row.at)}</TableCell>
+              <TableCell className="text-muted-foreground">{stamp(row.at)}</TableCell>
               <TableCell>
                 <PoolCell pool={row.pool} />
               </TableCell>

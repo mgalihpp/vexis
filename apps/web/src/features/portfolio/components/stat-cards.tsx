@@ -126,7 +126,7 @@ export function StatCards({ stats, currency }: { stats: Stats; currency: Currenc
       <Card>
         <div className="flex w-full items-center justify-between gap-1.5">
           <div>
-            <Label info="Share of active days (UTC) whose closed positions added up to a profit.">Day win %</Label>
+            <Label info="Share of active days whose closed positions added up to a profit.">Day win %</Label>
             <Big>
               {stats.dayWins + stats.dayLosses ? (
                 <AnimatedNumber value={stats.dayWins / (stats.dayWins + stats.dayLosses)} format={pct} />

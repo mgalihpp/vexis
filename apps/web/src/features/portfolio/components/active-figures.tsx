@@ -1,8 +1,9 @@
 import { CircleCheckIcon, CircleXIcon, ShareIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
-import { compactUsd, duration, money, pct, tone, utcStamp } from "../money";
+import { compactUsd, duration, money, pct, tone } from "../money";
 import {
   type ActiveAmounts,
   type ActivePool,
@@ -108,11 +109,12 @@ export function LiveDuration({ since }: { since: number }) {
 }
 
 export function Age({ positions }: { positions: ActivePosition[] }) {
+  const stamp = useStamp();
   const opened = openedAt(positions);
   if (opened === null) return <span className="text-muted-foreground">—</span>;
   return (
     <div className="tabular-nums">
-      <div className="text-foreground/80">{utcStamp(opened, " at ")}</div>
+      <div className="text-foreground/80">{stamp(opened, " at ")}</div>
       <div className="font-semibold">
         <LiveDuration since={opened} />
       </div>

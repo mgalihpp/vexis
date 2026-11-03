@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useStamp } from "@/features/timezone/timezone";
 import { solscanTx } from "@/lib/format";
-import { compactUsd, money, utcStamp } from "../money";
+import { compactUsd, money } from "../money";
 import {
   type ActivePool,
   type ActivityRow,
@@ -124,6 +125,7 @@ export function ActivityList({
   currency: Currency;
   layout: "lines" | "cards";
 }) {
+  const stamp = useStamp();
   const solPrice = usePortfolio().solPrice;
   if (activity.status === "error") return <p className="p-2.5 text-xs text-loss">{activity.message}</p>;
   if (activity.status !== "ready") return <p className="p-2.5 text-xs text-muted-foreground">Loading activity…</p>;
@@ -140,7 +142,7 @@ export function ActivityList({
             <span className="w-30 shrink-0">
               <EventBadge type={row.type} href={solscanTx(row.signature)} />
             </span>
-            <span className="w-37.5 shrink-0 text-muted-foreground tabular-nums">{utcStamp(row.at)}</span>
+            <span className="w-37.5 shrink-0 text-muted-foreground tabular-nums">{stamp(row.at)}</span>
             <span className="w-16 shrink-0">
               <FdvChip row={row} pool={pool} />
             </span>
@@ -165,7 +167,7 @@ export function ActivityList({
             <span className="font-semibold tabular-nums">{value(row.total[currency], currency)}</span>
           </div>
           <div className="mt-1.25 flex items-center justify-between gap-1.5">
-            <span className="text-foreground/80 tabular-nums">{utcStamp(row.at)}</span>
+            <span className="text-foreground/80 tabular-nums">{stamp(row.at)}</span>
             <FdvChip row={row} pool={pool} />
           </div>
           <div className="mt-1.25 flex flex-col gap-0.75">

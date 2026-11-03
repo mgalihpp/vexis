@@ -6,6 +6,7 @@ import { StatCards } from "@/features/portfolio/components/stat-cards";
 import { ActiveSummary, Performance } from "@/features/portfolio/components/summary-panels";
 import { summarize } from "@/features/portfolio/portfolio";
 import { usePortfolioView } from "@/features/portfolio/use-portfolio-view";
+import { useTzOffset } from "@/features/timezone/timezone";
 
 export const Route = createFileRoute("/portfolio/$wallet/")({
   component: Overview,
@@ -13,7 +14,8 @@ export const Route = createFileRoute("/portfolio/$wallet/")({
 
 function Overview() {
   const { portfolio, closed, active, currency } = usePortfolioView();
-  const stats = useMemo(() => summarize(closed, currency), [closed, currency]);
+  const offset = useTzOffset();
+  const stats = useMemo(() => summarize(closed, currency, offset), [closed, currency, offset]);
 
   return (
     <div className="space-y-2">

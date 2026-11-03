@@ -4,16 +4,21 @@ import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { DAY_MS, type DateRange, RANGE_PRESETS, type RangePreset, resolveRange } from "../portfolio";
+import { useTzOffset } from "@/features/timezone/timezone";
+import { DAY_MS, type DateRange, RANGE_PRESETS, type RangePreset, resolveRange, shifted } from "../portfolio";
 
 // Search params carry custom dates as YYYY-MM-DD with an inclusive end day.
 export const isoDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const parseIso = (s: string | undefined) => (s ? Date.parse(`${s}T00:00:00Z`) : null);
 
-export function rangeFromSearch(search: { range: RangePreset; from?: string; to?: string }, now: number): DateRange {
+export function rangeFromSearch(
+  search: { range: RangePreset; from?: string; to?: string },
+  now: number,
+  offset = 0,
+): DateRange {
   const from = parseIso(search.from);
   const to = parseIso(search.to);
-  return resolveRange(search.range, now, { from, to: to === null ? null : to + DAY_MS });
+  return resolveRange(search.range, now, { from, to: to === null ? null : to + DAY_MS }, offset);
 }
 
 const pretty = (ms: number) =>
@@ -66,12 +71,13 @@ function DateField({
 export function RangePicker({ now }: { now: number }) {
   const search = useSearch({ from: "/portfolio/$wallet" });
   const navigate = useNavigate({ from: "/portfolio/$wallet" });
+  const offset = useTzOffset();
   const [open, setOpen] = useState(false);
   const [preset, setPreset] = useState<RangePreset>(search.range);
-  const [custom, setCustom] = useState<DateRange>(() => rangeFromSearch({ ...search, range: "custom" }, now));
+  const [custom, setCustom] = useState<DateRange>(() => rangeFromSearch({ ...search, range: "custom" }, now, offset));
 
-  const draft = resolveRange(preset, now, custom);
-  const applied = rangeFromSearch(search, now);
+  const draft = resolveRange(preset, now, custom, offset);
+  const applied = rangeFromSearch(search, now, offset);
 
   const reset = (next: boolean) => {
     if (next) {
@@ -83,7 +89,7 @@ export function RangePicker({ now }: { now: number }) {
 
   const choose = (id: RangePreset) => {
     setPreset(id);
-    if (id !== "custom" && id !== "all") setCustom(resolveRange(id, now));
+    if (id !== "custom" && id !== "all") setCustom(resolveRange(id, now, undefined, offset));
   };
 
   const apply = () => {
@@ -150,7 +156,7 @@ export function RangePicker({ now }: { now: number }) {
                   mode="range"
                   className="[--cell-size:--spacing(8)]"
                   numberOfMonths={2}
-                  defaultMonth={toLocal((draft.to ?? now + DAY_MS) - DAY_MS - 31 * DAY_MS)}
+                  defaultMonth={toLocal((draft.to ?? shifted(now, offset) + DAY_MS) - DAY_MS - 31 * DAY_MS)}
                   selected={{
                     from: draft.from === null ? undefined : toLocal(draft.from),
                     to: draft.to === null ? undefined : toLocal(draft.to - DAY_MS),

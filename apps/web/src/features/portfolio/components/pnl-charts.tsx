@@ -2,6 +2,7 @@ import { ShareIcon } from "lucide-react";
 import { type ReactNode, useId, useMemo, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { type ChartConfig, ChartContainer } from "@/components/ui/chart";
+import { useTzOffset } from "@/features/timezone/timezone";
 import { money, tone } from "../money";
 import {
   type ClosedPosition,
@@ -206,9 +207,13 @@ function ShareHeader({
 }
 
 export function CumulativeChart({ closed, currency }: { closed: ClosedPosition[]; currency: Currency }) {
+  const offset = useTzOffset();
   const [metric, setMetric] = useState<Metric>("pnl");
   const [sharing, setSharing] = useState(false);
-  const data = useMemo(() => cumulative(dailyBuckets(closed, currency, metric)), [closed, currency, metric]);
+  const data = useMemo(
+    () => cumulative(dailyBuckets(closed, currency, metric, offset)),
+    [closed, currency, metric, offset],
+  );
   const total = data.at(-1)?.value ?? 0;
   return (
     <ChartPanel
@@ -241,12 +246,13 @@ const GRANULARITY = [
 ] as const;
 
 export function PeriodChart({ closed, currency }: { closed: ClosedPosition[]; currency: Currency }) {
+  const offset = useTzOffset();
   const [metric, setMetric] = useState<Metric>("pnl");
   const [granularity, setGranularity] = useState<Granularity>("daily");
   const [sharing, setSharing] = useState(false);
   const data = useMemo(
-    () => series(dailyBuckets(closed, currency, metric), granularity),
-    [closed, currency, metric, granularity],
+    () => series(dailyBuckets(closed, currency, metric, offset), granularity),
+    [closed, currency, metric, offset, granularity],
   );
   const total = data.reduce((sum, d) => sum + d.value, 0);
   const title = `${GRANULARITY.find((g) => g.value === granularity)?.label} P&L`;

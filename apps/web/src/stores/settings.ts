@@ -22,6 +22,8 @@ interface SettingsState {
   currency: Currency;
   analyticsTimeframe: TimeframeId;
   numberMotion: NumberMotion;
+  /** Minutes east of UTC that days, ranges and timestamps are shown in, or `auto` for the browser's own offset. */
+  timezoneOffset: number | "auto";
   notify: NotifySettings;
   spikeMultiplier: SpikeMultiplier;
   spikeTimeframe: SpikeTimeframe;
@@ -32,6 +34,7 @@ interface SettingsState {
   setCurrency: (currency: Currency) => void;
   setAnalyticsTimeframe: (timeframe: TimeframeId) => void;
   setNumberMotion: (motion: NumberMotion) => void;
+  setTimezoneOffset: (offset: number | "auto") => void;
   setNotify: (key: keyof NotifySettings, value: boolean) => void;
   setSpikeMultiplier: (value: SpikeMultiplier) => void;
   setSpikeTimeframe: (value: SpikeTimeframe) => void;
@@ -47,6 +50,7 @@ export const useSettings = create<SettingsState>()(
       currency: "sol",
       analyticsTimeframe: "1h",
       numberMotion: "tween",
+      timezoneOffset: 0,
       notify: { outOfRange: true, positions: true, volumeSpike: true, browser: false, sound: true },
       spikeMultiplier: 3,
       spikeTimeframe: "1h",
@@ -56,6 +60,7 @@ export const useSettings = create<SettingsState>()(
       setCurrency: (currency) => set({ currency }),
       setAnalyticsTimeframe: (analyticsTimeframe) => set({ analyticsTimeframe }),
       setNumberMotion: (numberMotion) => set({ numberMotion }),
+      setTimezoneOffset: (timezoneOffset) => set({ timezoneOffset }),
       setNotify: (key, value) => set((s) => ({ notify: { ...s.notify, [key]: value } })),
       setSpikeMultiplier: (spikeMultiplier) => set({ spikeMultiplier }),
       setSpikeTimeframe: (spikeTimeframe) => set({ spikeTimeframe }),

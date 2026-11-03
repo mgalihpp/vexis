@@ -5,6 +5,7 @@ import { Logo } from "@/components/icons";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { Slider } from "@/components/ui/slider";
+import { offsetLabel, useTzOffset } from "@/features/timezone/timezone";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { CurrencyToggle } from "./currency-toggle";
 
@@ -90,6 +91,7 @@ export function ShareDialog({
   title: string;
   children: ReactNode;
 }) {
+  const offset = useTzOffset();
   const card = useRef<HTMLDivElement>(null);
   const [background, setBackground] = useState<string | null>(null);
   const [texture, setTexture] = useState<string | null>("noise");
@@ -168,7 +170,8 @@ export function ShareDialog({
               </div>
               {children}
               <p className="mt-2.5 text-right text-[0.625rem] text-muted-foreground">
-                {new Date().toISOString().slice(0, 19).replace("T", " ")} UTC
+                {new Date(Date.now() + offset * 60_000).toISOString().slice(0, 19).replace("T", " ")}{" "}
+                {offsetLabel(offset)}
               </p>
             </div>
           </div>

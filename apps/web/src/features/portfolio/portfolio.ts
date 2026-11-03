@@ -1,5 +1,7 @@
 // Client-safe portfolio model and the pure math behind every panel.
-// All day boundaries are UTC so the server render and the browser agree.
+// Day boundaries are UTC unless an offset (minutes east of UTC) is passed. Offset math works in "shifted" time:
+// a timestamp plus the offset, read with the UTC getters, is the wall clock in that zone. Buckets and ranges are
+// keyed by shifted midnights, so format them with timeZone "UTC".
 
 export type Currency = "sol" | "usd";
 export type Metric = "pnl" | "fees";
@@ -125,7 +127,12 @@ export interface LoadProgress {
 
 export const DAY_MS = 86_400_000;
 
+export const MIN_MS = 60_000;
+
 export const dayStart = (ms: number) => Math.floor(ms / DAY_MS) * DAY_MS;
+
+/** `ms` moved onto the wall clock of a zone `offset` minutes east of UTC. */
+export const shifted = (ms: number, offset = 0) => ms + offset * MIN_MS;
 
 const utc = (y: number, m: number, d = 1) => Date.UTC(y, m, d);
 
@@ -151,7 +158,7 @@ export const RANGE_PRESETS = [
 
 export type RangePreset = (typeof RANGE_PRESETS)[number]["id"];
 
-/** Inclusive start, exclusive end, both UTC midnights. `null` means unbounded. */
+/** Inclusive start, exclusive end, both midnights in shifted time. `null` means unbounded. */
 export interface DateRange {
   from: number | null;
   to: number | null;
@@ -161,8 +168,9 @@ export function resolveRange(
   preset: RangePreset,
   now: number,
   custom: DateRange = { from: null, to: null },
+  offset = 0,
 ): DateRange {
-  const today = dayStart(now);
+  const today = dayStart(shifted(now, offset));
   const tomorrow = today + DAY_MS;
   const d = new Date(today);
   const y = d.getUTCFullYear();
@@ -203,8 +211,11 @@ export function resolveRange(
   }
 }
 
-export const inRange = (closed: ClosedPosition[], { from, to }: DateRange) =>
-  closed.filter((p) => (from === null || p.closedAt >= from) && (to === null || p.closedAt < to));
+export const inRange = (closed: ClosedPosition[], { from, to }: DateRange, offset = 0) =>
+  closed.filter((p) => {
+    const at = shifted(p.closedAt, offset);
+    return (from === null || at >= from) && (to === null || at < to);
+  });
 
 // ---------- Headline stats ----------
 
@@ -229,7 +240,7 @@ export interface Stats {
 
 const ratio = (a: number, b: number) => (b === 0 ? null : a / b);
 
-export function summarize(closed: ClosedPosition[], currency: Currency): Stats {
+export function summarize(closed: ClosedPosition[], currency: Currency, offset = 0): Stats {
   let wins = 0;
   let grossProfit = 0;
   let grossLoss = 0;
@@ -251,7 +262,7 @@ export function summarize(closed: ClosedPosition[], currency: Currency): Stats {
   const losses = closed.length - wins;
   const avgWin = wins ? grossProfit / wins : 0;
   const avgLoss = losses ? grossLoss / losses : 0;
-  const days = dailyBuckets(closed, currency, "pnl");
+  const days = dailyBuckets(closed, currency, "pnl", offset);
   const dayWins = days.filter((b) => b.value > 0).length;
   return {
     count: closed.length,
@@ -276,7 +287,7 @@ export function summarize(closed: ClosedPosition[], currency: Currency): Stats {
 // ---------- Day buckets ----------
 
 export interface Bucket {
-  /** UTC midnight of the bucket's first day. */
+  /** Shifted midnight of the bucket's first day. */
   start: number;
   value: number;
   positions: number;
@@ -285,11 +296,11 @@ export interface Bucket {
 
 const amountOf = (p: ClosedPosition, currency: Currency, metric: Metric) => p[currency][metric];
 
-/** One bucket per UTC day that closed at least one position, oldest first. */
-export function dailyBuckets(closed: ClosedPosition[], currency: Currency, metric: Metric): Bucket[] {
+/** One bucket per day that closed at least one position, oldest first. */
+export function dailyBuckets(closed: ClosedPosition[], currency: Currency, metric: Metric, offset = 0): Bucket[] {
   const byDay = new Map<number, Bucket>();
   for (const p of closed) {
-    const start = dayStart(p.closedAt);
+    const start = dayStart(shifted(p.closedAt, offset));
     const b = byDay.get(start) ?? { start, value: 0, positions: 0, wins: 0 };
     b.value += amountOf(p, currency, metric);
     b.positions++;

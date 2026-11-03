@@ -99,5 +99,8 @@ const utcTime = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-/** `Oct 30, 2026 20:30:10` in UTC; `joiner` replaces the space between date and time. */
-export const utcStamp = (ms: number, joiner = " ") => `${utcDate.format(ms)}${joiner}${utcTime.format(ms)}`;
+/** `Oct 30, 2026 20:30:10` in the zone `offset` minutes east of UTC; `joiner` replaces the space between date and time. */
+export const utcStamp = (ms: number, joiner = " ", offset = 0) => {
+  const at = ms + offset * 60_000;
+  return `${utcDate.format(at)}${joiner}${utcTime.format(at)}`;
+};

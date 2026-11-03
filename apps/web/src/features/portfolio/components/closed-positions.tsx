@@ -1,8 +1,9 @@
 import { ChevronRightIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useStamp } from "@/features/timezone/timezone";
 import { solscanAccount } from "@/lib/format";
-import { fullDuration, money, timeAgo, utcStamp } from "../money";
+import { fullDuration, money, timeAgo } from "../money";
 import { type ClosedPoolRow, type ClosedPosition, type Currency, closedPoolRows, type PoolMeta } from "../portfolio";
 import { usePortfolio } from "../use-portfolio-view";
 import { Pnl, ShareButton, Tile } from "./active-figures";
@@ -230,6 +231,7 @@ function ClosedGrid({
   onShare: (target: ShareTarget) => void;
   onOpen: (address: string) => void;
 }) {
+  const stamp = useStamp();
   const fetchedAt = usePortfolio().fetchedAt;
   if (rows.length === 0) return <p className="flex-1 py-10 text-center text-muted-foreground">{empty}</p>;
   return (
@@ -265,7 +267,7 @@ function ClosedGrid({
                 </div>
               </div>
               <Tile label="Last close" className="text-right">
-                <div>{utcStamp(row.lastClosedAt, " at ")}</div>
+                <div>{stamp(row.lastClosedAt, " at ")}</div>
                 <div className="font-semibold">{timeAgo(row.lastClosedAt, fetchedAt)}</div>
               </Tile>
               <div className="grid grid-cols-3 gap-0.5">
@@ -300,6 +302,7 @@ function PoolRows({
   currency: Currency;
   onShare: (target: ShareTarget) => void;
 }) {
+  const stamp = useStamp();
   const fetchedAt = usePortfolio().fetchedAt;
   const t = row[currency];
   return (
@@ -319,7 +322,7 @@ function PoolRows({
           </div>
         </TableCell>
         <TableCell className="text-right">
-          <div className="text-muted-foreground">{utcStamp(row.lastClosedAt, " at ")}</div>
+          <div className="text-muted-foreground">{stamp(row.lastClosedAt, " at ")}</div>
           <div className="font-semibold">{timeAgo(row.lastClosedAt, fetchedAt)}</div>
         </TableCell>
         <TableCell className="text-right">{fullDuration(row.heldMs)}</TableCell>
@@ -355,6 +358,7 @@ function PositionRows({
   currency: Currency;
   onShare: (target: ShareTarget) => void;
 }) {
+  const stamp = useStamp();
   const [open, setOpen] = useState(false);
   const a = position[currency];
   return (
@@ -376,8 +380,8 @@ function PositionRows({
           </div>
         </TableCell>
         <TableCell className="text-right text-muted-foreground">
-          <div>Opened: {utcStamp(position.openedAt, " at ")}</div>
-          <div>Closed: {utcStamp(position.closedAt, " at ")}</div>
+          <div>Opened: {stamp(position.openedAt, " at ")}</div>
+          <div>Closed: {stamp(position.closedAt, " at ")}</div>
         </TableCell>
         <TableCell className="text-right">{fullDuration(position.closedAt - position.openedAt)}</TableCell>
         <TableCell className="text-right">{money(a.deposit, currency)}</TableCell>
