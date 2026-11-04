@@ -7,6 +7,14 @@ import { defineConfig } from "vite";
 
 const src = fileURLToPath(new URL("./src", import.meta.url));
 
+// Server code reads DATABASE_URL and BETTER_AUTH_* from process.env. In dev they come from the repo-root .env;
+// in production the process environment supplies them (bun --env-file, or pm2).
+try {
+  process.loadEnvFile(fileURLToPath(new URL("../../.env", import.meta.url)));
+} catch {
+  // No .env file: rely on the environment.
+}
+
 // The deploy target is a build flag, not an app change:
 // NITRO_PRESET=node-server | vercel | cloudflare-module | ... bun run build
 export default defineConfig({
