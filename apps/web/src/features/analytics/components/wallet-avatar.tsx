@@ -199,7 +199,7 @@ export function WalletAvatar({ address, className = "size-8" }: { address: strin
       className={`${className} inline-block shrink-0 overflow-hidden rounded-md`}
       style={{ boxShadow: `inset 0 0 0 2px ${ring.color}, ${ring.glow}` }}
     >
-      <svg viewBox="0 0 32 32" className="block size-full">
+      <svg viewBox="0 0 32 32" aria-hidden="true" className="block size-full">
         <Background kind={t.background} hue={t.hue} id={id} />
         <Ears kind={t.ears} fill={shade} />
         <path d={BODIES[t.body]} fill={body} />
