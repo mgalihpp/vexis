@@ -13,7 +13,8 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "studio": "drizzle-kit studio",
-    "isolation": "bun scripts/isolation.ts"
+    "isolation": "bun scripts/isolation.ts",
+    "invite": "bun scripts/invite.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",

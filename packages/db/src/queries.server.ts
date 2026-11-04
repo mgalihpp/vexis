@@ -201,7 +201,7 @@ export function hashInviteToken(token: string) {
 /** Returns the plain token once; only its hash is stored. */
 export async function createInvite(
   db: Db,
-  input: { createdBy: string; email?: string; note?: string; maxUses?: number; expiresAt: Date },
+  input: { createdBy?: string; email?: string; note?: string; maxUses?: number; expiresAt: Date },
 ) {
   const token = randomBytes(24).toString("base64url");
   const [invite] = await db

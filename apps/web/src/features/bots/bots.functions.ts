@@ -2,26 +2,32 @@ import { notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { EventKind } from "@vexis/bot-state";
 import { z } from "zod";
+import { requireViewer } from "@/features/auth/auth.middleware";
 import { botStore } from "./bots.server";
 
 const DAY_MS = 86_400_000;
 
-export const getFleet = createServerFn({ method: "GET" }).handler(async () => {
-  const store = await botStore();
-  const now = Date.now();
-  return { now, bots: await Promise.all(store.sources.map((s) => store.summary(s, now))) };
-});
+export const getFleet = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .handler(async () => {
+    const store = await botStore();
+    const now = Date.now();
+    return { now, bots: await Promise.all(store.sources.map((s) => store.summary(s, now))) };
+  });
 
 // Reads every journal in full, so routes stream it instead of blocking on it.
-export const getFleetActivity = createServerFn({ method: "GET" }).handler(async () => {
-  const store = await botStore();
-  const since = Date.now() - DAY_MS;
-  return Promise.all(store.sources.map((s) => store.activity(s, since)));
-});
+export const getFleetActivity = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .handler(async () => {
+    const store = await botStore();
+    const since = Date.now() - DAY_MS;
+    return Promise.all(store.sources.map((s) => store.activity(s, since)));
+  });
 
 const BotInput = z.object({ botId: z.string() });
 
 export const getBot = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
   .validator(BotInput)
   .handler(async ({ data }) => {
     const store = await botStore();
@@ -32,6 +38,7 @@ export const getBot = createServerFn({ method: "GET" })
   });
 
 export const getBotEvents = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
   .validator(
     BotInput.extend({
       kinds: z.array(EventKind).optional(),

@@ -19,7 +19,8 @@
     "db:generate": "bun run --filter @vexis/db generate",
     "db:migrate": "bun run --filter @vexis/db migrate",
     "db:studio": "bun run --filter @vexis/db studio",
-    "db:isolation": "bun run --filter @vexis/db isolation"
+    "db:isolation": "bun run --filter @vexis/db isolation",
+    "db:invite": "bun packages/db/scripts/invite.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
