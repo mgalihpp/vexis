@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useNow } from "@/hooks/use-now";
 import { ago } from "@/lib/format";
 import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
@@ -46,7 +47,8 @@ export function NotificationsDialog({
     ]),
   );
   const navigate = useNavigate();
-  const now = Date.now();
+  // Ticks once a second so "10s ago" counts up while the list is open.
+  const now = useNow(Date.now(), open);
   const today = items.filter((n) => now - n.at < DAY_MS);
   const earlier = items.filter((n) => now - n.at >= DAY_MS);
   const unread = items.some((n) => !n.read);
