@@ -96,9 +96,7 @@ function AppHeader() {
           <span className="hidden md:inline">Vexis</span>
         </Link>
         <nav className="hidden items-center gap-5 md:flex">
-          <NavItem to="/portfolio">
-            Portfolio
-          </NavItem>
+          <NavItem to="/portfolio">Portfolio</NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
           <span className="relative text-sm font-medium text-muted-foreground">
             Agents

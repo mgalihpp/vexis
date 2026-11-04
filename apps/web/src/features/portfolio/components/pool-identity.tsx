@@ -22,7 +22,7 @@ const IPFS_PATH_RE = /^https?:\/\/[^/]+\/ipfs\/(.+)$/;
 const IPFS_PROTO_RE = /^ipfs:\/\/(.+)$/;
 
 function rewriteIpfs(url: string, gatewayIndex = 0): string {
-  const gw = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0]!;
+  const gw = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0] ?? "";
   const pathMatch = IPFS_PATH_RE.exec(url);
   if (pathMatch) return `${gw}${pathMatch[1]}`;
   const protoMatch = IPFS_PROTO_RE.exec(url);

@@ -43,6 +43,6 @@ export function isPublicPath(pathname: string) {
 
 /** Only same-site paths, so a crafted ?redirect= can't send someone to another origin after login. */
 export function safeRedirect(target: string | undefined) {
-  if (!target || !target.startsWith("/") || target.startsWith("//") || isPublicPath(target)) return "/";
+  if (!target?.startsWith("/") || target.startsWith("//") || isPublicPath(target)) return "/";
   return target;
 }
