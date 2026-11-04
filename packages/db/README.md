@@ -28,18 +28,18 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 
 ## Tables
 
-| Table | Owner | Notes |
-| --- | --- | --- |
-| `users`, `sessions`, `accounts`, `verifications` | auth | Better Auth's core column names, text ids. `users.role` is `admin` or `member`. |
-| `invites` | admin | SHA-256 `token_hash`, optional `email`, `max_uses`/`use_count`, `expires_at`, `revoked_at`. |
-| `invite_redemptions` | user | `used_by`/`used_at`, one per user. |
-| `user_settings` | user | `timezone` (IANA), `currency` (`usd`/`sol`). |
-| `wallets` | user | Unique per `(user_id, address)`. |
-| `telegram_links` | user | One chat per user, one user per chat; one-time `link_code` with expiry. |
-| `agents` | user | One per `(user_id, kind)`; `enabled`, `paused`, `config` jsonb (zod-validated). |
-| `agent_pools` | user | Pools an agent watches; `last_alert_at` for the cooldown. |
-| `agent_alerts` | user | `vol_1m`, `baseline`, `ratio`, `delivered`, `error`, `at`. |
-| `pool_minutes` | global | Per-minute volume per pool, shared by everyone. |
+| Table                                            | Owner  | Notes                                                                                       |
+| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------- |
+| `users`, `sessions`, `accounts`, `verifications` | auth   | Better Auth's core column names, text ids. `users.role` is `admin` or `member`.             |
+| `invites`                                        | admin  | SHA-256 `token_hash`, optional `email`, `max_uses`/`use_count`, `expires_at`, `revoked_at`. |
+| `invite_redemptions`                             | user   | `used_by`/`used_at`, one per user.                                                          |
+| `user_settings`                                  | user   | `timezone` (IANA), `currency` (`usd`/`sol`).                                                |
+| `wallets`                                        | user   | Unique per `(user_id, address)`.                                                            |
+| `telegram_links`                                 | user   | One chat per user, one user per chat; one-time `link_code` with expiry.                     |
+| `agents`                                         | user   | One per `(user_id, kind)`; `enabled`, `paused`, `config` jsonb (zod-validated).             |
+| `agent_pools`                                    | user   | Pools an agent watches; `last_alert_at` for the cooldown.                                   |
+| `agent_alerts`                                   | user   | `vol_1m`, `baseline`, `ratio`, `delivered`, `error`, `at`.                                  |
+| `pool_minutes`                                   | global | Per-minute volume per pool, shared by everyone.                                             |
 
 ## Isolation
 
