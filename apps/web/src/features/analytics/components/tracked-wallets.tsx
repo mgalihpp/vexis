@@ -18,6 +18,7 @@ import {
   TRACKED_PAGE_SIZES,
   type TrackedPageSize,
   type TrackedPosition,
+  type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
 import { compact, NA, Panel } from "./ui";
@@ -117,14 +118,26 @@ function RangePill({ inRange, known, total }: { inRange: number; known: number; 
   );
 }
 
-function PoolTotals({ wallets }: { wallets: TrackedWallet[] }) {
-  const t = totals(wallets.flatMap((w) => w.positions));
-  const share = t.known > 0 ? t.inRange / t.known : null;
+/**
+ * Every tile covers the whole pool. Fees and PnL fill in as the server's background job reaches each wallet, so they
+ * say how far it has got, and how many wallets are missing when some failed.
+ */
+function PoolTotals({ data }: { data: Extract<TrackedResult, { ok: true }> }) {
+  const t = data.totals;
+  const share = data.rangeKnownPositions > 0 ? data.inRangePositions / data.rangeKnownPositions : null;
+  const missing = t.total - t.loaded + t.failed;
+  const note = t.running ? (
+    <span className="text-muted-foreground">
+      {t.loaded} of {plural(t.total, "wallet")}
+    </span>
+  ) : missing > 0 ? (
+    <span className="text-muted-foreground">{plural(missing, "wallet")} missing</span>
+  ) : null;
   return (
     <div className="grid grid-cols-2 gap-1.5 pb-1 @xl:grid-cols-4">
       <Tile label="Wallets">
-        <Big>{wallets.length}</Big>
-        <span className="text-muted-foreground">{plural(t.positions, "position")}</span>
+        <Big>{data.totalWallets}</Big>
+        <span className="text-muted-foreground">{plural(data.totalPositions, "position")}</span>
       </Tile>
       <Tile label="In range">
         <div className="flex items-center gap-2">
@@ -134,10 +147,12 @@ function PoolTotals({ wallets }: { wallets: TrackedWallet[] }) {
       </Tile>
       <Tile label="Fees">
         <Big>{usd(t.feesUsd)}</Big>
+        {note}
       </Tile>
       <Tile label="Unrealized PnL">
         <Big className={tone(t.pnlUsd)}>{usd(t.pnlUsd, true)}</Big>
         <span className={`tabular-nums ${tone(sol3(t.pnlSol))}`}>{sol(t.pnlSol)}</span>
+        {note}
       </Tile>
     </div>
   );
@@ -483,7 +498,7 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
       {ok && wallets.length === 0 && <p className="text-xs text-muted-foreground">No open positions.</p>}
       {ok && wallets.length > 0 && (
         <>
-          <PoolTotals wallets={wallets} />
+          <PoolTotals data={data} />
           <div className="flex items-center justify-between gap-2.5 pt-1">
             <PoolFilter
               value={query}

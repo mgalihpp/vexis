@@ -27,6 +27,19 @@ export interface TrackedWallet {
   pnlUsd: number | null;
 }
 
+/** Fees and PnL summed over the wallets whose Meteora detail has loaded so far. */
+export interface PoolTotals {
+  feesUsd: number | null;
+  pnlUsd: number | null;
+  pnlSol: number | null;
+  /** Wallets fetched so far, failed ones included. */
+  loaded: number;
+  total: number;
+  /** Wallets whose detail request failed; their figures are missing from the sums. */
+  failed: number;
+  running: boolean;
+}
+
 /** Rows per page the user can pick; the first is the default. */
 export const TRACKED_PAGE_SIZES = [10, 25, 50] as const;
 export type TrackedPageSize = (typeof TRACKED_PAGE_SIZES)[number];
@@ -42,6 +55,12 @@ export type TrackedResult =
       /** Wallets with an open position in the pool, across every page. */
       totalWallets: number;
       totalPositions: number;
+      /** In-range positions across every page, judged against the pool's active bin. */
+      inRangePositions: number;
+      /** Positions across every page whose range status is known. */
+      rangeKnownPositions: number;
+      /** Fees and PnL across every page, filled in by a background job. */
+      totals: PoolTotals;
       scannedAt: number;
       /** This page's wallets only. */
       wallets: TrackedWallet[];

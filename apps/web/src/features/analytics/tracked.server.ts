@@ -4,6 +4,7 @@ import { z } from "zod";
 import { get } from "../portfolio/meteora.server";
 import {
   inRangeStatus,
+  type PoolTotals,
   sumKnown,
   TRACKED_PAGE_SIZES,
   type TrackedPageSize,
@@ -163,6 +164,55 @@ const scanFor = (pool: string) =>
 const detailFor = (pool: string, owner: string) =>
   cached(detailCache, `${pool}:${owner}`, DETAIL_CACHE_MS, () => fetchOwnerDetail(pool, owner));
 
+/**
+ * Meteora detail for every wallet in the pool, so fees and PnL can be totaled across pages. One job per pool and
+ * scan: a new scan starts a new job and the old one stops at its next wallet. It goes through `detailFor`, so pages
+ * reuse what it fetched and the shared rate-limit budget paces it.
+ */
+interface TotalsJob {
+  scanAt: number;
+  total: number;
+  rows: Map<string, PnlRow[] | null>;
+  running: boolean;
+}
+
+const totalsJobs = new Map<string, TotalsJob>();
+
+function totalsJobFor(pool: string, scan: Scan): TotalsJob {
+  const current = totalsJobs.get(pool);
+  if (current?.scanAt === scan.at) return current;
+  const job: TotalsJob = { scanAt: scan.at, total: scan.groups.length, rows: new Map(), running: true };
+  totalsJobs.set(pool, job);
+  const owners = scan.groups.map((g) => g.owner);
+  let next = 0;
+  const worker = async () => {
+    while (next < owners.length && totalsJobs.get(pool) === job) {
+      const owner = owners[next++];
+      if (owner === undefined) break;
+      job.rows.set(owner, await detailFor(pool, owner));
+    }
+  };
+  void Promise.all(Array.from({ length: Math.min(PNL_CONCURRENCY, owners.length) }, worker)).finally(() => {
+    job.running = false;
+  });
+  return job;
+}
+
+function poolTotals(job: TotalsJob): PoolTotals {
+  const rows = [...job.rows.values()].flatMap((r) => r ?? []);
+  let failed = 0;
+  for (const r of job.rows.values()) if (r === null) failed++;
+  return {
+    feesUsd: sumKnown(rows.map((r) => r.allTimeFees?.total?.usd ?? null)),
+    pnlUsd: sumKnown(rows.map((r) => r.pnlUsd)),
+    pnlSol: sumKnown(rows.map((r) => r.pnlSol)),
+    loaded: job.rows.size,
+    total: job.total,
+    failed,
+    running: job.running,
+  };
+}
+
 const ms = (t: number) => (t < 1e12 ? t * 1000 : t);
 
 function buildPosition(p: OnChainPosition, row: PnlRow | undefined): TrackedPosition {
@@ -202,6 +252,7 @@ async function buildPage(pool: string, page: number, pageSize: number): Promise<
   }
 
   const { groups } = scan;
+  const job = totalsJobFor(pool, scan);
   const pages = Math.max(1, Math.ceil(groups.length / pageSize));
   const slice = groups.slice((page - 1) * pageSize, page * pageSize);
 
@@ -225,6 +276,26 @@ async function buildPage(pool: string, page: number, pageSize: number): Promise<
     return { owner: g.owner, positions, pnlUsd: sumKnown(positions.map((p) => p.pnlUsd)) };
   });
 
+  // Range status for every position in the pool, not just this page: bins come from the scan and the active bin is
+  // one value for the pool, so only this page's Meteora detail is needed. Meteora's own flag wins where it is known.
+  const activeBinId = [...details.values()].find((r) => r.poolActiveBinId != null)?.poolActiveBinId ?? null;
+  let inRangePositions = 0;
+  let rangeKnownPositions = 0;
+  for (const g of groups) {
+    for (const p of g.positions) {
+      const row = details.get(p.address);
+      const status = inRangeStatus({
+        outOfRange: row?.isOutOfRange,
+        activeBinId: row?.poolActiveBinId ?? activeBinId,
+        lowerBinId: p.lowerBinId,
+        upperBinId: p.upperBinId,
+      });
+      if (status == null) continue;
+      rangeKnownPositions++;
+      if (status) inRangePositions++;
+    }
+  }
+
   return {
     ok: true,
     pool,
@@ -233,6 +304,9 @@ async function buildPage(pool: string, page: number, pageSize: number): Promise<
     pages,
     totalWallets: groups.length,
     totalPositions: groups.reduce((n, g) => n + g.positions.length, 0),
+    inRangePositions,
+    rangeKnownPositions,
+    totals: poolTotals(job),
     scannedAt: scan.at,
     wallets,
     unmatched: slice.reduce((n, g) => n + g.positions.filter((p) => !details.has(p.address)).length, 0),

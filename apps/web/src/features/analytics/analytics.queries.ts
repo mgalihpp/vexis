@@ -16,7 +16,8 @@ export const trackedQuery = (input: { pool: string; page?: number; pageSize?: 10
     queryKey: ["analytics", "tracked", input.pool, page, pageSize],
     queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize } }),
     staleTime: 5 * 60_000,
-    refetchInterval: false,
+    // Poll while the pool-wide totals are still loading.
+    refetchInterval: (q) => (q.state.data?.ok && q.state.data.totals.running ? 2000 : false),
   });
 };
 
