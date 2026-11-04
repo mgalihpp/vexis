@@ -78,15 +78,23 @@ export function Expander({ open, onToggle, label }: { open: boolean; onToggle: (
   );
 }
 
-export function PoolFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function PoolFilter({
+  value,
+  onChange,
+  placeholder = "Filter by pool name",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
   return (
     <label className="relative w-full max-w-[16rem]">
       <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.25 -translate-y-1/2 text-muted-foreground" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Filter by pool name"
-        aria-label="Filter by pool name"
+        placeholder={placeholder}
+        aria-label={placeholder}
         className="h-7 w-full rounded-md border bg-card pr-2 pl-8 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
       />
     </label>

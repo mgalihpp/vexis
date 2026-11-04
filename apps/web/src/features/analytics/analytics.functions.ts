@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireViewer } from "@/features/auth/auth.middleware";
 import { TIMEFRAMES, type TimeframeId } from "./analytics";
 import { loadAnalytics, loadChart, loadOlder, searchPools } from "./analytics.server";
+import { trackedPositions } from "./tracked.server";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
 export const PoolAddress = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Not a Solana address");
@@ -21,6 +22,11 @@ export const findPools = createServerFn({ method: "GET" })
   .middleware([requireViewer])
   .validator(z.object({ query: z.string().trim().min(1).max(40) }))
   .handler(({ data }) => searchPools(data.query));
+
+export const getTrackedPositions = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .validator(z.object({ pool: PoolAddress }))
+  .handler(({ data }) => trackedPositions(data.pool));
 
 export const getOlderBars = createServerFn({ method: "GET" })
   .middleware([requireViewer])
