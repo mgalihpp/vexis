@@ -15,7 +15,11 @@
     "test": "bun test",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "docs:fetch": "bun scripts/fetch-docs.ts"
+    "docs:fetch": "bun scripts/fetch-docs.ts",
+    "db:generate": "bun run --filter @vexis/db generate",
+    "db:migrate": "bun run --filter @vexis/db migrate",
+    "db:studio": "bun run --filter @vexis/db studio",
+    "db:isolation": "bun run --filter @vexis/db isolation"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",
