@@ -7,6 +7,7 @@ import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { analyticsQuery, chartQuery, trackedQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
 import { AnalyticsSkeleton } from "@/features/analytics/components/analytics-skeleton";
+import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
@@ -51,6 +52,41 @@ function Analytics() {
   const tf = searchTf ?? savedTf;
   const { data } = useSuspenseQuery(analyticsQuery({ pool }));
   const navigate = Route.useNavigate();
+  // With no pool in the URL, open the pool the user looked at last. The store rehydrates after mount, so this runs
+  // once it has loaded; until then the page shows the default pool.
+  const lastPool = usePools((s) => s.history[0]?.address);
+  const recordPool = usePools((s) => s.recordHistory);
+  useEffect(() => {
+    if (!pool && lastPool) void navigate({ search: (prev) => ({ ...prev, pool: lastPool }), replace: true });
+  }, [pool, lastPool, navigate]);
+  // Only pools the user picked count as history; the default pool is not recorded.
+  const loadedAddress = data.pool.address;
+  const loadedName = data.pool.name;
+  const loadedBinStep = data.pool.binStep;
+  const loadedX = data.pool.tokenX;
+  const loadedY = data.pool.tokenY;
+  useEffect(() => {
+    if (!pool) return;
+    recordPool({
+      address: loadedAddress,
+      name: loadedName,
+      binStep: loadedBinStep,
+      tokenXSymbol: loadedX.symbol,
+      tokenXIcon: loadedX.icon,
+      tokenYSymbol: loadedY.symbol,
+      tokenYIcon: loadedY.icon,
+    });
+  }, [
+    pool,
+    loadedAddress,
+    loadedName,
+    loadedBinStep,
+    loadedX.symbol,
+    loadedX.icon,
+    loadedY.symbol,
+    loadedY.icon,
+    recordPool,
+  ]);
   useEffect(() => {
     if (searchTf) setAnalyticsTimeframe(searchTf);
   }, [searchTf, setAnalyticsTimeframe]);

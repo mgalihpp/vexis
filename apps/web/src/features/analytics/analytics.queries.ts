@@ -9,13 +9,16 @@ export const analyticsQuery = (input: { pool?: string | undefined }) =>
   });
 
 /** Positions change slowly and each scan costs RPC and rate-limit budget, so this query does not poll. */
-export const trackedQuery = (input: { pool: string }) =>
-  queryOptions({
-    queryKey: ["analytics", "tracked", input.pool],
-    queryFn: () => getTrackedPositions({ data: input }),
+export const trackedQuery = (input: { pool: string; page?: number; pageSize?: 10 | 25 | 50 }) => {
+  const page = input.page ?? 1;
+  const pageSize = input.pageSize ?? 10;
+  return queryOptions({
+    queryKey: ["analytics", "tracked", input.pool, page, pageSize],
+    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize } }),
     staleTime: 5 * 60_000,
     refetchInterval: false,
   });
+};
 
 export const chartQuery = (input: { pool: string; tf: TimeframeId }) =>
   queryOptions({
