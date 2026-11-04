@@ -13,6 +13,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: deploy
+    # Only ever deploy main, even when triggered manually from another branch.
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
 
