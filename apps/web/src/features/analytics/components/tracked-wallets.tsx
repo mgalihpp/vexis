@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDownIcon, CircleCheckIcon, CircleXIcon, ExternalLinkIcon, FilterIcon, InfoIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
@@ -15,14 +15,16 @@ import {
   type RangeFilter,
   rangeBar,
   sumKnown,
+  TRACKED_PAGE_SIZES,
+  type TrackedPageSize,
   type TrackedPosition,
   type TrackedWallet,
 } from "../tracked";
 import { compact, NA, Panel } from "./ui";
+import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
 
-const PAGE_SIZES = [10, 25, 50] as const;
 const NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
 const short = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
@@ -39,9 +41,6 @@ const sol = (v: number | null) => {
 };
 const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-/** A stable hue per wallet, so the same owner always gets the same avatar color. */
-const ownerHue = (owner: string) => [...owner].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
 
 interface Totals {
   positions: number;
@@ -306,20 +305,11 @@ function WalletCard({
   base: Token;
   quote: Token;
 }) {
-  const hue = ownerHue(wallet.owner);
   const t = totals(wallet.positions);
   return (
     <details className="group text-xs">
       <summary className="flex cursor-pointer list-none items-center gap-2.5 rounded-md px-1 py-2.5 hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
-        <span
-          aria-hidden
-          className="grid size-8 shrink-0 place-items-center rounded-full font-mono text-[10px] font-bold text-white"
-          style={{
-            background: `linear-gradient(135deg, hsl(${hue} 80% 55%), hsl(${(hue + 60) % 360} 75% 40%))`,
-          }}
-        >
-          {wallet.owner.slice(0, 2)}
-        </span>
+        <WalletAvatar address={wallet.owner} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="truncate font-mono text-xs font-semibold" title={wallet.owner}>
@@ -453,25 +443,28 @@ function WalletFilterMenu({
 }
 
 export function TrackedWallets({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
-  const { data } = useQuery(trackedQuery({ pool }));
+  // Paging state belongs to one pool, so switching pools starts again on the first page.
+  const [paging, setPaging] = useState<{ pool: string; page: number; size: TrackedPageSize }>({
+    pool,
+    page: 1,
+    size: TRACKED_PAGE_SIZES[0],
+  });
+  if (paging.pool !== pool) setPaging({ pool, page: 1, size: paging.size });
+  const page = paging.pool === pool ? paging.page : 1;
+  // The previous page stays on screen while the next one loads.
+  const { data } = useQuery({
+    ...trackedQuery({ pool, page, pageSize: paging.size }),
+    placeholderData: keepPreviousData,
+  });
   const ok = data?.ok === true;
   const wallets = ok ? data.wallets : [];
-  // Paging state belongs to one pool, so switching pools starts again on the first page.
-  const [paging, setPaging] = useState<{ pool: string; page: number; size: number }>({
-    pool,
-    page: 0,
-    size: PAGE_SIZES[0],
-  });
-  if (paging.pool !== pool) setPaging({ pool, page: 0, size: paging.size });
   const [query, setQuery] = useState("");
   const [range, setRange] = useState<ReadonlySet<RangeFilter>>(new Set());
   const [pnl, setPnl] = useState<ReadonlySet<PnlFilter>>(new Set());
-  // A new search or filter starts from the first page.
-  const firstPage = () => setPaging((p) => ({ ...p, page: 0 }));
+  // Filters apply to the wallets on the current page; a new search or filter starts from the first page.
+  const firstPage = () => setPaging((p) => ({ ...p, page: 1 }));
   const matched = useMemo(() => filterWallets(wallets, { query, range, pnl }), [wallets, query, range, pnl]);
-  const pages = Math.max(1, Math.ceil(matched.length / paging.size));
-  const page = Math.min(paging.page, pages - 1);
-  const shown = matched.slice(page * paging.size, (page + 1) * paging.size);
+  const pages = ok ? data.pages : 1;
 
   return (
     <Panel
@@ -517,7 +510,7 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
             <p className="py-6 text-center text-xs text-muted-foreground">No wallets match.</p>
           ) : (
             <div className="flex flex-col divide-y">
-              {shown.map((w) => (
+              {matched.map((w) => (
                 <WalletCard key={w.owner} wallet={w} scannedAt={data.scannedAt} base={base} quote={quote} />
               ))}
             </div>
@@ -527,17 +520,17 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
               {plural(data.unmatched, "position")} had no detail from Meteora, so their figures show a dash.
             </p>
           )}
-          {matched.length > PAGE_SIZES[0] && (
+          {pages > 1 && (
             // The portfolio's pagination bar, flattened onto the panel's bottom edge instead of sticking.
             <div className="-mx-3 -mb-3 [&>div]:static [&>div]:rounded-b-[10px] [&>div]:bg-card">
               <Pagination
-                total={matched.length}
-                page={page}
+                total={data.totalWallets}
+                page={page - 1}
                 pages={pages}
                 pageSize={paging.size}
-                sizes={PAGE_SIZES}
-                onPage={(p) => setPaging({ pool, page: p, size: paging.size })}
-                onPageSize={(size) => setPaging({ pool, page: 0, size })}
+                sizes={TRACKED_PAGE_SIZES}
+                onPage={(p) => setPaging((prev) => ({ ...prev, pool, page: p + 1 }))}
+                onPageSize={(size) => setPaging({ pool, page: 1, size: size as TrackedPageSize })}
               />
             </div>
           )}

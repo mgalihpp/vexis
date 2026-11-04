@@ -27,13 +27,25 @@ export interface TrackedWallet {
   pnlUsd: number | null;
 }
 
+/** Rows per page the user can pick; the first is the default. */
+export const TRACKED_PAGE_SIZES = [10, 25, 50] as const;
+export type TrackedPageSize = (typeof TRACKED_PAGE_SIZES)[number];
+
 export type TrackedResult =
   | {
       ok: true;
       pool: string;
+      /** 1-based page of wallets, newest activity first. */
+      page: number;
+      pageSize: number;
+      pages: number;
+      /** Wallets with an open position in the pool, across every page. */
+      totalWallets: number;
+      totalPositions: number;
       scannedAt: number;
+      /** This page's wallets only. */
       wallets: TrackedWallet[];
-      /** Open on-chain positions Meteora returned no detail for. */
+      /** Open on-chain positions on this page that Meteora returned no detail for. */
       unmatched: number;
     }
   | { ok: false; message: string };

@@ -25,8 +25,14 @@ export const findPools = createServerFn({ method: "GET" })
 
 export const getTrackedPositions = createServerFn({ method: "GET" })
   .middleware([requireViewer])
-  .validator(z.object({ pool: PoolAddress }))
-  .handler(({ data }) => trackedPositions(data.pool));
+  .validator(
+    z.object({
+      pool: PoolAddress,
+      page: z.number().int().min(1).max(10_000).default(1),
+      pageSize: z.union([z.literal(10), z.literal(25), z.literal(50)]).default(10),
+    }),
+  )
+  .handler(({ data }) => trackedPositions(data.pool, data.page, data.pageSize));
 
 export const getOlderBars = createServerFn({ method: "GET" })
   .middleware([requireViewer])
