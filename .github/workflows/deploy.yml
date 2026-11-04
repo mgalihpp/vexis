@@ -1,0 +1,50 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - run: bun run build
+
+      - name: Pack build (dereference symlinks)
+        run: tar -chzf web-output.tgz -C apps/web .output
+
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload and restart
+        env:
+          VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          scp -P "$PORT" web-output.tgz "$VPS:/root/vexis/"
+          ssh -p "$PORT" "$VPS" 'set -e
+            cd /root/vexis
+            rm -rf apps/web/.output
+            tar -xzf web-output.tgz -C apps/web
+            rm -f web-output.tgz
+            if [ -n "$(find apps/web/.output -xtype l)" ]; then echo "broken symlinks"; exit 1; fi
+            pm2 restart vexis-dashboard
+            pm2 save'
