@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { z } from "zod";
 import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
-import { analyticsQuery, chartQuery } from "@/features/analytics/analytics.queries";
+import { analyticsQuery, chartQuery, trackedQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
 import { AnalyticsSkeleton } from "@/features/analytics/components/analytics-skeleton";
 import { useSettings } from "@/stores/settings";
@@ -34,6 +34,10 @@ export const Route = createFileRoute("/analytics")({
     // the page stays and the chart shows its own skeleton. prefetchQuery never throws; a failed chart retries there.
     const chart = context.queryClient.prefetchQuery(chartQuery({ pool: pool.address, tf: deps.tf }));
     if (typeof window === "undefined") await chart;
+    // The tracked-wallets scan is slow (RPC plus one Meteora call per owner), so it starts here and never blocks the page.
+    // Browser only: on the server a warm cache would stream the data in after the HTML already showed the skeleton,
+    // and hydration would then see different markup.
+    if (typeof window !== "undefined") void context.queryClient.prefetchQuery(trackedQuery({ pool: pool.address }));
   },
   head: () => ({ meta: [{ title: "Analytics | Vexis" }] }),
   pendingComponent: AnalyticsSkeleton,

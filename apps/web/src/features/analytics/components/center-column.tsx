@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { Segmented } from "@/features/portfolio/components/segmented";
@@ -83,16 +83,11 @@ export function VolumeStats({ pool, volume7d }: { pool: PoolView; volume7d: numb
 
 const TOKEN_WIDE = "Token-wide across every market (Jupiter), not this pool alone";
 
-const CHART_HEIGHT = { min: 340, start: 620, max: 1400 };
+// A fixed start: tracked wallets share the column below, so fitting the chart to the column's free room would make
+// it fill the screen while that section is still a skeleton.
+const CHART_HEIGHT = { min: 340, start: 380, max: 1400 };
 
-/** Room left in the scrolling column once everything else is laid out, or null when the column does not scroll. */
-function fitHeight(el: HTMLElement, current: number) {
-  for (let p = el.parentElement; p; p = p.parentElement) {
-    if (getComputedStyle(p).overflowY !== "auto") continue;
-    return current - (p.scrollHeight - p.clientHeight) - 8;
-  }
-  return null;
-}
+const CHART_OPEN_KEY = "vexis-chart-open";
 
 export function ChartPanel({
   bars,
@@ -119,15 +114,43 @@ export function ChartPanel({
   loadingOlder: boolean;
 }) {
   const [height, setHeight] = useState(CHART_HEIGHT.start);
-  const box = useRef<HTMLDivElement>(null);
-  // Start at the tallest chart that still leaves the column unscrolled; dragging the handle overrides it.
-  useLayoutEffect(() => {
-    const fit = box.current && fitHeight(box.current, CHART_HEIGHT.start);
-    if (fit !== null && fit !== undefined) setHeight(Math.min(CHART_HEIGHT.start, Math.max(CHART_HEIGHT.min, fit)));
-  }, []);
   const drag = useRef<{ y: number; height: number } | null>(null);
+  const [open, setOpen] = useState(true);
+  // The server always renders the chart open; the saved choice applies before the first paint after hydration.
+  useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(CHART_OPEN_KEY) === "0") setOpen(false);
+    } catch {}
+  }, []);
+  const toggle = (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? "Collapse chart" : "Expand chart"}
+      onClick={() => {
+        setOpen(!open);
+        try {
+          localStorage.setItem(CHART_OPEN_KEY, open ? "0" : "1");
+        } catch {}
+      }}
+      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      <ChevronDownIcon className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+    </button>
+  );
+  if (!open) {
+    // Collapsed, the panel keeps only its title; the height set by dragging comes back on expand.
+    return (
+      <Panel>
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold">{metric === "volume" ? "Volume" : "Fees"} Chart</h2>
+          <div className="ml-auto">{toggle}</div>
+        </div>
+      </Panel>
+    );
+  }
   return (
-    <div ref={box} className="relative shrink-0" style={{ height }}>
+    <div className="relative shrink-0" style={{ height }}>
       <Panel className="h-full min-h-0 gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold">{metric === "volume" ? "Volume" : "Fees"} Chart</h2>
@@ -147,7 +170,7 @@ export function ChartPanel({
             onChange={onTimeframe}
             options={TIMEFRAMES.map((t) => ({ value: t.id, label: t.label }))}
           />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-1.5">
             <Segmented
               variant="muted"
               value={currency}
@@ -157,6 +180,7 @@ export function ChartPanel({
                 { value: "usd", label: "USD" },
               ]}
             />
+            {toggle}
           </div>
         </div>
         {bars === null ? (
