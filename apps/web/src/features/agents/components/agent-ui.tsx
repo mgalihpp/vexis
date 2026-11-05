@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { BadgeCheckIcon, CheckIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react";
+import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -610,7 +610,7 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
 }
 
 /** Shows whether alerts have a chat to go to, and runs the one-time-code link flow when they do not. */
-export function TelegramPanel({ children }: { children?: ReactNode }) {
+export function TelegramPanel() {
   const { data: tg } = useSuspenseQuery(telegramQuery);
   const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { token } }));
   const detect = useAgentMutation(() => detectTelegramChat());
@@ -621,13 +621,15 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
   const busy = connect.isPending || detect.isPending || disconnect.isPending;
   const error = connect.error ?? detect.error ?? disconnect.error;
 
-  const status = !bot
+  // One line each: who gets the alerts, and the state of the link.
+  const [title, subtitle] = !bot
     ? tg.relink
-      ? `The saved token for @${tg.relink} can no longer be read. Paste it again to resume alerts.`
-      : "Not connected"
+      ? [`@${tg.relink}`, "Token needs to be pasted again"]
+      : ["Not connected", "Alerts go to your own Telegram bot"]
     : bot.linked
-      ? `${bot.chatUsername ? `@${bot.chatUsername}` : "Your chat"} via @${bot.username}`
-      : `@${bot.username} · waiting for /start`;
+      ? [bot.chatUsername ? `@${bot.chatUsername}` : "Your chat", `via @${bot.username}`]
+      : [`@${bot.username}`, "Waiting for /start"];
+  const warn = !bot && tg.relink != null;
 
   const submitToken = async () => {
     if (!BOT_TOKEN_PATTERN.test(token.trim())) {
@@ -639,42 +641,35 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
     setToken("");
   };
 
+  // No padding of its own: the card or box around it sets the inset, so it never nests a second frame.
   return (
-    <div className="divide-y divide-border">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3.5">
-        <TelegramIcon className="size-9 shrink-0" />
-        <span className="min-w-0 flex-1 basis-36">
-          <span className="block text-sm font-medium">Telegram</span>
-          <span
-            className={`block text-xs ${!bot && tg.relink ? "text-amber-600 dark:text-amber-400" : "truncate text-muted-foreground"}`}
-          >
-            {status}
-          </span>
-        </span>
-        <span className="ml-auto flex shrink-0 items-center gap-2">
-          {bot && !bot.linked && (
-            <Button
-              size="sm"
-              className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-              disabled={busy}
-              onClick={() => detect.mutate(undefined)}
-            >
-              {detect.isPending && <Spinner />}
-              Check
-            </Button>
-          )}
-          {bot && (
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
-              {disconnect.isPending && <Spinner />}
-              {bot.linked ? "Unlink" : "Cancel"}
-            </Button>
-          )}
-          {children}
-        </span>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <TelegramIcon className="size-8 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{title}</p>
+          <p className={`truncate text-xs ${warn ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`}>
+            {subtitle}
+          </p>
+        </div>
+        {bot?.linked && (
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
+            {disconnect.isPending && <Spinner />}
+            Unlink
+          </Button>
+        )}
       </div>
+
+      {warn && (
+        <p className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+          <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
+          <span>The saved token can no longer be read, so no alerts are sent. Paste it again.</span>
+        </p>
+      )}
+
       {!bot && (
         <form
-          className="flex items-center gap-2 px-4 py-3.5"
+          className="flex items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void submitToken().catch(() => {});
@@ -705,25 +700,59 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
         </form>
       )}
       {bot && !bot.linked && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3.5 text-xs">
-          <span className="text-muted-foreground">
-            Send <code className="font-mono text-foreground">/start</code> to the bot, then press Check
-          </span>
-          <a
-            href={`https://t.me/${bot.username}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex shrink-0 items-center gap-1.5 font-medium text-brand"
-          >
-            <TelegramIcon className="size-4" /> Open @{bot.username}
-          </a>
-        </div>
+        <>
+          <ol className="space-y-2 text-xs text-muted-foreground">
+            <li className="flex items-baseline gap-2">
+              <StepNumber n={1} />
+              <span>
+                Open{" "}
+                <a
+                  href={`https://t.me/${bot.username}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-brand hover:underline"
+                >
+                  @{bot.username}
+                </a>{" "}
+                and send <code className="font-mono text-foreground">/start</code>
+              </span>
+            </li>
+            <li className="flex items-baseline gap-2">
+              <StepNumber n={2} />
+              <span>Come back and press Check</span>
+            </li>
+          </ol>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="flex-1 bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+              disabled={busy}
+              onClick={() => detect.mutate(undefined)}
+            >
+              {detect.isPending && <Spinner />}
+              Check
+            </Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
+              {disconnect.isPending && <Spinner />}
+              Cancel
+            </Button>
+          </div>
+        </>
       )}
-      {(tokenError || error != null) && (
-        <div className="px-4 py-2.5">
-          {tokenError ? <p className="text-[0.7rem] text-loss">{tokenError}</p> : <FormError error={error} />}
-        </div>
+
+      {tokenError ? (
+        <p className="text-[0.7rem] text-loss">{tokenError}</p>
+      ) : (
+        error != null && <FormError error={error} />
       )}
     </div>
+  );
+}
+
+function StepNumber({ n }: { n: number }) {
+  return (
+    <span className="flex size-4 shrink-0 translate-y-0.5 items-center justify-center rounded-full bg-muted text-[0.6rem] font-semibold text-foreground tabular-nums">
+      {n}
+    </span>
   );
 }

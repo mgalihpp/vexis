@@ -292,7 +292,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
           </ul>
         </div>
       )}
-      <div className="overflow-hidden rounded-2xl bg-muted/40">
+      <div className="rounded-2xl bg-muted/40 p-4">
         <TelegramPanel />
       </div>
     </>
