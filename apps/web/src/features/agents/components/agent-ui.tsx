@@ -318,6 +318,10 @@ const CUSTOM = -1;
 const minutesLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60}h` : `${m}m`);
 const usdLabel = (v: number) => (v >= 1000 ? `$${+(v / 1000).toFixed(1)}K` : `$${v}`);
 
+const NUMBER_INPUT =
+  "bg-transparent outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none " +
+  "[&::-webkit-outer-spin-button]:appearance-none";
+
 type CustomField = {
   id: string;
   value: string;
@@ -329,12 +333,9 @@ type CustomField = {
   onChange: (value: string) => void;
 };
 
-/** The last column is wider so a typed value fits. */
-const LAST_WEIGHT = 1.7;
-
 /**
- * iOS-style segmented control: one thumb that slides under the chosen option. The option with
- * value CUSTOM becomes a number field inside the control once it is chosen.
+ * Segmented control sized to its options, so a row never stretches them across the page. The chosen option is
+ * raised; Custom becomes a number field in place once it is chosen.
  */
 function Segmented({
   label,
@@ -349,106 +350,92 @@ function Segmented({
   onChange: (value: number) => void;
   custom?: CustomField;
 }) {
-  const weights = options.map((_, i) => (i === options.length - 1 ? LAST_WEIGHT : 1));
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  const index = options.findIndex((o) => o.value === value);
-  const offset = weights.slice(0, Math.max(index, 0)).reduce((sum, w) => sum + w, 0) / total;
-  const share = (weights[index] ?? 1) / total;
   return (
-    <fieldset
-      className="relative m-0 grid min-w-0 rounded-[0.65rem] border-0 bg-black/35 p-0.5 dark:bg-black/40"
-      style={{ gridTemplateColumns: weights.map((w) => `minmax(0, ${w}fr)`).join(" ") }}
-    >
+    <fieldset className="m-0 flex w-fit max-w-full min-w-0 flex-wrap gap-0.5 rounded-lg border-0 bg-muted p-0.5">
       <legend className="sr-only">{label}</legend>
-      {index >= 0 && (
-        <span
-          aria-hidden
-          className="absolute inset-y-0.5 rounded-[0.55rem] bg-foreground/[0.16] shadow-[0_1px_3px_rgba(0,0,0,0.35)] ring-1 ring-white/10 transition-[left,width] duration-200 ease-out"
-          style={{ left: `calc(2px + (100% - 4px) * ${offset})`, width: `calc((100% - 4px) * ${share})` }}
-        />
-      )}
-      {options.map((o) =>
-        custom && o.value === CUSTOM && value === CUSTOM ? (
-          <label
-            key={o.value}
-            htmlFor={custom.id}
-            className={`relative z-10 flex h-8 items-center justify-center gap-0.5 rounded-[0.55rem] px-2 text-xs font-medium tabular-nums ${
-              custom.invalid ? "text-loss" : "text-foreground"
-            }`}
-          >
-            {custom.prefix}
-            <input
-              id={custom.id}
-              type="number"
-              inputMode="decimal"
-              step={custom.step}
-              value={custom.value}
-              // biome-ignore lint/a11y/noAutofocus: focus moves here only after the user picked Custom
-              autoFocus={custom.autoFocus}
-              aria-invalid={custom.invalid}
-              aria-label={label}
-              onChange={(e) => custom.onChange(e.target.value)}
-              className="w-full min-w-0 bg-transparent text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            {custom.suffix}
-          </label>
-        ) : (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={o.value === value}
-            onClick={() => onChange(o.value)}
-            className={`relative z-10 h-8 rounded-[0.55rem] px-3 text-xs font-medium whitespace-nowrap tabular-nums transition-colors ${
-              o.value === value ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
+      {options.map((o) => {
+        const on = o.value === value;
+        const look = `h-7 shrink-0 rounded-md px-2 text-xs sm:px-2.5 font-medium whitespace-nowrap tabular-nums transition-colors ${
+          on ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+        }`;
+        if (custom && o.value === CUSTOM && on) {
+          return (
+            <label
+              key={o.value}
+              htmlFor={custom.id}
+              className={`${look} flex items-center gap-1 ${custom.invalid ? "text-loss" : ""}`}
+            >
+              {custom.prefix}
+              <input
+                id={custom.id}
+                type="number"
+                inputMode="decimal"
+                step={custom.step}
+                value={custom.value}
+                // biome-ignore lint/a11y/noAutofocus: focus moves here only after the user picked Custom
+                autoFocus={custom.autoFocus}
+                aria-invalid={custom.invalid}
+                aria-label={label}
+                onChange={(e) => custom.onChange(e.target.value)}
+                // Grows with the number (Chromium); elsewhere it keeps the min width.
+                className={`max-w-20 min-w-6 text-center [field-sizing:content] ${NUMBER_INPUT}`}
+              />
+              {custom.suffix && <span className="text-muted-foreground">{custom.suffix}</span>}
+            </label>
+          );
+        }
+        return (
+          <button key={o.value} type="button" aria-pressed={on} onClick={() => onChange(o.value)} className={look}>
             {o.label}
           </button>
-        ),
-      )}
+        );
+      })}
     </fieldset>
   );
 }
 
 const SLIDER =
-  "h-7 w-full cursor-pointer appearance-none bg-transparent outline-none " +
+  "h-5 w-full cursor-pointer appearance-none bg-transparent outline-none " +
   "[&::-webkit-slider-runnable-track]:h-1.5 [&::-webkit-slider-runnable-track]:rounded-full " +
-  "[&::-webkit-slider-runnable-track]:bg-[linear-gradient(to_right,var(--brand)_var(--p),var(--muted)_var(--p))] " +
-  "[&::-webkit-slider-thumb]:-mt-[11px] [&::-webkit-slider-thumb]:size-7 [&::-webkit-slider-thumb]:appearance-none " +
-  "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white " +
-  "[&::-webkit-slider-thumb]:shadow-[0_2px_6px_rgba(0,0,0,0.45)] " +
+  "[&::-webkit-slider-runnable-track]:bg-[linear-gradient(to_right,var(--brand)_var(--p),color-mix(in_oklab,var(--muted-foreground)_25%,transparent)_var(--p))] " +
+  "[&::-webkit-slider-thumb]:-mt-[5px] [&::-webkit-slider-thumb]:size-4 [&::-webkit-slider-thumb]:appearance-none " +
+  "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-brand " +
+  "[&::-webkit-slider-thumb]:bg-background [&::-webkit-slider-thumb]:shadow-sm " +
   "[&::-moz-range-track]:h-1.5 [&::-moz-range-track]:rounded-full " +
-  "[&::-moz-range-track]:bg-[linear-gradient(to_right,var(--brand)_var(--p),var(--muted)_var(--p))] " +
-  "[&::-moz-range-thumb]:size-7 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 " +
-  "[&::-moz-range-thumb]:bg-white focus-visible:[&::-webkit-slider-thumb]:ring-4 focus-visible:[&::-webkit-slider-thumb]:ring-brand/40";
+  "[&::-moz-range-track]:bg-[linear-gradient(to_right,var(--brand)_var(--p),color-mix(in_oklab,var(--muted-foreground)_25%,transparent)_var(--p))] " +
+  "[&::-moz-range-thumb]:size-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 " +
+  "[&::-moz-range-thumb]:border-brand [&::-moz-range-thumb]:bg-background " +
+  "focus-visible:[&::-webkit-slider-thumb]:ring-4 focus-visible:[&::-webkit-slider-thumb]:ring-brand/30";
 
+/** One setting: what it is and what it does on the left, the control on the right (stacked when narrow). */
 function SettingRow({
   label,
-  right,
+  hint,
   error,
-  inline = false,
   children,
 }: {
   label: string;
-  right?: ReactNode;
+  hint: string;
   error?: string;
-  inline?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className={`px-4 py-3.5 ${inline ? "sm:flex sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-4" : ""}`}>
-      <div className={`flex items-center justify-between gap-3 ${inline ? "mb-2.5 sm:mb-0 sm:h-8" : "mb-2"}`}>
-        <span className="text-sm font-medium">{label}</span>
-        {right}
+    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:gap-8">
+      <div className="min-w-0 @2xl:max-w-[18rem]">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{hint}</p>
       </div>
-      <div className={inline ? "sm:w-[32rem]" : ""}>{children}</div>
-      {error && <p className="mt-1.5 w-full text-right text-[0.7rem] text-loss">{error}</p>}
+      <div className="flex min-w-0 shrink-0 flex-col @2xl:items-end">
+        {children}
+        {error && <p className="mt-1.5 text-[0.7rem] text-loss">{error}</p>}
+      </div>
     </div>
   );
 }
 
 function PresetRow({
   label,
+  hint,
   field,
   presets,
   fields,
@@ -460,6 +447,7 @@ function PresetRow({
   onChange,
 }: {
   label: string;
+  hint: string;
   field: "baseline" | "minUsd" | "cooldownMin";
   presets: number[];
   fields: ConfigFields;
@@ -477,7 +465,7 @@ function PresetRow({
   const custom = customOn || !isPreset;
   const options = [...presets.map((v) => ({ value: v, label: fmt(v) })), { value: CUSTOM, label: "Custom" }];
   return (
-    <SettingRow label={label} inline error={error}>
+    <SettingRow label={label} hint={hint} error={error}>
       <Segmented
         label={label}
         options={options}
@@ -508,6 +496,7 @@ function PresetRow({
 const MULT_MIN = 1.5;
 const MULT_MAX = 10;
 
+/** The spike rule's fields. No frame of its own: the settings card and the wizard step set the inset. */
 export function ConfigForm({
   fields,
   errors,
@@ -522,14 +511,29 @@ export function ConfigForm({
   const clamped = Math.min(MULT_MAX, Math.max(MULT_MIN, shown));
   const fill = ((clamped - MULT_MIN) / (MULT_MAX - MULT_MIN)) * 100;
   return (
-    <div className="divide-y divide-border overflow-hidden rounded-2xl bg-muted/40">
+    <div className="@container divide-y divide-border">
       <SettingRow
         label="Spike multiplier"
+        hint="Alert when a minute's volume reaches this many times the baseline."
         error={errors.mult}
-        right={
+      >
+        <div className="flex items-center gap-3 @2xl:w-72">
+          <input
+            type="range"
+            min={MULT_MIN}
+            max={MULT_MAX}
+            step={0.5}
+            value={clamped}
+            aria-label="Spike multiplier"
+            onChange={(e) => onChange("mult", e.target.value)}
+            className={SLIDER}
+            style={{ "--p": `${fill}%` } as React.CSSProperties}
+          />
           <label
             htmlFor="cfg-mult"
-            className="flex items-baseline gap-0.5 font-mono text-base font-semibold text-brand tabular-nums"
+            className={`flex h-7 shrink-0 items-center rounded-md bg-muted px-2 font-mono text-xs font-semibold tabular-nums ${
+              errors.mult ? "text-loss" : "text-brand"
+            }`}
           >
             <input
               id="cfg-mult"
@@ -539,26 +543,15 @@ export function ConfigForm({
               value={fields.mult}
               aria-invalid={Boolean(errors.mult)}
               onChange={(e) => onChange("mult", e.target.value)}
-              className="w-14 bg-transparent text-right outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className={`w-9 text-right ${NUMBER_INPUT}`}
             />
             ×
           </label>
-        }
-      >
-        <input
-          type="range"
-          min={MULT_MIN}
-          max={MULT_MAX}
-          step={0.5}
-          value={clamped}
-          aria-label="Spike multiplier"
-          onChange={(e) => onChange("mult", e.target.value)}
-          className={SLIDER}
-          style={{ "--p": `${fill}%` } as React.CSSProperties}
-        />
+        </div>
       </SettingRow>
       <PresetRow
         label="Baseline window"
+        hint="The normal level is the median volume over this many past minutes."
         field="baseline"
         presets={BASELINE_PRESETS}
         fields={fields}
@@ -569,7 +562,8 @@ export function ConfigForm({
         onChange={onChange}
       />
       <PresetRow
-        label="Minimum volume per minute"
+        label="Minimum volume"
+        hint="Ignore spikes smaller than this, in USD per minute."
         field="minUsd"
         presets={MIN_USD_PRESETS}
         fields={fields}
@@ -581,6 +575,7 @@ export function ConfigForm({
       />
       <PresetRow
         label="Cooldown per pool"
+        hint="After an alert, wait this long before alerting the same pool again."
         field="cooldownMin"
         presets={COOLDOWN_PRESETS}
         fields={fields}
