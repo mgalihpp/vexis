@@ -8,6 +8,20 @@
       "when": 1793784317181,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793851850113,
+      "tag": "0001_telegram_own_bot",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793852316273,
+      "tag": "0002_telegram_own_bot_only",
+      "breakpoints": true
     }
   ]
 }

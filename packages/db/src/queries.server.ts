@@ -168,28 +168,28 @@ export function getTelegramLink({ db, userId }: UserScope) {
     .then((rows) => rows[0]);
 }
 
-/** Starts (or restarts) linking: a fresh one-time code the user sends to the bot. */
-export async function createTelegramLinkCode({ db, userId }: UserScope, ttlMs = 10 * 60_000) {
-  const linkCode = randomBytes(6).toString("base64url");
-  const linkCodeExpiresAt = new Date(Date.now() + ttlMs);
+/** Stores the user's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
+export async function saveOwnBot({ db, userId }: UserScope, encryptedToken: string, botUsername: string) {
+  const fresh = { botToken: encryptedToken, botUsername, chatId: null, username: null, linkedAt: null };
   await db
     .insert(telegramLinks)
-    .values({ userId, linkCode, linkCodeExpiresAt })
-    .onConflictDoUpdate({ target: telegramLinks.userId, set: { linkCode, linkCodeExpiresAt } });
-  return { linkCode, expiresAt: linkCodeExpiresAt };
+    .values({ userId, ...fresh })
+    .onConflictDoUpdate({ target: telegramLinks.userId, set: fresh });
 }
 
-/**
- * Called by the bot (not user-scoped: the code is the proof). Consumes the code and binds the chat.
- * Returns the linked user id, or undefined for an unknown or expired code.
- */
-export async function redeemTelegramLinkCode(db: Db, code: string, chatId: bigint, username?: string) {
-  const [row] = await db
+/** Binds the chat found on the user's own bot. False when the user has no bot saved. */
+export async function linkOwnBotChat({ db, userId }: UserScope, chatId: bigint, username?: string) {
+  const rows = await db
     .update(telegramLinks)
-    .set({ chatId, username, linkedAt: new Date(), linkCode: null, linkCodeExpiresAt: null })
-    .where(and(eq(telegramLinks.linkCode, code), gt(telegramLinks.linkCodeExpiresAt, new Date())))
+    .set({ chatId, username: username ?? null, linkedAt: new Date() })
+    .where(eq(telegramLinks.userId, userId))
     .returning({ userId: telegramLinks.userId });
-  return row?.userId;
+  return rows.length > 0;
+}
+
+/** Forgets the bot and the chat. The runner pauses the user's agents at the next alert. */
+export async function removeTelegramLink({ db, userId }: UserScope) {
+  await db.delete(telegramLinks).where(eq(telegramLinks.userId, userId));
 }
 
 // --- invites (not user-scoped: used before the user exists, or by admins) ---------------------

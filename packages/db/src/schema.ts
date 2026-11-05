@@ -195,26 +195,23 @@ export const wallets = pgTable(
 ).enableRLS();
 
 /**
- * A user's Telegram chat. The app creates the row with a one-time `link_code`; the user sends it
- * to the bot, and the bot sets `chat_id` and `linked_at` and clears the code. One chat per user and
- * one user per chat, so alerts never reach someone else's chat.
+ * A user's Telegram setup. There is no shared bot: the user brings their own (`bot_token`, AES-GCM encrypted,
+ * see `secret.ts`). The web app validates it with `getMe`, then reads `chat_id` from the messages waiting on
+ * that bot once the user has sent /start. The runner sends alerts with this token. One chat per user and one
+ * user per chat, so alerts never reach someone else's chat.
  */
-export const telegramLinks = pgTable(
-  "telegram_links",
-  {
-    userId: text("user_id")
-      .primaryKey()
-      .references(() => users.id, { onDelete: "cascade" }),
-    chatId: bigint("chat_id", { mode: "bigint" }).unique(),
-    username: text("username"),
-    linkCode: text("link_code").unique(),
-    linkCodeExpiresAt: timestamp("link_code_expires_at", { withTimezone: true }),
-    linkedAt: timestamp("linked_at", { withTimezone: true }),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  (t) => [check("telegram_links_state_check", sql`${t.chatId} is not null or ${t.linkCode} is not null`)],
-).enableRLS();
+export const telegramLinks = pgTable("telegram_links", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  botToken: text("bot_token").notNull(),
+  botUsername: text("bot_username").notNull(),
+  chatId: bigint("chat_id", { mode: "bigint" }).unique(),
+  username: text("username"),
+  linkedAt: timestamp("linked_at", { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}).enableRLS();
 
 /**
  * One row per user per agent kind. The runner runs rows where `enabled and not paused`.

@@ -400,22 +400,63 @@ export async function loadOlder({ pool, tf, before }: OlderRequest) {
 }
 
 export async function searchPools(query: string): Promise<PoolSearchHit[]> {
-  const pools = await listPools({ page_size: 8, query, sort_by: "volume_24h:desc", filter_by: "is_blacklisted=false" });
+  const pools = await listPools({
+    page_size: 8,
+    ...(query ? { query } : {}),
+    sort_by: "volume_24h:desc",
+    filter_by: "is_blacklisted=false",
+  });
   // One batched Jupiter call for both sides of every hit, so each row can show the pair icons.
   const meta = await loadTokenInfo(pools.flatMap((p) => [p.token_x.address, p.token_y.address]));
-  const side = (t: RawPool["token_x"]): PoolSearchHit["tokenX"] => ({
-    symbol: t.symbol,
-    icon: meta.get(t.address)?.icon ?? null,
-  });
+  const side = (t: RawPool["token_x"]): PoolSearchHit["tokenX"] => {
+    const info = meta.get(t.address);
+    return {
+      symbol: t.symbol,
+      mint: t.address,
+      icon: info?.icon ?? null,
+      verified: info?.verified ?? false,
+      organicScore: info?.organicScore ?? null,
+      risks: info?.risks ?? null,
+    };
+  };
   return pools.map((p) => ({
     address: p.address,
     name: p.name,
     binStep: p.pool_config.bin_step,
+    baseFee: p.pool_config.base_fee_pct,
+    dynamicFee: p.dynamic_fee_pct > 0 ? p.dynamic_fee_pct : null,
     tvl: p.tvl,
     volume24h: p.volume["24h"],
+    fees24h: p.fees["24h"],
     tokenX: side(p.token_x),
     tokenY: side(p.token_y),
   }));
+}
+
+export interface PoolTokens {
+  x: { symbol: string; icon: string | null };
+  y: { symbol: string; icon: string | null };
+}
+
+// A pool's pair never changes, so each address is looked up once per server process.
+const poolTokenCache = new Map<string, Promise<PoolTokens | null>>();
+
+/** The two token symbols and icons of a pool, or null when Meteora or Jupiter can't be reached. */
+export function poolTokens(address: string): Promise<PoolTokens | null> {
+  const hit = poolTokenCache.get(address);
+  if (hit) return hit;
+  const lookup = resolvePool(address)
+    .then(async (p) => {
+      const meta = await loadTokenInfo([p.token_x.address, p.token_y.address]);
+      const side = (t: RawPool["token_x"]) => ({ symbol: t.symbol, icon: meta.get(t.address)?.icon ?? null });
+      return { x: side(p.token_x), y: side(p.token_y) };
+    })
+    .catch(() => {
+      poolTokenCache.delete(address);
+      return null;
+    });
+  poolTokenCache.set(address, lookup);
+  return lookup;
 }
 
 const VOLUME_BARS = 25;

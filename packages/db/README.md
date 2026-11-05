@@ -35,7 +35,7 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 | `invite_redemptions`                             | user   | `used_by`/`used_at`, one per user.                                                          |
 | `user_settings`                                  | user   | `timezone` (IANA), `currency` (`usd`/`sol`).                                                |
 | `wallets`                                        | user   | Unique per `(user_id, address)`.                                                            |
-| `telegram_links`                                 | user   | One chat per user, one user per chat; one-time `link_code` with expiry.                     |
+| `telegram_links`                                 | user   | The user's own bot (encrypted token) and linked chat; one chat per user.                    |
 | `agents`                                         | user   | One per `(user_id, kind)`; `enabled`, `paused`, `config` jsonb (zod-validated).             |
 | `agent_pools`                                    | user   | Pools an agent watches; `last_alert_at` for the cooldown.                                   |
 | `agent_alerts`                                   | user   | `vol_1m`, `baseline`, `ratio`, `delivered`, `error`, `at`.                                  |
@@ -49,4 +49,4 @@ RLS is enabled on every table with no policies. The server connects as `postgres
 
 ## Agents runner
 
-The runner (`apps/agents`, later) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.
+The runner (`apps/agents`) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.

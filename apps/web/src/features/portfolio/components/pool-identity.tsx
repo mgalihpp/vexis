@@ -80,7 +80,7 @@ const TONES = {
   amber: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
 } as const;
 
-function Badge({ tone, title, children }: { tone: keyof typeof TONES; title: string; children: ReactNode }) {
+export function Badge({ tone, title, children }: { tone: keyof typeof TONES; title: string; children: ReactNode }) {
   return (
     <span className={`${badge} ${TONES[tone]}`} title={title}>
       {children}
@@ -121,7 +121,7 @@ export function OrganicScore({ score }: { score: number }) {
   );
 }
 
-function TokenScores({ token }: { token: Token }) {
+export function TokenScores({ token }: { token: Token }) {
   return (
     <>
       {token.organicScore !== null && <OrganicScore score={token.organicScore} />}

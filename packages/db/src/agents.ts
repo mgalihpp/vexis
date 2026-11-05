@@ -33,3 +33,6 @@ export function parseAgentConfig<K extends AgentKind>(kind: K, config: unknown):
 export function defaultAgentConfig<K extends AgentKind>(kind: K): AgentConfig<K> {
   return parseAgentConfig(kind, {});
 }
+
+/** `agents.paused_reason` the runner sets while the user has no linked Telegram chat; linking clears it. */
+export const TELEGRAM_NOT_LINKED = "telegram_not_linked";
