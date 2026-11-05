@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 
-// Bots write files and Meteora updates on their own schedule; refetching visible queries is the whole
+// Meteora updates on its own schedule; refetching visible queries is the whole
 // live-update mechanism. Query pauses it while the tab is hidden.
 export const LIVE_MS = 15_000;
 

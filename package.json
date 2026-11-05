@@ -11,7 +11,6 @@
     "dev:web": "bun run --filter @vexis/web dev",
     "dev:agents": "bun run --filter @vexis/agents dev",
     "start:agents": "bun run --filter @vexis/agents start",
-    "dev:worker": "bun run --filter @vexis/worker dev",
     "build": "bun run --filter @vexis/web build",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun test",
