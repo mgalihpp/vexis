@@ -55,7 +55,6 @@ import {
   poolName,
   RemovePoolButton,
   STATUS_STYLE,
-  StatusDot,
   TelegramPanel,
   useAgentMutation,
 } from "./agent-ui";
@@ -132,7 +131,6 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
         </Link>
         <ChevronRightIcon className="size-3.25 shrink-0 text-muted-foreground" />
         <BarPill>Volume spike</BarPill>
-        <StatusDot status={agentStatus(agent)} />
       </AgentsBar>
 
       <nav className="flex shrink-0 overflow-x-auto border-b px-2">
