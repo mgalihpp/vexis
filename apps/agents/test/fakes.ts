@@ -3,6 +3,7 @@ import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
 import { Db, type NewAlert, type NewMinute, TELEGRAM_NOT_LINKED, type Watch } from "../src/Db.ts";
 import { MeteoraError, TelegramError } from "../src/errors.ts";
+import type { LinkButton } from "../src/format.ts";
 import { Meteora, type PoolReading } from "../src/Meteora.ts";
 import { Telegram } from "../src/Telegram.ts";
 
@@ -130,14 +131,17 @@ export function fakeMeteora() {
 
 /** Telegram stand-in. Set `failSend` to make the next sends fail. */
 export function fakeTelegram() {
-  const state = { sent: [] as { chatId: bigint; text: string; botToken: string }[], failSend: false };
+  const state = {
+    sent: [] as { chatId: bigint; text: string; botToken: string; buttons: ReadonlyArray<LinkButton> }[],
+    failSend: false,
+  };
   const layer = Layer.succeed(
     Telegram,
     Telegram.of({
-      send: (chatId, text, botToken) =>
+      send: (chatId, text, botToken, buttons = []) =>
         state.failSend
           ? Effect.fail(new TelegramError({ method: "sendMessage", cause: new Error("chat not found") }))
-          : Effect.sync(() => void state.sent.push({ chatId, text, botToken })),
+          : Effect.sync(() => void state.sent.push({ chatId, text, botToken, buttons })),
     }),
   );
   return { state, layer };

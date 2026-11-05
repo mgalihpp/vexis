@@ -3,7 +3,7 @@ import { Array as Arr, Clock, Effect, Option } from "effect";
 import { AppConfig } from "./AppConfig.ts";
 import { Db, TELEGRAM_NOT_LINKED, type Watch } from "./Db.ts";
 import { BadAgentConfig } from "./errors.ts";
-import { formatMessage, type SpikeLine } from "./format.ts";
+import { formatMessage, linkButtons, type SpikeLine } from "./format.ts";
 import type { PoolReading } from "./Meteora.ts";
 import { evaluateSpike, type Spike } from "./spike.ts";
 import { Telegram } from "./Telegram.ts";
@@ -127,11 +127,12 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
       name: reading?.name ?? hit.watch.label ?? hit.watch.poolAddress,
       binStep: reading?.binStep,
       poolAddress: hit.watch.poolAddress,
+      baselineMin: hit.config.baseline,
       spike: hit.spike,
     };
   });
 
-  yield* telegram.send(chatId, formatMessage(lines, webUrl), botToken).pipe(
+  yield* telegram.send(chatId, formatMessage(lines), botToken, linkButtons(lines, webUrl)).pipe(
     Effect.matchEffect({
       onSuccess: () => db.markDelivered(ids),
       onFailure: (error) =>

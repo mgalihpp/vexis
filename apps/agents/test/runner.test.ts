@@ -3,7 +3,7 @@ import { Effect, Layer } from "effect";
 import type { AppConfig } from "../src/AppConfig.ts";
 import { cycle } from "../src/Cycle.ts";
 import type { Db } from "../src/Db.ts";
-import { formatMessage, formatUsd } from "../src/format.ts";
+import { formatMessage, formatUsd, linkButtons, type SpikeLine } from "../src/format.ts";
 import { prune, RETENTION_MS } from "../src/Ingest.ts";
 import type { Meteora } from "../src/Meteora.ts";
 import type { Telegram } from "../src/Telegram.ts";
@@ -135,8 +135,9 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([
       {
         chatId: 42n,
-        text: "⚡ DOGE-SOL bin 25 — $5.0k in 1 minute (50.0× normal, baseline $100)\nhttps://vexis.test/analytics?pool=POOL1",
+        text: `⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$5.0k</b>\nMedian 5m: $100\nSpike: <b>50.0×</b>\nBin step: 25`,
         botToken: "user-bot-token",
+        buttons: [{ text: "View pool on Vexis", url: "https://vexis.test/analytics?pool=POOL1" }],
       },
     ]);
   });
@@ -255,8 +256,8 @@ describe("evaluate and notify", () => {
     await s.run(cycle());
     expect(s.db.alerts).toHaveLength(2);
     expect(s.telegram.sent).toHaveLength(1);
-    expect(s.telegram.sent[0]?.text).toContain("DOGE-SOL bin 25");
-    expect(s.telegram.sent[0]?.text).toContain("SOL-USDC bin 10");
+    expect(s.telegram.sent[0]?.text).toContain("DOGE-SOL");
+    expect(s.telegram.sent[0]?.text).toContain("SOL-USDC");
   });
 });
 
@@ -267,28 +268,41 @@ describe("format", () => {
     expect(formatUsd(1_250_000)).toBe("$1.3M");
   });
 
+  const line = (over: Partial<SpikeLine> = {}): SpikeLine => ({
+    name: "DOGE-SOL",
+    binStep: 25,
+    poolAddress: "P",
+    baselineMin: 30,
+    spike: { vol1m: 18_400, baseline: 2_900, ratio: 6.2 },
+    ...over,
+  });
+
   test("matches the agreed message", () => {
-    const text = formatMessage(
-      [{ name: "DOGE-SOL", binStep: 25, poolAddress: "P", spike: { vol1m: 18_400, baseline: 2_900, ratio: 6.2 } }],
-      "https://vexis.test/",
-    );
-    expect(text).toBe(
-      "⚡ DOGE-SOL bin 25 — $18.4k in 1 minute (6.2× normal, baseline $2.9k)\nhttps://vexis.test/analytics?pool=P",
+    expect(formatMessage([line()])).toBe(
+      "⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$18.4k</b>\nMedian 30m: $2.9k\nSpike: <b>6.2×</b>\nBin step: 25",
     );
   });
 
   test("a zero baseline reads without an infinite ratio", () => {
-    const text = formatMessage(
-      [
-        {
-          name: "X-Y",
-          binStep: undefined,
-          poolAddress: "P",
-          spike: { vol1m: 6_000, baseline: 0, ratio: Number.POSITIVE_INFINITY },
-        },
-      ],
-      "https://vexis.test",
-    );
-    expect(text).toContain("X-Y — $6.0k in 1 minute (up from a $0 baseline)");
+    const text = formatMessage([
+      line({ binStep: undefined, spike: { vol1m: 6_000, baseline: 0, ratio: Number.POSITIVE_INFINITY } }),
+    ]);
+    expect(text).toContain("Spike: <b>from zero</b>");
+    expect(text).not.toContain("Bin step");
+  });
+
+  test("pool names are escaped for HTML", () => {
+    expect(formatMessage([line({ name: "A<B>&C" })])).toContain("A&lt;B&gt;&amp;C");
+  });
+
+  test("buttons: one per pool, none for a local web url", () => {
+    expect(linkButtons([line()], "https://vexis.test/")).toEqual([
+      { text: "View pool on Vexis", url: "https://vexis.test/analytics?pool=P" },
+    ]);
+    expect(linkButtons([line(), line({ name: "SOL-USDC", poolAddress: "Q" })], "https://vexis.test")).toEqual([
+      { text: "View DOGE-SOL", url: "https://vexis.test/analytics?pool=P" },
+      { text: "View SOL-USDC", url: "https://vexis.test/analytics?pool=Q" },
+    ]);
+    expect(linkButtons([line()], "http://localhost:3000")).toEqual([]);
   });
 });

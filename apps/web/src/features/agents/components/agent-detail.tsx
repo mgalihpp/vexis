@@ -10,6 +10,7 @@ import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
   type AgentView,
+  type AlertView,
   agentStatus,
   type ConfigFields,
   compactUsd,
@@ -153,7 +154,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
       <div className="mt-4 space-y-3">
         {tab === "overview" && <Overview agent={agent} now={now} />}
         {tab === "pools" && <PoolsTab agent={agent} />}
-        {tab === "alerts" && <AlertsTab />}
+        {tab === "alerts" && <AlertsTab agent={agent} now={now} />}
         {tab === "settings" && <SettingsTab agent={agent} onSaved={setNotice} />}
       </div>
     </div>
@@ -173,6 +174,47 @@ function PairLogo({ tokens, name }: { tokens: PoolView["tokens"]; name: string }
       <TokenIcon token={tokens[0]} className="relative z-10 size-8 text-xs ring-2 ring-card" />
       <TokenIcon token={tokens[1]} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
     </span>
+  );
+}
+
+/** One alert: pair logos and time on the left, the numbers as labelled columns on the right. */
+function AlertRow({ alert: a, tokens, now }: { alert: AlertView; tokens: PoolView["tokens"]; now: number }) {
+  const name = a.poolLabel ?? shortAddr(a.poolAddress);
+  return (
+    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+      <PairLogo tokens={tokens} name={name} />
+      <span className="min-w-0 flex-1 basis-32">
+        <Link
+          to="/analytics"
+          search={{ pool: a.poolAddress }}
+          className="block truncate text-sm font-medium hover:text-brand"
+        >
+          {name}
+        </Link>
+        <span className="block truncate text-xs whitespace-nowrap text-muted-foreground" title={utcStamp(a.at)}>
+          {!a.delivered && (
+            <span className="mr-1.5 text-loss" title={a.error ?? undefined}>
+              {a.error ? "Not sent" : "Sending"}
+            </span>
+          )}
+          {timeAgo(a.at, now)}
+        </span>
+      </span>
+      <span className="grid shrink-0 grid-cols-3 gap-x-5 text-right tabular-nums">
+        {[
+          ["Volume 1m", compactUsd(a.vol1m), false],
+          ["Median", compactUsd(a.baseline), false],
+          ["Spike", ratioText(a.ratio), true],
+        ].map(([label, value, strong]) => (
+          <span key={String(label)} className="block min-w-14">
+            <span className="block font-mono text-[0.6rem] tracking-[0.08em] text-muted-foreground uppercase">
+              {label}
+            </span>
+            <span className={`mt-0.5 block text-sm font-semibold ${strong ? "text-brand" : ""}`}>{value}</span>
+          </span>
+        ))}
+      </span>
+    </li>
   );
 }
 
@@ -224,28 +266,7 @@ function Overview({ agent, now }: { agent: AgentView; now: number }) {
           ) : (
             <ul className="-my-1 divide-y">
               {recent.map((a) => (
-                <li key={a.id} className="flex items-center gap-3 py-3">
-                  <PairLogo tokens={tokensByPool.get(a.poolAddress) ?? null} name={a.poolLabel ?? a.poolAddress} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {a.poolLabel ?? shortAddr(a.poolAddress)}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground tabular-nums">
-                      {compactUsd(a.vol1m)} in 1 min · median {compactUsd(a.baseline)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-sm font-semibold text-brand tabular-nums">{ratioText(a.ratio)}</span>
-                    <span className="block text-xs whitespace-nowrap text-muted-foreground">
-                      {a.error && !a.delivered && (
-                        <span className="mr-1.5 text-loss" title={a.error}>
-                          Not sent
-                        </span>
-                      )}
-                      {timeAgo(a.at, now)}
-                    </span>
-                  </span>
-                </li>
+                <AlertRow key={a.id} alert={a} tokens={tokensByPool.get(a.poolAddress) ?? null} now={now} />
               ))}
             </ul>
           )}
@@ -323,51 +344,19 @@ function PoolsTab({ agent }: { agent: AgentView }) {
   );
 }
 
-function AlertsTab() {
+function AlertsTab({ agent, now }: { agent: AgentView; now: number }) {
   const { data } = useSuspenseQuery(alertsQuery);
+  const tokensByPool = new Map(agent.pools.map((p) => [p.address, p.tokens]));
   return (
     <Card title="Alert history">
       {data.alerts.length === 0 ? (
         <p className="py-8 text-center text-xs text-muted-foreground">No alerts yet</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b text-left text-[0.65rem] tracking-wider text-muted-foreground uppercase">
-                <th className="py-1.5 pr-3 font-medium">When (UTC)</th>
-                <th className="py-1.5 pr-3 font-medium">Pool</th>
-                <th className="py-1.5 pr-3 text-right font-medium">1 min volume</th>
-                <th className="py-1.5 pr-3 text-right font-medium">Baseline</th>
-                <th className="py-1.5 pr-3 text-right font-medium">Ratio</th>
-                <th className="py-1.5 font-medium">Telegram</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.alerts.map((a) => (
-                <tr key={a.id} className="border-b last:border-0">
-                  <td className="py-1.5 pr-3 whitespace-nowrap">{utcStamp(a.at)}</td>
-                  <td className="py-1.5 pr-3">
-                    <Link to="/analytics" search={{ pool: a.poolAddress }} className="hover:text-brand">
-                      {a.poolLabel ?? shortAddr(a.poolAddress)}
-                    </Link>
-                  </td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">{compactUsd(a.vol1m)}</td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">{compactUsd(a.baseline)}</td>
-                  <td className="py-1.5 pr-3 text-right tabular-nums">{ratioText(a.ratio)}</td>
-                  <td className="py-1.5">
-                    {a.delivered ? (
-                      <span className="text-profit">Sent</span>
-                    ) : (
-                      <span className="text-loss" title={a.error ?? undefined}>
-                        {a.error ? "Failed" : "Pending"}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="-my-1 divide-y">
+          {data.alerts.map((a) => (
+            <AlertRow key={a.id} alert={a} tokens={tokensByPool.get(a.poolAddress) ?? null} now={now} />
+          ))}
+        </ul>
       )}
     </Card>
   );
