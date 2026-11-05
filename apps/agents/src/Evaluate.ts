@@ -92,6 +92,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
     return;
   }
   const chatId = Option.getOrElse(chat, () => 0n);
+  const ownBot = yield* db.ownBotToken(userId);
 
   const at = new Date(yield* Clock.currentTimeMillis);
   const claimed = (yield* Effect.forEach(hits, (hit) =>
@@ -131,7 +132,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
     };
   });
 
-  yield* telegram.send(chatId, formatMessage(lines, webUrl)).pipe(
+  yield* telegram.send(chatId, formatMessage(lines, webUrl), Option.getOrUndefined(ownBot)).pipe(
     Effect.matchEffect({
       onSuccess: () => db.markDelivered(ids),
       onFailure: (error) =>

@@ -10,8 +10,8 @@ import { PoolBadges, TokenIcon, TokenScores } from "@/features/portfolio/compone
 import { compactUsd, pct } from "@/features/portfolio/money";
 import type { PoolMeta } from "@/features/portfolio/portfolio";
 import { shortAddr } from "@/lib/format";
-import { type AgentStatus, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
-import { beginTelegramLink } from "../agents.functions";
+import { type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
+import { beginTelegramLink, connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
 
 export const STATUS_STYLE: Record<AgentStatus, { text: string; dot: string }> = {
@@ -579,10 +579,19 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
 export function TelegramPanel({ children }: { children?: ReactNode }) {
   const { data: tg } = useSuspenseQuery(telegramQuery);
   const start = useAgentMutation(() => beginTelegramLink());
+  const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { token } }));
+  const detect = useAgentMutation(() => detectTelegramChat());
+  const disconnect = useAgentMutation(() => disconnectTelegramLink());
   const [copied, setCopied] = useState(false);
+  const [entering, setEntering] = useState(false);
+  const [token, setToken] = useState("");
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const own = tg.ownBot;
   const linked = tg.linked && !tg.code;
+  const busy = start.isPending || connect.isPending || detect.isPending || disconnect.isPending;
   const deepLink = tg.code && tg.botUsername ? `https://t.me/${tg.botUsername}?start=${tg.code.value}` : null;
   const command = tg.code ? `/start ${tg.code.value}` : "";
+  const error = start.error ?? connect.error ?? detect.error ?? disconnect.error;
 
   const copy = async () => {
     try {
@@ -594,42 +603,130 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
     }
   };
 
+  const status = own
+    ? linked
+      ? `${tg.username ? `@${tg.username}` : "Your chat"} via @${own.username}`
+      : `@${own.username} · waiting for /start`
+    : linked
+      ? tg.username
+        ? `Alerts go to @${tg.username}`
+        : "Alerts go to your linked chat"
+      : tg.code
+        ? "Waiting for the code"
+        : "Not linked";
+
+  const submitToken = async () => {
+    if (!BOT_TOKEN_PATTERN.test(token.trim())) {
+      setTokenError("That does not look like a bot token");
+      return;
+    }
+    setTokenError(null);
+    await connect.mutateAsync(token);
+    setToken("");
+    setEntering(false);
+  };
+
   return (
     <div className="divide-y divide-border">
-      <div className="flex items-center gap-3 px-4 py-3.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3.5">
         <TelegramIcon className="size-9 shrink-0" />
-        <span className="min-w-0 flex-1">
+        <span className="min-w-0 flex-1 basis-36">
           <span className="block text-sm font-medium">Telegram</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {linked
-              ? tg.username
-                ? `Alerts go to @${tg.username}`
-                : "Alerts go to your linked chat"
-              : tg.code
-                ? "Waiting for the code"
-                : "Not linked"}
-          </span>
+          <span className="block truncate text-xs text-muted-foreground">{status}</span>
         </span>
-        {linked ? (
-          <Button variant="outline" size="sm" disabled={start.isPending} onClick={() => start.mutate(undefined)}>
-            {start.isPending && <Spinner />}
-            Link another
-          </Button>
-        ) : (
-          !tg.code && (
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {own && !linked && (
             <Button
               size="sm"
               className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-              disabled={start.isPending}
+              disabled={busy}
+              onClick={() => detect.mutate(undefined)}
+            >
+              {detect.isPending && <Spinner />}
+              Check
+            </Button>
+          )}
+          {!own && !tg.code && !entering && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEntering(true)}>
+              Use my own bot
+            </Button>
+          )}
+          {linked && !own && (
+            <Button variant="outline" size="sm" disabled={busy} onClick={() => start.mutate(undefined)}>
+              {start.isPending && <Spinner />}
+              Link another
+            </Button>
+          )}
+          {!linked && !own && !tg.code && !entering && (
+            <Button
+              size="sm"
+              className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+              disabled={busy}
               onClick={() => start.mutate(undefined)}
             >
               {start.isPending && <Spinner />}
               Get a link code
             </Button>
-          )
-        )}
-        {children}
+          )}
+          {own && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
+              {disconnect.isPending && <Spinner />}
+              {linked ? "Unlink" : "Cancel"}
+            </Button>
+          )}
+          {children}
+        </span>
       </div>
+      {entering && !own && (
+        <form
+          className="flex items-center gap-2 px-4 py-3.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submitToken().catch(() => {});
+          }}
+        >
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={token}
+            onChange={(e) => {
+              setToken(e.target.value);
+              setTokenError(null);
+            }}
+            placeholder="Bot token from @BotFather"
+            aria-label="Bot token"
+            className="h-8 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-mono text-xs outline-none focus:border-brand/60"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+            disabled={busy || token.trim() === ""}
+          >
+            {connect.isPending && <Spinner />}
+            Connect
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setEntering(false)}>
+            Cancel
+          </Button>
+        </form>
+      )}
+      {own && !linked && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3.5 text-xs">
+          <span className="text-muted-foreground">
+            Send <code className="font-mono text-foreground">/start</code> to the bot, then press Check
+          </span>
+          <a
+            href={`https://t.me/${own.username}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center gap-1.5 font-medium text-brand"
+          >
+            <TelegramIcon className="size-4" /> Open @{own.username}
+          </a>
+        </div>
+      )}
       {tg.code && (
         <div className="space-y-2.5 px-4 py-3.5">
           <p className="text-xs text-muted-foreground">Send this to the bot, valid 10 minutes</p>
@@ -653,9 +750,9 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
           )}
         </div>
       )}
-      {start.error != null && (
+      {(tokenError || error != null) && (
         <div className="px-4 py-2.5">
-          <FormError error={start.error} />
+          {tokenError ? <p className="text-[0.7rem] text-loss">{tokenError}</p> : <FormError error={error} />}
         </div>
       )}
     </div>

@@ -92,7 +92,8 @@ export async function loadTelegram(userId: string): Promise<TelegramView> {
     linked: link?.chatId != null,
     username: link?.username ?? null,
     code: link?.linkCode && expiresAt && expiresAt > now ? { value: link.linkCode, expiresAt } : null,
-    botUsername: process.env.TELEGRAM_BOT_USERNAME ?? null,
+    botUsername: link?.botToken ? (link.botUsername ?? null) : (process.env.TELEGRAM_BOT_USERNAME ?? null),
+    ownBot: link?.botToken ? { username: link.botUsername ?? "", linked: link.chatId != null } : null,
   };
 }
 

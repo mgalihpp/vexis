@@ -175,8 +175,51 @@ export async function createTelegramLinkCode({ db, userId }: UserScope, ttlMs = 
   await db
     .insert(telegramLinks)
     .values({ userId, linkCode, linkCodeExpiresAt })
-    .onConflictDoUpdate({ target: telegramLinks.userId, set: { linkCode, linkCodeExpiresAt } });
+    .onConflictDoUpdate({
+      target: telegramLinks.userId,
+      set: {
+        linkCode,
+        linkCodeExpiresAt,
+        // Back to the shared bot. A chat that belonged to the user's own bot is no use there, so it goes.
+        chatId: sql`case when ${telegramLinks.botToken} is not null then null else ${telegramLinks.chatId} end`,
+        linkedAt: sql`case when ${telegramLinks.botToken} is not null then null else ${telegramLinks.linkedAt} end`,
+        botToken: null,
+        botUsername: null,
+      },
+    });
   return { linkCode, expiresAt: linkCodeExpiresAt };
+}
+
+/** Stores the user's own bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
+export async function saveOwnBot({ db, userId }: UserScope, encryptedToken: string, botUsername: string) {
+  const fresh = {
+    botToken: encryptedToken,
+    botUsername,
+    chatId: null,
+    username: null,
+    linkedAt: null,
+    linkCode: null,
+    linkCodeExpiresAt: null,
+  };
+  await db
+    .insert(telegramLinks)
+    .values({ userId, ...fresh })
+    .onConflictDoUpdate({ target: telegramLinks.userId, set: fresh });
+}
+
+/** Binds the chat found on the user's own bot. False when the user has no bot saved. */
+export async function linkOwnBotChat({ db, userId }: UserScope, chatId: bigint, username?: string) {
+  const rows = await db
+    .update(telegramLinks)
+    .set({ chatId, username: username ?? null, linkedAt: new Date() })
+    .where(and(eq(telegramLinks.userId, userId), sql`${telegramLinks.botToken} is not null`))
+    .returning({ userId: telegramLinks.userId });
+  return rows.length > 0;
+}
+
+/** Forgets the chat, the code and the bot. The runner pauses the user's agents at the next alert. */
+export async function removeTelegramLink({ db, userId }: UserScope) {
+  await db.delete(telegramLinks).where(eq(telegramLinks.userId, userId));
 }
 
 /**

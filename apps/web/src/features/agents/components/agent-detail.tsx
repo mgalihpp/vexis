@@ -10,12 +10,12 @@ import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
   type AgentView,
-  type PoolView,
   agentStatus,
   type ConfigFields,
   compactUsd,
   configFields,
   formatMinutes,
+  type PoolView,
   parseConfigFields,
   ratioText,
   STATUS_HINT,

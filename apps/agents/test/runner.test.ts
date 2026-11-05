@@ -200,6 +200,20 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([]);
   });
 
+  test("an alert goes out through the user's own bot when they have one", async () => {
+    const s = spikeScenario(5000);
+    s.db.ownBots.set("user-1", "own-bot-token");
+    await s.run(cycle());
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.telegram.sent[0]?.botToken).toBe("own-bot-token");
+  });
+
+  test("without an own bot the shared bot sends", async () => {
+    const s = spikeScenario(5000);
+    await s.run(cycle());
+    expect(s.telegram.sent[0]?.botToken).toBeUndefined();
+  });
+
   test("the console stand-in never pauses anyone", async () => {
     const s = spikeScenario(5000);
     s.db.chats.clear();

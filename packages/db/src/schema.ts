@@ -197,7 +197,8 @@ export const wallets = pgTable(
 /**
  * A user's Telegram chat. The app creates the row with a one-time `link_code`; the user sends it
  * to the bot, and the bot sets `chat_id` and `linked_at` and clears the code. One chat per user and
- * one user per chat, so alerts never reach someone else's chat.
+ * one user per chat, so alerts never reach someone else's chat. A user may instead bring their own bot
+ * (`bot_token`): the app then reads the chat from that bot's pending messages and the runner sends with it.
  */
 export const telegramLinks = pgTable(
   "telegram_links",
@@ -210,10 +211,18 @@ export const telegramLinks = pgTable(
     linkCode: text("link_code").unique(),
     linkCodeExpiresAt: timestamp("link_code_expires_at", { withTimezone: true }),
     linkedAt: timestamp("linked_at", { withTimezone: true }),
+    /** The user's own bot, AES-GCM encrypted (`secret.ts`). Null means alerts go through the shared bot. */
+    botToken: text("bot_token"),
+    botUsername: text("bot_username"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [check("telegram_links_state_check", sql`${t.chatId} is not null or ${t.linkCode} is not null`)],
+  (t) => [
+    check(
+      "telegram_links_state_check",
+      sql`${t.chatId} is not null or ${t.linkCode} is not null or ${t.botToken} is not null`,
+    ),
+  ],
 ).enableRLS();
 
 /**

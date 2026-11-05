@@ -2,6 +2,7 @@ import { TELEGRAM_NOT_LINKED } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
 import { redeemTelegramLinkCode } from "@vexis/db/queries";
 import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
+import { decryptSecret } from "@vexis/db/secret";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "./errors.ts";
@@ -59,6 +60,8 @@ export class Db extends Context.Service<
       limit: number,
     ): Effect.Effect<ReadonlyArray<{ readonly minute: number; readonly volume: number | null }>, DbError>;
     telegramChat(userId: string): Effect.Effect<Option.Option<bigint>, DbError>;
+    /** The user's own bot token, decrypted; None when alerts go through the shared bot. */
+    ownBotToken(userId: string): Effect.Effect<Option.Option<string>, DbError>;
     pauseAgent(agentId: string, reason: string): Effect.Effect<void, DbError>;
     /**
      * In one transaction: reads `last_alert_at` under a row lock and, unless it is inside the
@@ -165,6 +168,15 @@ export class Db extends Context.Service<
           run("telegramChat", () =>
             db.select({ chatId: telegramLinks.chatId }).from(telegramLinks).where(eq(telegramLinks.userId, userId)),
           ).pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]?.chatId))),
+
+        ownBotToken: (userId) =>
+          run("ownBotToken", async () => {
+            const [row] = await db
+              .select({ botToken: telegramLinks.botToken })
+              .from(telegramLinks)
+              .where(eq(telegramLinks.userId, userId));
+            return row?.botToken ? decryptSecret(row.botToken) : undefined;
+          }).pipe(Effect.map(Option.fromNullishOr)),
 
         pauseAgent: (agentId, reason) =>
           run("pauseAgent", () =>

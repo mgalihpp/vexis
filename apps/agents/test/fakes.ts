@@ -27,6 +27,7 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
     watches: seed.watches ?? [],
     minutes: new Map<string, NewMinute[]>(),
     chats: new Map<string, bigint>(),
+    ownBots: new Map<string, string>(),
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
     codes: new Map<string, string>(),
@@ -64,6 +65,7 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
             .slice(-limit)
             .map((r) => ({ minute: r.minute.getTime(), volume: r.volume })),
         ),
+      ownBotToken: (userId) => Effect.succeed(Option.fromNullishOr(state.ownBots.get(userId))),
       telegramChat: (userId) => Effect.succeed(Option.fromNullishOr(state.chats.get(userId))),
       pauseAgent: (agentId, reason) => Effect.sync(() => void state.paused.set(agentId, reason)),
       claimCooldown: (agentPoolId, cooldownMs, now) =>
@@ -139,15 +141,19 @@ export function fakeMeteora() {
 
 /** Telegram stand-in. Set `failSend` to make the next sends fail. */
 export function fakeTelegram(options: { requiresLink?: boolean } = {}) {
-  const state = { sent: [] as { chatId: bigint; text: string }[], failSend: false, incoming: [] as Incoming[] };
+  const state = {
+    sent: [] as { chatId: bigint; text: string; botToken?: string }[],
+    failSend: false,
+    incoming: [] as Incoming[],
+  };
   const layer = Layer.succeed(
     Telegram,
     Telegram.of({
       requiresLink: options.requiresLink ?? true,
-      send: (chatId, text) =>
+      send: (chatId, text, botToken) =>
         state.failSend
           ? Effect.fail(new TelegramError({ method: "sendMessage", cause: new Error("chat not found") }))
-          : Effect.sync(() => void state.sent.push({ chatId, text })),
+          : Effect.sync(() => void state.sent.push({ chatId, text, botToken })),
       updates: () => Effect.sync(() => state.incoming.splice(0)),
     }),
   );
