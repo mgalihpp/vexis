@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRightIcon, PauseIcon, PlayIcon, TerminalIcon } from "lucide-react";
+import { ArrowRightIcon, PauseIcon, PlayIcon, PlusIcon, TerminalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
@@ -18,7 +18,14 @@ export function FleetPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-4 md:px-6">
-      <h1 className="text-[1.375rem] leading-none font-semibold tracking-tight">Agents</h1>
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-[1.375rem] leading-none font-semibold tracking-tight">Agents</h1>
+        <Button asChild size="sm" className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90">
+          <Link to="/agents/new" search={{ step: "agent" }}>
+            <PlusIcon /> New agent
+          </Link>
+        </Button>
+      </header>
 
       <section className="grid grid-cols-2 divide-border rounded-xl border bg-card md:grid-cols-4 md:divide-x">
         <Stat label="Live" value={`${summary.live} of ${summary.total}`} />
