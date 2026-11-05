@@ -16,27 +16,16 @@ import {
 // The DLMM program. Every position account is owned by it, and the filters below select one pool's positions.
 const DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
 
-// The SDK exports the account filters and the Anchor decoder. Load its CJS build like analytics does.
+// The SDK exports the account filters. Load its CJS build like analytics does.
 interface DlmmSdk {
   positionV2Filter: () => GetProgramAccountsFilter;
   positionLbPairFilter: (lbPair: PublicKey) => GetProgramAccountsFilter;
-  createProgram: (connection: Connection) => unknown;
-  decodeAccount: (program: unknown, accountName: string, buffer: Buffer) => unknown;
 }
 const sdkModule: unknown = createRequire(import.meta.url)("@meteora-ag/dlmm");
 const sdk = ((sdkModule as { default?: unknown }).default ?? sdkModule) as DlmmSdk;
 
-/** The fields of a decoded PositionV2 account this section reads. */
-interface DecodedPosition {
-  owner: PublicKey;
-  lowerBinId: number;
-  upperBinId: number;
-  lastUpdatedAt: { toString(): string };
-}
-
 const RPC = process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
 const connection = new Connection(RPC);
-const program = sdk.createProgram(connection);
 
 // Each wallet on a page costs one Meteora call, so the page size caps the cost of one request.
 const SCAN_CACHE_MS = 5 * 60_000;
@@ -95,22 +84,29 @@ interface Scan {
   groups: OwnerGroup[];
 }
 
+// PositionV2 byte offsets (8-byte discriminator, lb_pair, owner, then 70-entry share, reward and fee arrays).
+// A position account is 8,120 bytes and busy pools hold thousands, so the scan asks the RPC for only these fields:
+// fetching whole accounts for a 3,000-position pool took the 1 GB VPS past 500 MB and got the server OOM-killed.
+const OWNER_SLICE = { offset: 40, length: 32 };
+const BINS_SLICE = { offset: 7912, length: 16 }; // lower_bin_id i32, upper_bin_id i32, last_updated_at i64
+
 /** Every open position in the pool, grouped by owner and ordered by latest activity. */
 async function scanOwners(pool: string): Promise<OwnerGroup[]> {
-  const accounts = await connection.getProgramAccounts(DLMM_PROGRAM, {
-    filters: [sdk.positionV2Filter(), sdk.positionLbPairFilter(new PublicKey(pool))],
-  });
+  const filters = [sdk.positionV2Filter(), sdk.positionLbPairFilter(new PublicKey(pool))];
+  const [owners, bins] = await Promise.all([
+    connection.getProgramAccounts(DLMM_PROGRAM, { filters, dataSlice: OWNER_SLICE }),
+    connection.getProgramAccounts(DLMM_PROGRAM, { filters, dataSlice: BINS_SLICE }),
+  ]);
+  const binsByAddress = new Map(bins.map(({ pubkey, account }) => [pubkey.toBase58(), Buffer.from(account.data)]));
   const groups = new Map<string, OwnerGroup>();
-  for (const { pubkey, account } of accounts) {
-    const decoded = sdk.decodeAccount(program, "positionV2", account.data) as DecodedPosition;
-    const owner = decoded.owner.toBase58();
-    const updated = Number(decoded.lastUpdatedAt.toString());
-    const position: OnChainPosition = {
-      address: pubkey.toBase58(),
-      owner,
-      lowerBinId: decoded.lowerBinId,
-      upperBinId: decoded.upperBinId,
-    };
+  for (const { pubkey, account } of owners) {
+    const address = pubkey.toBase58();
+    const b = binsByAddress.get(address);
+    // A position opened or closed between the two reads is in only one of them; it shows up on the next scan.
+    if (!b || b.length < BINS_SLICE.length || account.data.length < OWNER_SLICE.length) continue;
+    const owner = new PublicKey(account.data).toBase58();
+    const updated = Number(b.readBigInt64LE(8));
+    const position: OnChainPosition = { address, owner, lowerBinId: b.readInt32LE(0), upperBinId: b.readInt32LE(4) };
     const group = groups.get(owner);
     if (group) {
       group.positions.push(position);
@@ -123,11 +119,12 @@ async function scanOwners(pool: string): Promise<OwnerGroup[]> {
 }
 
 /** Meteora's open-position detail for one owner in one pool, every page. Null when the request fails. */
-async function fetchOwnerDetail(pool: string, owner: string): Promise<PnlRow[] | null> {
+async function fetchOwnerDetail(pool: string, owner: string, background = false): Promise<PnlRow[] | null> {
   try {
     const out: PnlRow[] = [];
     for (let page = 1; page <= PNL_MAX_PAGES; page++) {
-      const r = await get(`/positions/${pool}/pnl`, PnlPage, { user: owner, status: "open", page, page_size: 100 });
+      const params = { user: owner, status: "open", page, page_size: 100 };
+      const r = await get(`/positions/${pool}/pnl`, PnlPage, params, { background });
       out.push(...r.positions);
       if (!r.hasNext) break;
     }
@@ -166,8 +163,9 @@ const detailFor = (pool: string, owner: string) =>
 
 /**
  * Meteora detail for every wallet in the pool, so fees and PnL can be totaled across pages. One job per pool and
- * scan: a new scan starts a new job and the old one stops at its next wallet. It goes through `detailFor`, so pages
- * reuse what it fetched and the shared rate-limit budget paces it.
+ * scan: a new scan starts a new job and the old one stops at its next wallet. It runs at background priority, so a
+ * busy pool (thousands of wallets) cannot starve open pages of the shared Meteora budget, and it puts only finished
+ * results into `detailCache`, so a page never waits on a request the job has parked until the next window.
  */
 interface TotalsJob {
   scanAt: number;
@@ -189,7 +187,15 @@ function totalsJobFor(pool: string, scan: Scan): TotalsJob {
     while (next < owners.length && totalsJobs.get(pool) === job) {
       const owner = owners[next++];
       if (owner === undefined) break;
-      job.rows.set(owner, await detailFor(pool, owner));
+      const key = `${pool}:${owner}`;
+      const hit = detailCache.get(key);
+      if (hit && Date.now() - hit.at < DETAIL_CACHE_MS) {
+        job.rows.set(owner, await hit.value);
+        continue;
+      }
+      const rows = await fetchOwnerDetail(pool, owner, true);
+      if (rows) detailCache.set(key, { at: Date.now(), value: Promise.resolve(rows) });
+      job.rows.set(owner, rows);
     }
   };
   void Promise.all(Array.from({ length: Math.min(PNL_CONCURRENCY, owners.length) }, worker)).finally(() => {

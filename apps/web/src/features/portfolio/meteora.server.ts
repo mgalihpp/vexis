@@ -140,13 +140,21 @@ const toMs = (t: number | null | undefined) => (t == null ? null : ms(t));
 // shares this budget, and a 429 waits for the window to reset instead of failing the page.
 const budget = { remaining: Number.POSITIVE_INFINITY, resetAt: 0 };
 const MAX_ATTEMPTS = 6;
+// Background jobs stop here and wait for the next window, so pages someone has open never queue behind a job.
+const BACKGROUND_RESERVE = 60;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function get<T>(path: string, schema: z.ZodType<T>, params: Record<string, string | number>): Promise<T> {
+export async function get<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  params: Record<string, string | number>,
+  opts: { background?: boolean } = {},
+): Promise<T> {
   const url = new URL(path, API);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  const floor = opts.background ? BACKGROUND_RESERVE : 0;
   for (let attempt = 1; ; attempt++) {
-    if (budget.remaining <= 0 && Date.now() < budget.resetAt) await sleep(budget.resetAt - Date.now() + 100);
+    while (budget.remaining <= floor && Date.now() < budget.resetAt) await sleep(budget.resetAt - Date.now() + 100);
     const res = await fetch(url, { headers: { accept: "application/json" } });
     const remaining = res.headers.get("x-ratelimit-remaining");
     const reset = res.headers.get("x-ratelimit-reset");
@@ -184,9 +192,9 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
-const poolPositions = (pool: string, user: string, status: "open" | "closed") =>
+const poolPositions = (pool: string, user: string, status: "open" | "closed", opts?: { background?: boolean }) =>
   allPages(async (page) => {
-    const r = await get(`/positions/${pool}/pnl`, PnlPage, { user, status, page, page_size: 100 });
+    const r = await get(`/positions/${pool}/pnl`, PnlPage, { user, status, page, page_size: 100 }, opts);
     return { hasNext: r.hasNext, items: r.positions };
   });
 
@@ -203,7 +211,7 @@ interface ClosedPoolInfo extends ClosedPoolRef {
 }
 
 async function fetchPoolClosed(user: string, pool: ClosedPoolInfo): Promise<ClosedPosition[]> {
-  const positions = await poolPositions(pool.pool, user, "closed");
+  const positions = await poolPositions(pool.pool, user, "closed", { background: true });
   return positions.flatMap((p): ClosedPosition[] => {
     const closedAt = toMs(p.closedAt);
     if (!p.isClosed || closedAt === null) return [];
@@ -509,8 +517,8 @@ export async function loadPortfolio(wallet: string): Promise<Portfolio> {
 
 const activities = new Map<string, { at: number; value: Promise<PositionEvent[]> }>();
 
-async function fetchActivity(position: string): Promise<PositionEvent[]> {
-  const r = await get(`/positions/${position}/historical`, History, { order_direction: "asc" });
+async function fetchActivity(position: string, opts?: { background?: boolean }): Promise<PositionEvent[]> {
+  const r = await get(`/positions/${position}/historical`, History, { order_direction: "asc" }, opts);
   return r.events.map((e) => ({
     id: `${e.signature}:${e.ixIndex ?? 0}:${e.eventType}`,
     signature: e.signature,
@@ -582,7 +590,7 @@ function startHistoryJob(base: BaseSnapshot, pools: PoolCache, history: HistoryC
   const fetchOne = async (ref: HistoryRef) => {
     tried.add(ref.position);
     try {
-      const events = await fetchActivity(ref.position);
+      const events = await fetchActivity(ref.position, { background: true });
       if (ref.closedAt === null) activeEvents.set(ref.position, events);
       else {
         history.set(ref.position, events);
