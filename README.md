@@ -65,7 +65,7 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `BETTER_AUTH_URL`      | web         | none                                 | Public origin; requests from another origin are rejected  |
 | `TOKEN_ENC_KEY`        | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
 | `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for on-chain bin and fee reads                        |
-| `JUPITER_API_KEY`      | web         | none, uses `lite-api.jup.ag`         | Switches price and balance calls to `api.jup.ag`         |
+| `JUPITER_API_KEY`      | web         | none, uses `lite-api.jup.ag`         | Switches price and balance calls to `api.jup.ag`          |
 | `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
 | `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
@@ -75,21 +75,21 @@ There is no shared Telegram bot. Each user pastes their own BotFather token in S
 
 ## Scripts
 
-| Command               | What it does                                   |
-| --------------------- | ---------------------------------------------- |
-| `bun run dev:web`     | Dev server on port 3000                        |
-| `bun run dev:agents`  | The alert runner, watching for changes         |
-| `bun run start:agents`| The alert runner without file watching        |
-| `bun test`            | All tests in every workspace                   |
-| `bun run typecheck`   | `tsc --noEmit` in every workspace              |
-| `bun run lint`        | Biome check (`lint:fix` applies fixes)         |
-| `bun run build`       | Production build into `apps/web/.output`       |
-| `bun run docs:fetch`  | Refresh the offline docs in `docs/`            |
-| `bun run db:generate` | Turn `schema.ts` changes into a migration      |
-| `bun run db:migrate`  | Apply migrations                               |
-| `bun run db:studio`   | Open Drizzle Studio                            |
-| `bun run db:isolation`| Check that scoped queries keep users apart     |
-| `bun run db:invite`   | Create an invite and print its join link       |
+| Command                | What it does                               |
+| ---------------------- | ------------------------------------------ |
+| `bun run dev:web`      | Dev server on port 3000                    |
+| `bun run dev:agents`   | The alert runner, watching for changes     |
+| `bun run start:agents` | The alert runner without file watching     |
+| `bun test`             | All tests in every workspace               |
+| `bun run typecheck`    | `tsc --noEmit` in every workspace          |
+| `bun run lint`         | Biome check (`lint:fix` applies fixes)     |
+| `bun run build`        | Production build into `apps/web/.output`   |
+| `bun run docs:fetch`   | Refresh the offline docs in `docs/`        |
+| `bun run db:generate`  | Turn `schema.ts` changes into a migration  |
+| `bun run db:migrate`   | Apply migrations                           |
+| `bun run db:studio`    | Open Drizzle Studio                        |
+| `bun run db:isolation` | Check that scoped queries keep users apart |
+| `bun run db:invite`    | Create an invite and print its join link   |
 
 CI runs lint, typecheck, test and build on every PR, so the same four locally is a good sanity check.
 
@@ -113,15 +113,15 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 
 ## Routes
 
-| Route                | Page                                                       |
-| -------------------- | ---------------------------------------------------------- |
-| `/`                  | Redirects to `/portfolio`                                  |
-| `/portfolio`         | Wallet search with favorites and recent wallets            |
-| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions        |
-| `/analytics`         | Pool analytics; `?pool=` picks the pool                    |
+| Route                | Page                                                                         |
+| -------------------- | ---------------------------------------------------------------------------- |
+| `/`                  | Redirects to `/portfolio`                                                    |
+| `/portfolio`         | Wallet search with favorites and recent wallets                              |
+| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions                          |
+| `/analytics`         | Pool analytics; `?pool=` picks the pool                                      |
 | `/agents`            | Alert agents; `/agents/new` and `/agents/$agentId` for the wizard and detail |
-| `/login`             | Sign in, or join with an invite                            |
-| `/terms`, `/privacy` | Public pages, readable without an account                  |
+| `/login`             | Sign in, or join with an invite                                              |
+| `/terms`, `/privacy` | Public pages, readable without an account                                    |
 
 ## The runner
 
