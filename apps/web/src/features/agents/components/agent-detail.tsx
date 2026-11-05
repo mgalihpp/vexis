@@ -1,11 +1,11 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useIsMutating, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { Notice } from "@/features/portfolio/components/notice";
 import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
@@ -82,6 +82,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   const status = agentStatus(agent);
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
   const hint = STATUS_HINT[status];
+  const saving = useIsMutating() > 0;
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-4 md:px-6">
       <nav className="flex items-center justify-between gap-2 text-xs">
@@ -112,6 +113,12 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
       </header>
       {hint && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{hint}</p>}
       <FormError error={toggle.error} />
+
+      {saving && (
+        <div className="mt-4">
+          <Notice>Saving changes…</Notice>
+        </div>
+      )}
 
       <div role="tablist" className="mt-4 flex gap-5 border-b text-xs">
         {DETAIL_TABS.map((t) => (
@@ -342,9 +349,7 @@ function SettingsTab({ agent }: { agent: AgentView }) {
         <div className="flex items-center justify-end gap-3">
           <Button
             disabled={!result.ok || !dirty || save.isPending}
-            onClick={() =>
-              result.ok && save.mutate({ data: result.config }, { onSuccess: () => toast.success("Rule saved") })
-            }
+            onClick={() => result.ok && save.mutate({ data: result.config })}
             className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
           >
             {save.isPending && <Spinner />}
