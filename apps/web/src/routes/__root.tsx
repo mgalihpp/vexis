@@ -14,7 +14,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { isPublicPath } from "@/features/auth/auth";
 import { viewerQuery } from "@/features/auth/auth.queries";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
-import { useTelegramBackButton } from "@/features/telegram/use-telegram-back-button";
 import { themeScript } from "@/features/theme/theme";
 import appCss from "@/styles.css?url";
 
@@ -62,7 +61,6 @@ function RootDocument({ children }: { children: ReactNode }) {
 function RootLayout() {
   const { data: prices } = useSuspenseQuery(pricesQuery);
   const bare = useRouterState({ select: (s) => isPublicPath(s.location.pathname) });
-  useTelegramBackButton();
   if (bare) return <Outlet />;
   return (
     <AppShell prices={prices}>

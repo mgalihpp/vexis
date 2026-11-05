@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { NotificationWatcher } from "@/features/notifications/components/notification-watcher";
 import { type Theme, useTheme } from "@/features/theme/theme";
 import { shortAddr } from "@/lib/format";
+import { useAgents } from "@/stores/agents";
 import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
@@ -28,9 +29,10 @@ const DATA_SOURCES = [
   { name: "Jupiter", href: "https://jup.ag", icon: "https://static.jup.ag/jup/icon.png" },
 ];
 
-const MOBILE_LINKS: { to: "/portfolio" | "/analytics"; label: string; badge?: string }[] = [
+const MOBILE_LINKS: { to: "/portfolio" | "/analytics" | "/agents"; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
   { to: "/analytics", label: "Analytics" },
+  { to: "/agents", label: "Agents" },
 ];
 
 const THEMES: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
@@ -49,6 +51,7 @@ interface Prices {
 
 export function AppShell({ prices, children }: { prices: Prices; children: ReactNode }) {
   useEffect(() => {
+    useAgents.persist.rehydrate();
     useWallets.persist.rehydrate();
     usePools.persist.rehydrate();
     useSettings.persist.rehydrate();
@@ -66,7 +69,15 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
   );
 }
 
-function NavItem({ to, children, badge }: { to: "/portfolio" | "/analytics"; children: ReactNode; badge?: string }) {
+function NavItem({
+  to,
+  children,
+  badge,
+}: {
+  to: "/portfolio" | "/analytics" | "/agents";
+  children: ReactNode;
+  badge?: string;
+}) {
   return (
     <Link
       to={to}
@@ -98,12 +109,7 @@ function AppHeader() {
         <nav className="hidden items-center gap-5 md:flex">
           <NavItem to="/portfolio">Portfolio</NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
-          <span className="relative text-sm font-medium text-muted-foreground">
-            Agents
-            <span className="absolute -top-1.5 -right-0.75 translate-x-full rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
-              SOON
-            </span>
-          </span>
+          <NavItem to="/agents">Agents</NavItem>
         </nav>
         <HeaderActions />
       </div>
@@ -143,12 +149,6 @@ function MobileMenu() {
               </Link>
             </SheetClose>
           ))}
-          <span className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium text-muted-foreground">
-            Agents
-            <span className="rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
-              SOON
-            </span>
-          </span>
         </nav>
       </SheetContent>
     </Sheet>
