@@ -27,6 +27,10 @@ jobs:
       - name: Pack build (dereference symlinks)
         run: tar -chzf web-output.tgz -C apps/web .output
 
+      # The runner (pm2 `vexis-agents`) runs one self-contained Bun bundle; the VPS has no workspace install for it.
+      - name: Bundle agents runner
+        run: bun build apps/agents/src/main.ts --target=bun --outfile=agents-main.js
+
       - name: Set up SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -50,4 +54,28 @@ jobs:
             rm -f web-output.tgz
             if [ -n "$(find apps/web/.output -xtype l)" ]; then echo "broken symlinks"; exit 1; fi
             pm2 restart vexis-dashboard
+            pm2 save'
+
+      # Keeps the previous bundle as main.js.prev and puts it back if the new one does not stay up.
+      - name: Upload and restart agents runner
+        env:
+          VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          scp -P "$PORT" agents-main.js "$VPS:/root/vexis-agents/main.js.new"
+          ssh -p "$PORT" "$VPS" 'set -e
+            cd /root/vexis-agents
+            restarts() { pm2 jlist | bun -e "const p = JSON.parse(await Bun.stdin.text()).find((x) => x.name === \"vexis-agents\"); console.log(p?.pm2_env.status === \"online\" ? p.pm2_env.restart_time : \"down\")"; }
+            if [ -f main.js ]; then cp main.js main.js.prev; fi
+            mv main.js.new main.js
+            pm2 restart vexis-agents
+            before=$(restarts)
+            sleep 20
+            after=$(restarts)
+            if [ "$after" = "down" ] || [ "$after" != "$before" ]; then
+              echo "agents runner did not stay up (restarts $before -> $after); rolling back"
+              pm2 logs vexis-agents --lines 30 --nostream || true
+              if [ -f main.js.prev ]; then cp main.js.prev main.js; pm2 restart vexis-agents; fi
+              exit 1
+            fi
             pm2 save'
