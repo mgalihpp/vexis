@@ -49,4 +49,4 @@ RLS is enabled on every table with no policies. The server connects as `postgres
 
 ## Agents runner
 
-The runner (`apps/agents`, later) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.
+The runner (`apps/agents`) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.
