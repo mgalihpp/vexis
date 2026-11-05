@@ -1,14 +1,16 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon, ZapIcon } from "lucide-react";
+import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
   type AgentView,
+  type PoolView,
   agentStatus,
   type ConfigFields,
   compactUsd,
@@ -158,6 +160,22 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   );
 }
 
+/** The two token logos of a pool, overlapped; a letter stands in when they could not be looked up. */
+function PairLogo({ tokens, name }: { tokens: PoolView["tokens"]; name: string }) {
+  if (!tokens)
+    return (
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+        {name.slice(0, 1)}
+      </span>
+    );
+  return (
+    <span className="flex shrink-0 items-center">
+      <TokenIcon token={tokens[0]} className="relative z-10 size-8 text-xs ring-2 ring-card" />
+      <TokenIcon token={tokens[1]} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
+    </span>
+  );
+}
+
 function Overview({ agent, now }: { agent: AgentView; now: number }) {
   const { data } = useSuspenseQuery(alertsQuery);
   const edit = (
@@ -171,6 +189,7 @@ function Overview({ agent, now }: { agent: AgentView; now: number }) {
     </Link>
   );
   const recent = data.alerts.slice(0, 6);
+  const tokensByPool = new Map(agent.pools.map((p) => [p.address, p.tokens]));
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -206,9 +225,7 @@ function Overview({ agent, now }: { agent: AgentView; now: number }) {
             <ul className="-my-1 divide-y">
               {recent.map((a) => (
                 <li key={a.id} className="flex items-center gap-3 py-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
-                    <ZapIcon className="size-4" />
-                  </span>
+                  <PairLogo tokens={tokensByPool.get(a.poolAddress) ?? null} name={a.poolLabel ?? a.poolAddress} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
                       {a.poolLabel ?? shortAddr(a.poolAddress)}
@@ -219,11 +236,12 @@ function Overview({ agent, now }: { agent: AgentView; now: number }) {
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block text-sm font-semibold text-brand tabular-nums">{ratioText(a.ratio)}</span>
-                    <span className="flex items-center justify-end gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
-                      <span
-                        aria-hidden
-                        className={`size-1.5 rounded-full ${a.delivered ? "bg-profit" : a.error ? "bg-loss" : "bg-muted-foreground"}`}
-                      />
+                    <span className="block text-xs whitespace-nowrap text-muted-foreground">
+                      {a.error && !a.delivered && (
+                        <span className="mr-1.5 text-loss" title={a.error}>
+                          Not sent
+                        </span>
+                      )}
                       {timeAgo(a.at, now)}
                     </span>
                   </span>
