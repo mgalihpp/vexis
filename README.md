@@ -17,89 +17,123 @@ Portfolio tracker and pool analytics for Meteora DLMM on Solana.
 [![Meteora DLMM](https://img.shields.io/badge/Meteora-DLMM-BAF448)](https://www.meteora.ag)
 [![Biome](https://img.shields.io/badge/Biome-60A5FA?logo=biome&logoColor=white)](https://biomejs.dev)
 
-[Live app](https://stunobagent.my.id) · [Run locally](#run-locally) · [Deploy](#deploy)
+[Live app](https://stunobagent.my.id) · [Run locally](#running-it-locally) · [Deploy](#deploy)
 
 </div>
 
-## Features
+Meteora's own UI tells you what you hold right now. It is much less helpful about what you held three months ago. Vexis reads a wallet's whole DLMM history from Meteora's data API and shows it in one place: every closed and active position, PnL in SOL and USD, a chart you can bucket by day, week or month, and a calendar of your trading days.
 
-**Portfolio.** Paste a Solana wallet to see its DLMM positions from Meteora's data API. The Overview tab has PnL totals, a daily, weekly or monthly chart and a month calendar. Active, Closed, Balances and Transactions get a tab each. Every amount shows in SOL or USD, and the date range and pair filter live in the URL so a view can be shared.
+The second half is pool analytics. Pick any DLMM pool and you get the price chart, volume, TVL, fees, LP and trader counts, and the liquidity sitting in each bin around the active bin. Bins and fees are read on-chain, not estimated.
 
-**Analytics.** Pick any DLMM pool to see its price chart, volume, TVL, fees, LP and trader counts, and the liquidity in each bin around the active bin. Bin and fee data are read on-chain with the DLMM SDK.
+Alerts come in two flavors. The browser watches your favorite wallets and pools and notifies you when a position opens, closes or goes out of range. Separately, the runner polls pools once a minute and sends a Telegram message when a pool's volume spikes against its own recent median.
 
-**Alerts.** Browser notifications when a position opens, closes or goes out of range, and per-pool volume spike alerts. Settings has the alert sound, including a custom one.
+## What it does
 
-## Tech stack
+**Portfolio.** Paste a Solana wallet address. The Overview tab has net P&L, win rate, profit factor, day win % and average win/loss, plus a chart and a month calendar. Active, Closed, Balances and Transactions have their own tabs. Every amount is shown in SOL and USD, and the date range and pair filter live in the URL, so you can send someone a link to the exact view you are looking at.
 
-| Layer   | Tools                                                                |
-| ------- | -------------------------------------------------------------------- |
-| Runtime | Bun (package manager, test runner, production server)                |
-| App     | TanStack Start, TanStack Router, TanStack Query with SSR, React 19   |
-| Build   | Vite 8, Nitro                                                        |
-| UI      | Tailwind CSS v4, shadcn/ui, Recharts, lucide-react                   |
-| Data    | zod at every API boundary, Effect 4, zustand                         |
-| Solana  | `@meteora-ag/dlmm`, `@solana/web3.js`, Meteora data API, Jupiter API |
-| Tooling | TypeScript, Biome, `bun:test`                                        |
+**Analytics.** Price chart, volume, TVL, fees, LP and trader counts, plus the bin distribution around the active bin, for any pool.
 
-## Run locally
+**Alerts.** Two separate things. In the browser, notifications for your favorite wallets and pools: opened, closed, out of range, volume spike. In Telegram, a saved `volume-watch` agent per user: the runner stores one minute of volume per pool, compares it to the median of the previous 30 minutes, and sends a message when the newest minute is both above your USD threshold and above your multiplier (both configurable). Cooldowns stop it from spamming you.
 
-Requires [Bun](https://bun.sh) 1.4 or newer.
+A few things are deliberately honest instead of convenient. A token with no Jupiter price shows a dash and is left out of totals rather than counted at zero. A field nobody can source, like limit order bonus, is a dash. Incomplete data says so instead of pretending to be complete.
+
+## Running it locally
+
+You need [Bun](https://bun.sh) 1.4 or newer and a Postgres database. Supabase works out of the box; the setup is in `packages/db/README.md`.
 
 ```bash
 git clone https://github.com/mgalihpp/vexis.git
 cd vexis
 bun install
+cp .env.example .env   # fill in DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL, TOKEN_ENC_KEY
+bun run db:migrate
+bun run db:invite --email you@example.com
 bun run dev:web
 ```
 
-The app runs at http://localhost:3000.
+The app runs at http://localhost:3000. Sign-up is invite-only, so the invite from `db:invite` is what gets you an account. The dev scripts need different pieces of the same `.env`; the table below says which.
 
-| Command              | What it does                             |
-| -------------------- | ---------------------------------------- |
-| `bun run dev:web`    | Dev server on port 3000                  |
-| `bun test`           | All tests in every workspace             |
-| `bun run typecheck`  | `tsc --noEmit` in every workspace        |
-| `bun run lint`       | Biome check (`lint:fix` applies fixes)   |
-| `bun run build`      | Production build into `apps/web/.output` |
-| `bun run docs:fetch` | Refresh the offline docs in `docs/`      |
+One thing worth knowing before you test with a big wallet: Meteora allows 300 requests per window per IP, and that budget is shared by everything on the machine. Closed positions therefore load in the background while the page shows progress, and they are cached in `.state/portfolio-cache/`. A large wallet takes a few minutes the first time and is instant afterwards.
 
 ## Configuration
 
-Every variable is optional.
+| Variable               | Used by     | Default                              | What it does                                              |
+| ---------------------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
+| `DATABASE_URL`         | web, runner | none                                 | Supabase Postgres, transaction pooler on port 6543        |
+| `DATABASE_MIGRATE_URL` | drizzle-kit | falls back to `DATABASE_URL`         | Session pooler on port 5432, for migrations               |
+| `BETTER_AUTH_SECRET`   | web         | none                                 | Long random string used to sign sessions                  |
+| `BETTER_AUTH_URL`      | web         | none                                 | Public origin; requests from another origin are rejected  |
+| `TOKEN_ENC_KEY`        | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
+| `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for on-chain bin and fee reads                        |
+| `JUPITER_API_KEY`      | web         | none, uses `lite-api.jup.ag`         | Switches price and balance calls to `api.jup.ag`         |
+| `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
+| `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
+| `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
+| `NITRO_PRESET`         | build       | `bun`                                | Build target, for example `node-server`                   |
 
-| Variable             | Default                               | Purpose                                          |
-| -------------------- | ------------------------------------- | ------------------------------------------------ |
-| `JUPITER_API_KEY`    | none (uses `lite-api.jup.ag`)         | Switches price and balance calls to `api.jup.ag` |
-| `SOLANA_RPC_URL`     | `https://api.mainnet-beta.solana.com` | RPC for on-chain bin and fee reads               |
-| `METEORA_DATAPI_URL` | `https://dlmm.datapi.meteora.ag`      | Meteora DLMM data API base URL                   |
-| `VEXIS_CACHE_DIR`    | `.state/portfolio-cache` at repo root | Where closed positions and history are cached    |
-| `NITRO_PRESET`       | `bun`                                 | Build target, for example `node-server`          |
+There is no shared Telegram bot. Each user pastes their own BotFather token in Settings, sends `/start` to it, and presses Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 
-Meteora's API allows 300 requests per window per IP. A large wallet loads its closed positions in the background, and the page shows progress until it finishes. The cache on disk makes later loads fast.
+## Scripts
 
-## Project structure
+| Command               | What it does                                   |
+| --------------------- | ---------------------------------------------- |
+| `bun run dev:web`     | Dev server on port 3000                        |
+| `bun run dev:agents`  | The alert runner, watching for changes         |
+| `bun run start:agents`| The alert runner without file watching        |
+| `bun test`            | All tests in every workspace                   |
+| `bun run typecheck`   | `tsc --noEmit` in every workspace              |
+| `bun run lint`        | Biome check (`lint:fix` applies fixes)         |
+| `bun run build`       | Production build into `apps/web/.output`       |
+| `bun run docs:fetch`  | Refresh the offline docs in `docs/`            |
+| `bun run db:generate` | Turn `schema.ts` changes into a migration      |
+| `bun run db:migrate`  | Apply migrations                               |
+| `bun run db:studio`   | Open Drizzle Studio                            |
+| `bun run db:isolation`| Check that scoped queries keep users apart     |
+| `bun run db:invite`   | Create an invite and print its join link       |
+
+CI runs lint, typecheck, test and build on every PR, so the same four locally is a good sanity check.
+
+## Project layout
 
 ```
 apps/
   web/                  TanStack Start app, the product
     src/routes/         thin route files: search params, loader, SSR mode
-    src/features/       domain code: portfolio, analytics, notifications, settings, theme
+    src/features/       domain code: portfolio, analytics, auth, agents, notifications, settings, theme
     src/components/ui/  shadcn/ui, generated by the CLI
+  agents/               volume-spike runner (Effect 4, its own Bun process)
 packages/
   db/                   Drizzle schema, queries and migrations for Supabase Postgres
 docs/                   offline reference docs, generated by scripts/fetch-docs.ts
 ```
 
-Inside a feature, `*.functions.ts` holds `createServerFn` wrappers that any file may import, `*.server.ts` holds server-only code, and plain `.ts` files hold client-safe types and pure logic. TanStack Start fails the build if client code imports a `.server.ts` file. Imports use the `@/` alias, and there are no barrel `index.ts` files.
+Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a feature `*.functions.ts` holds `createServerFn` wrappers that any file may import, `*.server.ts` holds server-only code, and plain `.ts` files hold client-safe types and pure logic. TanStack Start fails the build if client code imports a `.server.ts` file. Imports use the `@/` alias; there are no barrel `index.ts` files.
+
+`packages/db` is worth reading before touching user data. Every user-owned table carries a `user_id`, and the app only reaches those tables through the `forUser(db, userId)` helpers, so a scoped query cannot quietly become unscoped.
 
 ## Routes
 
-| Route                | Page                                                     |
-| -------------------- | -------------------------------------------------------- |
-| `/`                  | Redirects to `/portfolio`                                |
-| `/portfolio`         | Wallet search with favorite and recent wallets           |
-| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions tabs |
-| `/analytics`         | Pool analytics; `?pool=` picks the pool                  |
+| Route                | Page                                                       |
+| -------------------- | ---------------------------------------------------------- |
+| `/`                  | Redirects to `/portfolio`                                  |
+| `/portfolio`         | Wallet search with favorites and recent wallets            |
+| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions        |
+| `/analytics`         | Pool analytics; `?pool=` picks the pool                    |
+| `/agents`            | Alert agents; `/agents/new` and `/agents/$agentId` for the wizard and detail |
+| `/login`             | Sign in, or join with an invite                            |
+| `/terms`, `/privacy` | Public pages, readable without an account                  |
+
+## The runner
+
+The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with each user's own bot token, so the runner never polls Telegram.
+
+On a VPS it runs next to the web process under pm2:
+
+```bash
+pm2 start "bun apps/agents/src/main.ts" --name vexis-agents
+```
+
+It needs `DATABASE_URL` and `TOKEN_ENC_KEY`, the same values the web app uses.
 
 ## Deploy
 
@@ -108,6 +142,13 @@ bun run build
 bun apps/web/.output/server/index.mjs
 ```
 
-The server listens on `PORT` (default 3000).
+The server listens on `PORT`, default 3000. Pass `NITRO_PRESET=node-server` to build for a plain Node host instead of Bun.
 
-Nitro links some packages in `.output/server/node_modules/.nf3` with absolute symlinks. When you build on one machine and run on another, pack the output with `tar -czhf output.tgz .output` so the archive holds real files instead of links.
+One gotcha from doing this the hard way: Nitro symlinks some packages into `.output/server/node_modules/.nf3` with absolute paths. If you build on your laptop and run on a server, pack the output with `tar -czhf output.tgz .output` so the archive holds real files instead of links that point at your machine.
+
+## Notes
+
+- `.state/` is a cache, not a database. Deleting it costs you one slow reload per wallet.
+- The Meteora API only lists pools with a close in the last 365 days. `/portfolio/total` is all-time, so on a wallet older than that the app tells you when the loaded count is lower than the total.
+- Day boundaries are UTC everywhere. That is deliberate; it keeps the server render and the browser render identical.
+- `docs/` is generated. Edit `scripts/fetch-docs.ts`, not the files.
