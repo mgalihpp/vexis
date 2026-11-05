@@ -202,26 +202,6 @@ export function PoolPicker({
         />
       </label>
       <div>
-        {pinned.length > 0 && (
-          <>
-            <div className={`${ROW} border-b bg-brand/10 py-2 ${label} text-brand`}>
-              <span>
-                Selected · {count} of {MAX_POOLS}
-              </span>
-              <span className="hidden md:block" />
-              <span />
-              <span className="hidden md:block" />
-              <span />
-            </div>
-            <ul className="divide-y border-b">
-              {pinned.map((h) => (
-                <li key={h.address}>
-                  <PoolRow hit={h} picked locked={false} maxVol={maxVol} onClick={() => onRemove?.(h.address)} />
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
         <div className={`${ROW} border-b py-2 ${label} text-muted-foreground`}>
           <span>{searching ? "Results" : "Top pools by volume"}</span>
           <span className="hidden text-right md:block">TVL</span>
@@ -252,10 +232,37 @@ export function PoolPicker({
           )}
         </ul>
       </div>
-      {pinned.length === 0 && (
-        <p className={`text-right ${label} text-muted-foreground`}>
-          {count} of {MAX_POOLS} selected
-        </p>
+      <p className={`text-right ${label} text-muted-foreground`}>
+        {count} of {MAX_POOLS} selected
+      </p>
+      {pinned.length > 0 && (
+        <ul className="divide-y border-t">
+          {pinned.map((h) => (
+            <li
+              key={h.address}
+              className="flex items-center justify-between gap-3 py-3 pl-3 text-xs shadow-[inset_2px_0_0_var(--brand)]"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex shrink-0 items-center">
+                  <TokenIcon token={h.tokenX} className="relative z-10 size-8 text-xs ring-2 ring-card" />
+                  <TokenIcon token={h.tokenY} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[0.8rem] font-bold">{h.name}</span>
+                  <span className="block font-mono text-[0.7rem] text-muted-foreground">{shortAddr(h.address)}</span>
+                </span>
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove ${h.name}`}
+                onClick={() => onRemove?.(h.address)}
+                className="text-muted-foreground hover:text-loss"
+              >
+                <XIcon className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
