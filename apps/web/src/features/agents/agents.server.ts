@@ -11,6 +11,7 @@ import {
   removeAgentPool,
   updateAgent,
 } from "@vexis/db/queries";
+import { decryptSecret } from "@vexis/db/secret";
 import { poolTokens } from "@/features/analytics/analytics.server";
 import { type AgentsData, type AgentView, type AlertsData, MAX_POOLS, type TelegramView } from "./agents";
 
@@ -85,9 +86,25 @@ async function loadPoolLabels(userId: string) {
 
 export async function loadTelegram(userId: string): Promise<TelegramView> {
   const link = await getTelegramLink(scope(userId));
+  if (!link) return { bot: null, relink: null };
+  // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks for
+  // the token once more, and connecting overwrites the row.
+  if (!readable(link.botToken)) return { bot: null, relink: link.botUsername };
   return {
-    bot: link ? { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username } : null,
+    bot: { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username },
+    relink: null,
   };
+}
+
+function readable(encrypted: string) {
+  try {
+    decryptSecret(encrypted);
+    return true;
+  } catch (error) {
+    // A missing or malformed key is a server misconfiguration, not a stale token; let it surface.
+    if (error instanceof Error && error.message.startsWith("TOKEN_ENC_KEY")) throw error;
+    return false;
+  }
 }
 
 export interface NewAgentInput {

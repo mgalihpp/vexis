@@ -622,7 +622,9 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
   const error = connect.error ?? detect.error ?? disconnect.error;
 
   const status = !bot
-    ? "Not connected"
+    ? tg.relink
+      ? `The saved token for @${tg.relink} can no longer be read. Paste it again to resume alerts.`
+      : "Not connected"
     : bot.linked
       ? `${bot.chatUsername ? `@${bot.chatUsername}` : "Your chat"} via @${bot.username}`
       : `@${bot.username} · waiting for /start`;
@@ -643,7 +645,11 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
         <TelegramIcon className="size-9 shrink-0" />
         <span className="min-w-0 flex-1 basis-36">
           <span className="block text-sm font-medium">Telegram</span>
-          <span className="block truncate text-xs text-muted-foreground">{status}</span>
+          <span
+            className={`block text-xs ${!bot && tg.relink ? "text-amber-600 dark:text-amber-400" : "truncate text-muted-foreground"}`}
+          >
+            {status}
+          </span>
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2">
           {bot && !bot.linked && (

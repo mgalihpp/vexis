@@ -69,6 +69,8 @@ export const BOT_TOKEN_PATTERN = /^\d{5,}:[A-Za-z0-9_-]{30,}$/;
 export interface TelegramView {
   /** The user's own bot. Null until they connect one; `linked` once a chat has written to it. */
   bot: { username: string; linked: boolean; chatUsername: string | null } | null;
+  /** The bot whose saved token can no longer be read (the server's key changed). `bot` is null; paste it again. */
+  relink: string | null;
 }
 
 // --- status ------------------------------------------------------------------------------------
