@@ -1,12 +1,23 @@
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ChevronRightIcon, ZapIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  CoinsIcon,
+  RefreshCwIcon,
+  ShieldCheckIcon,
+  ZapIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { compactUsd } from "@/features/portfolio/money";
 import {
   AGENT_TYPES,
+  COMING_SOON,
   type Draft,
   defaultDraft,
   draftIssues,
@@ -202,6 +213,23 @@ function AgentStep({ added }: { added: Set<string> }) {
           </div>
         </li>
       ))}
+      {COMING_SOON.map((t, i) => {
+        const Icon = [RefreshCwIcon, ShieldCheckIcon, CoinsIcon][i] ?? ZapIcon;
+        return (
+          <li key={t.name}>
+            <div className="flex items-center gap-3 rounded-lg border border-dashed px-3 py-3 opacity-60">
+              <span className="flex size-8 items-center justify-center rounded-lg border bg-muted/40 text-muted-foreground">
+                <Icon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{t.name}</span>
+                <span className="block text-xs text-muted-foreground">{t.sub}</span>
+              </span>
+              <span className="rounded-full border px-2 py-0.5 text-[0.65rem] text-muted-foreground">Coming soon</span>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

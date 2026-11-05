@@ -167,6 +167,13 @@ export const AGENT_TYPES = [
   { kind: "volume-watch", name: "Volume spike alert", sub: "Telegram alert when pool volume jumps" },
 ] as const;
 
+/** Agents from the design that are not built yet. Shown greyed out in the first step. */
+export const COMING_SOON = [
+  { name: "Auto-rebalance", sub: "Re-centers your range when price moves out" },
+  { name: "Range guard", sub: "Warns before a position leaves its range" },
+  { name: "Fee harvester", sub: "Claims and compounds fees on a schedule" },
+] as const;
+
 export interface DraftPool {
   address: string;
   label: string;
