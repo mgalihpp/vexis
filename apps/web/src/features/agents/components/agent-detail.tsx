@@ -307,9 +307,6 @@ function PoolsTab({ agent }: { agent: AgentView }) {
         <p className="py-6 text-center text-xs text-muted-foreground">No pools</p>
       ) : (
         <ul className="divide-y border-t">
-          <li className="py-2 font-mono text-[0.6rem] tracking-[0.08em] text-brand uppercase">
-            Watching · {agent.pools.length}
-          </li>
           {agent.pools.map((p) => (
             <li
               key={p.id}
