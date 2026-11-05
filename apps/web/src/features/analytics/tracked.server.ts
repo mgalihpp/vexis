@@ -59,6 +59,7 @@ const PnlRow = z.object({
   allTimeFees: Pair,
   pnlUsd: maybeNum,
   pnlSol: maybeNum,
+  unrealizedPnl: z.object({ balances: maybeNum, balancesSol: maybeNum }).nullish(),
 });
 type PnlRow = z.infer<typeof PnlRow>;
 
@@ -210,6 +211,7 @@ function poolTotals(job: TotalsJob): PoolTotals {
   for (const r of job.rows.values()) if (r === null) failed++;
   return {
     feesUsd: sumKnown(rows.map((r) => r.allTimeFees?.total?.usd ?? null)),
+    feesSol: sumKnown(rows.map((r) => r.allTimeFees?.total?.sol ?? null)),
     pnlUsd: sumKnown(rows.map((r) => r.pnlUsd)),
     pnlSol: sumKnown(rows.map((r) => r.pnlSol)),
     loaded: job.rows.size,
@@ -241,7 +243,10 @@ function buildPosition(p: OnChainPosition, row: PnlRow | undefined): TrackedPosi
       : null,
     depositX: row?.allTimeDeposits?.tokenX?.amount ?? null,
     depositY: row?.allTimeDeposits?.tokenY?.amount ?? null,
+    liquidityUsd: row?.unrealizedPnl?.balances ?? null,
+    liquiditySol: row?.unrealizedPnl?.balancesSol ?? null,
     feesUsd: row?.allTimeFees?.total?.usd ?? null,
+    feesSol: row?.allTimeFees?.total?.sol ?? null,
     pnlUsd: row?.pnlUsd ?? null,
     pnlSol: row?.pnlSol ?? null,
   };
