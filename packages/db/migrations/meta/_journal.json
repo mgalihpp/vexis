@@ -15,6 +15,13 @@
       "when": 1793851850113,
       "tag": "0001_telegram_own_bot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793852316273,
+      "tag": "0002_telegram_own_bot_only",
+      "breakpoints": true
     }
   ]
 }

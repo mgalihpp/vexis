@@ -13,7 +13,6 @@ import {
   removePool,
   saveConfig,
   setAgentState,
-  startTelegramLink,
 } from "./agents.server";
 import { BotToken, connectOwnBot, detectOwnBotChat, disconnectTelegram } from "./telegram.server";
 
@@ -30,10 +29,6 @@ export const getAlerts = createServerFn({ method: "GET" })
 export const getTelegram = createServerFn({ method: "GET" })
   .middleware([requireViewer])
   .handler(({ context }) => loadTelegram(context.viewer.id));
-
-export const beginTelegramLink = createServerFn({ method: "POST" })
-  .middleware([requireViewer])
-  .handler(({ context }) => startTelegramLink(context.viewer.id));
 
 export const connectTelegramBot = createServerFn({ method: "POST" })
   .middleware([requireViewer])

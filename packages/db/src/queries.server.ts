@@ -168,39 +168,9 @@ export function getTelegramLink({ db, userId }: UserScope) {
     .then((rows) => rows[0]);
 }
 
-/** Starts (or restarts) linking: a fresh one-time code the user sends to the bot. */
-export async function createTelegramLinkCode({ db, userId }: UserScope, ttlMs = 10 * 60_000) {
-  const linkCode = randomBytes(6).toString("base64url");
-  const linkCodeExpiresAt = new Date(Date.now() + ttlMs);
-  await db
-    .insert(telegramLinks)
-    .values({ userId, linkCode, linkCodeExpiresAt })
-    .onConflictDoUpdate({
-      target: telegramLinks.userId,
-      set: {
-        linkCode,
-        linkCodeExpiresAt,
-        // Back to the shared bot. A chat that belonged to the user's own bot is no use there, so it goes.
-        chatId: sql`case when ${telegramLinks.botToken} is not null then null else ${telegramLinks.chatId} end`,
-        linkedAt: sql`case when ${telegramLinks.botToken} is not null then null else ${telegramLinks.linkedAt} end`,
-        botToken: null,
-        botUsername: null,
-      },
-    });
-  return { linkCode, expiresAt: linkCodeExpiresAt };
-}
-
-/** Stores the user's own bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
+/** Stores the user's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
 export async function saveOwnBot({ db, userId }: UserScope, encryptedToken: string, botUsername: string) {
-  const fresh = {
-    botToken: encryptedToken,
-    botUsername,
-    chatId: null,
-    username: null,
-    linkedAt: null,
-    linkCode: null,
-    linkCodeExpiresAt: null,
-  };
+  const fresh = { botToken: encryptedToken, botUsername, chatId: null, username: null, linkedAt: null };
   await db
     .insert(telegramLinks)
     .values({ userId, ...fresh })
@@ -212,27 +182,14 @@ export async function linkOwnBotChat({ db, userId }: UserScope, chatId: bigint, 
   const rows = await db
     .update(telegramLinks)
     .set({ chatId, username: username ?? null, linkedAt: new Date() })
-    .where(and(eq(telegramLinks.userId, userId), sql`${telegramLinks.botToken} is not null`))
+    .where(eq(telegramLinks.userId, userId))
     .returning({ userId: telegramLinks.userId });
   return rows.length > 0;
 }
 
-/** Forgets the chat, the code and the bot. The runner pauses the user's agents at the next alert. */
+/** Forgets the bot and the chat. The runner pauses the user's agents at the next alert. */
 export async function removeTelegramLink({ db, userId }: UserScope) {
   await db.delete(telegramLinks).where(eq(telegramLinks.userId, userId));
-}
-
-/**
- * Called by the bot (not user-scoped: the code is the proof). Consumes the code and binds the chat.
- * Returns the linked user id, or undefined for an unknown or expired code.
- */
-export async function redeemTelegramLinkCode(db: Db, code: string, chatId: bigint, username?: string) {
-  const [row] = await db
-    .update(telegramLinks)
-    .set({ chatId, username, linkedAt: new Date(), linkCode: null, linkCodeExpiresAt: null })
-    .where(and(eq(telegramLinks.linkCode, code), gt(telegramLinks.linkCodeExpiresAt, new Date())))
-    .returning({ userId: telegramLinks.userId });
-  return row?.userId;
 }
 
 // --- invites (not user-scoped: used before the user exists, or by admins) ---------------------

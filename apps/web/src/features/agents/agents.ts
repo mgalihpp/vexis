@@ -61,13 +61,8 @@ export interface AlertsData {
 export const BOT_TOKEN_PATTERN = /^\d{5,}:[A-Za-z0-9_-]{30,}$/;
 
 export interface TelegramView {
-  linked: boolean;
-  username: string | null;
-  /** A pending one-time code to send to the bot, if one was started and has not expired. */
-  code: { value: string; expiresAt: number } | null;
-  botUsername: string | null;
-  /** The user's own bot, when they brought one: its username, and whether a chat is linked on it yet. */
-  ownBot: { username: string; linked: boolean } | null;
+  /** The user's own bot. Null until they connect one; `linked` once a chat has written to it. */
+  bot: { username: string; linked: boolean; chatUsername: string | null } | null;
 }
 
 // --- status ------------------------------------------------------------------------------------

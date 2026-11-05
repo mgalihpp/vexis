@@ -2,7 +2,6 @@ import { VolumeWatchConfig as ConfigSchema, defaultAgentConfig } from "@vexis/db
 import { getDb } from "@vexis/db/client";
 import {
   addAgentPool,
-  createTelegramLinkCode,
   ensureAgent,
   forUser,
   getAgent,
@@ -86,21 +85,9 @@ async function loadPoolLabels(userId: string) {
 
 export async function loadTelegram(userId: string): Promise<TelegramView> {
   const link = await getTelegramLink(scope(userId));
-  const now = Date.now();
-  const expiresAt = link?.linkCodeExpiresAt?.getTime();
   return {
-    linked: link?.chatId != null,
-    username: link?.username ?? null,
-    code: link?.linkCode && expiresAt && expiresAt > now ? { value: link.linkCode, expiresAt } : null,
-    botUsername: link?.botToken ? (link.botUsername ?? null) : (process.env.TELEGRAM_BOT_USERNAME ?? null),
-    ownBot: link?.botToken ? { username: link.botUsername ?? "", linked: link.chatId != null } : null,
+    bot: link ? { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username } : null,
   };
-}
-
-/** Starts (or restarts) linking and returns the fresh code. */
-export async function startTelegramLink(userId: string): Promise<TelegramView> {
-  await createTelegramLinkCode(scope(userId));
-  return loadTelegram(userId);
 }
 
 export interface NewAgentInput {

@@ -4,7 +4,7 @@ import { AppConfig } from "../src/AppConfig.ts";
 import { Db, type NewAlert, type NewMinute, TELEGRAM_NOT_LINKED, type Watch } from "../src/Db.ts";
 import { MeteoraError, TelegramError } from "../src/errors.ts";
 import { Meteora, type PoolReading } from "../src/Meteora.ts";
-import { type Incoming, Telegram } from "../src/Telegram.ts";
+import { Telegram } from "../src/Telegram.ts";
 
 export const MINUTE = 60_000;
 /** A whole minute, so test readings land on a minute boundary. */
@@ -30,7 +30,6 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
     ownBots: new Map<string, string>(),
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
-    codes: new Map<string, string>(),
     pruned: [] as Date[],
   };
   const rowsOf = (pool: string) => state.minutes.get(pool) ?? [];
@@ -65,8 +64,14 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
             .slice(-limit)
             .map((r) => ({ minute: r.minute.getTime(), volume: r.volume })),
         ),
-      ownBotToken: (userId) => Effect.succeed(Option.fromNullishOr(state.ownBots.get(userId))),
-      telegramChat: (userId) => Effect.succeed(Option.fromNullishOr(state.chats.get(userId))),
+      telegramTarget: (userId) => {
+        const chatId = state.chats.get(userId);
+        return Effect.succeed(
+          chatId === undefined
+            ? Option.none()
+            : Option.some({ chatId, botToken: state.ownBots.get(userId) ?? "user-bot-token" }),
+        );
+      },
       pauseAgent: (agentId, reason) => Effect.sync(() => void state.paused.set(agentId, reason)),
       claimCooldown: (agentPoolId, cooldownMs, now) =>
         Effect.sync(() => {
@@ -101,22 +106,6 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
         Effect.sync(() => {
           for (const alert of state.alerts) if (ids.includes(alert.id)) alert.error = error;
         }),
-      redeemLink: (code, chatId) =>
-        Effect.sync(() => {
-          const userId = state.codes.get(code);
-          if (!userId) return Option.none();
-          state.codes.delete(code);
-          state.chats.set(userId, chatId);
-          for (const [agentId, reason] of state.paused) {
-            if (
-              reason === TELEGRAM_NOT_LINKED &&
-              state.watches.some((w) => w.agentId === agentId && w.userId === userId)
-            ) {
-              state.paused.delete(agentId);
-            }
-          }
-          return Option.some(userId);
-        }),
     }),
   );
   return { state, layer };
@@ -140,21 +129,15 @@ export function fakeMeteora() {
 }
 
 /** Telegram stand-in. Set `failSend` to make the next sends fail. */
-export function fakeTelegram(options: { requiresLink?: boolean } = {}) {
-  const state = {
-    sent: [] as { chatId: bigint; text: string; botToken?: string }[],
-    failSend: false,
-    incoming: [] as Incoming[],
-  };
+export function fakeTelegram() {
+  const state = { sent: [] as { chatId: bigint; text: string; botToken: string }[], failSend: false };
   const layer = Layer.succeed(
     Telegram,
     Telegram.of({
-      requiresLink: options.requiresLink ?? true,
       send: (chatId, text, botToken) =>
         state.failSend
           ? Effect.fail(new TelegramError({ method: "sendMessage", cause: new Error("chat not found") }))
           : Effect.sync(() => void state.sent.push({ chatId, text, botToken })),
-      updates: () => Effect.sync(() => state.incoming.splice(0)),
     }),
   );
   return { state, layer };

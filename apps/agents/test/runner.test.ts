@@ -5,7 +5,6 @@ import { cycle } from "../src/Cycle.ts";
 import type { Db } from "../src/Db.ts";
 import { formatMessage, formatUsd } from "../src/format.ts";
 import { prune, RETENTION_MS } from "../src/Ingest.ts";
-import { handleIncoming } from "../src/Link.ts";
 import type { Meteora } from "../src/Meteora.ts";
 import type { Telegram } from "../src/Telegram.ts";
 import {
@@ -22,10 +21,10 @@ import {
 } from "./fakes.ts";
 
 /** Fresh fakes wired together; `cycle` runs against them at `at`. */
-function setup(options: { watches?: ReturnType<typeof watch>[]; requiresLink?: boolean } = {}) {
+function setup(options: { watches?: ReturnType<typeof watch>[] } = {}) {
   const db = fakeDb({ watches: options.watches ?? [watch()] });
   const meteora = fakeMeteora();
-  const telegram = fakeTelegram({ requiresLink: options.requiresLink });
+  const telegram = fakeTelegram();
   const layer = Layer.mergeAll(db.layer, meteora.layer, telegram.layer, testConfig);
   const run = <A, E>(effect: Effect.Effect<A, E, AppConfig | Db | Meteora | Telegram>, at = T0) =>
     runAt(effect.pipe(Effect.provide(layer)), at);
@@ -137,6 +136,7 @@ describe("evaluate and notify", () => {
       {
         chatId: 42n,
         text: "⚡ DOGE-SOL bin 25 — $5.0k in 1 minute (50.0× normal, baseline $100)\nhttps://vexis.test/analytics?pool=POOL1",
+        botToken: "user-bot-token",
       },
     ]);
   });
@@ -200,29 +200,12 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([]);
   });
 
-  test("an alert goes out through the user's own bot when they have one", async () => {
+  test("an alert goes out through the user's own bot", async () => {
     const s = spikeScenario(5000);
     s.db.ownBots.set("user-1", "own-bot-token");
     await s.run(cycle());
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.botToken).toBe("own-bot-token");
-  });
-
-  test("without an own bot the shared bot sends", async () => {
-    const s = spikeScenario(5000);
-    await s.run(cycle());
-    expect(s.telegram.sent[0]?.botToken).toBeUndefined();
-  });
-
-  test("the console stand-in never pauses anyone", async () => {
-    const s = spikeScenario(5000);
-    s.db.chats.clear();
-    const console_ = setup({ requiresLink: false });
-    console_.db.minutes.set("POOL1", quietHistory("POOL1", 10));
-    console_.meteora.readings = [reading({ cumulativeVolume: 10_000 + 10 * 100 + 5000 })];
-    await console_.run(cycle());
-    expect(console_.db.paused.size).toBe(0);
-    expect(console_.db.alerts).toHaveLength(1);
   });
 
   test("a row with a bad config is skipped; other agents still run", async () => {
@@ -274,33 +257,6 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.text).toContain("DOGE-SOL bin 25");
     expect(s.telegram.sent[0]?.text).toContain("SOL-USDC bin 10");
-  });
-});
-
-describe("telegram link", () => {
-  test("/start <code> binds the chat and unpauses the agent", async () => {
-    const s = setup();
-    s.db.paused.set("agent-1", "telegram_not_linked");
-    s.db.codes.set("abc123", "user-1");
-    await s.run(handleIncoming({ updateId: 1, chatId: 99n, username: "galih", text: "/start abc123" }));
-    expect(s.db.chats.get("user-1")).toBe(99n);
-    expect(s.db.paused.size).toBe(0);
-    expect(s.telegram.sent[0]?.chatId).toBe(99n);
-    expect(s.telegram.sent[0]?.text).toContain("Linked");
-  });
-
-  test("an unknown code is refused", async () => {
-    const s = setup();
-    await s.run(handleIncoming({ updateId: 1, chatId: 99n, username: undefined, text: "/start nope" }));
-    expect(s.db.chats.size).toBe(0);
-    expect(s.telegram.sent[0]?.text).toContain("Unknown or expired");
-  });
-
-  test("/start with no code explains how, other text is ignored", async () => {
-    const s = setup();
-    await s.run(handleIncoming({ updateId: 1, chatId: 99n, username: undefined, text: "/start" }));
-    await s.run(handleIncoming({ updateId: 2, chatId: 99n, username: undefined, text: "hello" }));
-    expect(s.telegram.sent).toHaveLength(1);
   });
 });
 

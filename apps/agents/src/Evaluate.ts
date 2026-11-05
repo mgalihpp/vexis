@@ -85,14 +85,13 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
   const { webUrl } = yield* AppConfig;
   const { agentId, userId } = hits[0].watch;
 
-  const chat = yield* db.telegramChat(userId);
-  if (Option.isNone(chat) && telegram.requiresLink) {
+  const target = yield* db.telegramTarget(userId);
+  if (Option.isNone(target)) {
     yield* db.pauseAgent(agentId, TELEGRAM_NOT_LINKED);
-    yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked Telegram`);
+    yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked a Telegram bot`);
     return;
   }
-  const chatId = Option.getOrElse(chat, () => 0n);
-  const ownBot = yield* db.ownBotToken(userId);
+  const { chatId, botToken } = target.value;
 
   const at = new Date(yield* Clock.currentTimeMillis);
   const claimed = (yield* Effect.forEach(hits, (hit) =>
@@ -132,7 +131,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
     };
   });
 
-  yield* telegram.send(chatId, formatMessage(lines, webUrl), Option.getOrUndefined(ownBot)).pipe(
+  yield* telegram.send(chatId, formatMessage(lines, webUrl), botToken).pipe(
     Effect.matchEffect({
       onSuccess: () => db.markDelivered(ids),
       onFailure: (error) =>

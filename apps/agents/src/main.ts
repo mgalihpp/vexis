@@ -4,7 +4,6 @@ import { AppConfig } from "./AppConfig.ts";
 import { cycle } from "./Cycle.ts";
 import { Db } from "./Db.ts";
 import { prune } from "./Ingest.ts";
-import { linkLoop } from "./Link.ts";
 import { Meteora } from "./Meteora.ts";
 import { Telegram } from "./Telegram.ts";
 
@@ -20,7 +19,6 @@ const Runner = Layer.effectDiscard(
     yield* Effect.logInfo("agents runner starting");
     yield* Effect.forkScoped(supervised("cycle", cycle(), Schedule.fixed("1 minute")));
     yield* Effect.forkScoped(supervised("prune", prune(), Schedule.spaced("1 hour")));
-    yield* Effect.forkScoped(linkLoop);
   }),
 ).pipe(Layer.provide(Layer.mergeAll(Db.layer, Meteora.layer, Telegram.layer, AppConfig.layer)));
 

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { BadgeCheckIcon, CheckIcon, CopyIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react";
+import { BadgeCheckIcon, CheckIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,7 +11,7 @@ import { compactUsd, pct } from "@/features/portfolio/money";
 import type { PoolMeta } from "@/features/portfolio/portfolio";
 import { shortAddr } from "@/lib/format";
 import { type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
-import { beginTelegramLink, connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
+import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
 
 export const STATUS_STYLE: Record<AgentStatus, { text: string; dot: string }> = {
@@ -578,42 +578,20 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
 /** Shows whether alerts have a chat to go to, and runs the one-time-code link flow when they do not. */
 export function TelegramPanel({ children }: { children?: ReactNode }) {
   const { data: tg } = useSuspenseQuery(telegramQuery);
-  const start = useAgentMutation(() => beginTelegramLink());
   const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { token } }));
   const detect = useAgentMutation(() => detectTelegramChat());
   const disconnect = useAgentMutation(() => disconnectTelegramLink());
-  const [copied, setCopied] = useState(false);
-  const [entering, setEntering] = useState(false);
   const [token, setToken] = useState("");
   const [tokenError, setTokenError] = useState<string | null>(null);
-  const own = tg.ownBot;
-  const linked = tg.linked && !tg.code;
-  const busy = start.isPending || connect.isPending || detect.isPending || disconnect.isPending;
-  const deepLink = tg.code && tg.botUsername ? `https://t.me/${tg.botUsername}?start=${tg.code.value}` : null;
-  const command = tg.code ? `/start ${tg.code.value}` : "";
-  const error = start.error ?? connect.error ?? detect.error ?? disconnect.error;
+  const bot = tg.bot;
+  const busy = connect.isPending || detect.isPending || disconnect.isPending;
+  const error = connect.error ?? detect.error ?? disconnect.error;
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch {
-      // Clipboard can be blocked; the code stays selectable on screen.
-    }
-  };
-
-  const status = own
-    ? linked
-      ? `${tg.username ? `@${tg.username}` : "Your chat"} via @${own.username}`
-      : `@${own.username} · waiting for /start`
-    : linked
-      ? tg.username
-        ? `Alerts go to @${tg.username}`
-        : "Alerts go to your linked chat"
-      : tg.code
-        ? "Waiting for the code"
-        : "Not linked";
+  const status = !bot
+    ? "Not connected"
+    : bot.linked
+      ? `${bot.chatUsername ? `@${bot.chatUsername}` : "Your chat"} via @${bot.username}`
+      : `@${bot.username} · waiting for /start`;
 
   const submitToken = async () => {
     if (!BOT_TOKEN_PATTERN.test(token.trim())) {
@@ -623,7 +601,6 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
     setTokenError(null);
     await connect.mutateAsync(token);
     setToken("");
-    setEntering(false);
   };
 
   return (
@@ -635,7 +612,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
           <span className="block truncate text-xs text-muted-foreground">{status}</span>
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-2">
-          {own && !linked && (
+          {bot && !bot.linked && (
             <Button
               size="sm"
               className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
@@ -646,38 +623,16 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
               Check
             </Button>
           )}
-          {!own && !tg.code && !entering && (
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEntering(true)}>
-              Use my own bot
-            </Button>
-          )}
-          {linked && !own && (
-            <Button variant="outline" size="sm" disabled={busy} onClick={() => start.mutate(undefined)}>
-              {start.isPending && <Spinner />}
-              Link another
-            </Button>
-          )}
-          {!linked && !own && !tg.code && !entering && (
-            <Button
-              size="sm"
-              className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-              disabled={busy}
-              onClick={() => start.mutate(undefined)}
-            >
-              {start.isPending && <Spinner />}
-              Get a link code
-            </Button>
-          )}
-          {own && (
+          {bot && (
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
               {disconnect.isPending && <Spinner />}
-              {linked ? "Unlink" : "Cancel"}
+              {bot.linked ? "Unlink" : "Cancel"}
             </Button>
           )}
           {children}
         </span>
       </div>
-      {entering && !own && (
+      {!bot && (
         <form
           className="flex items-center gap-2 px-4 py-3.5"
           onSubmit={(e) => {
@@ -707,47 +662,21 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
             {connect.isPending && <Spinner />}
             Connect
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setEntering(false)}>
-            Cancel
-          </Button>
         </form>
       )}
-      {own && !linked && (
+      {bot && !bot.linked && (
         <div className="flex items-center justify-between gap-3 px-4 py-3.5 text-xs">
           <span className="text-muted-foreground">
             Send <code className="font-mono text-foreground">/start</code> to the bot, then press Check
           </span>
           <a
-            href={`https://t.me/${own.username}`}
+            href={`https://t.me/${bot.username}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex shrink-0 items-center gap-1.5 font-medium text-brand"
           >
-            <TelegramIcon className="size-4" /> Open @{own.username}
+            <TelegramIcon className="size-4" /> Open @{bot.username}
           </a>
-        </div>
-      )}
-      {tg.code && (
-        <div className="space-y-2.5 px-4 py-3.5">
-          <p className="text-xs text-muted-foreground">Send this to the bot, valid 10 minutes</p>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-[0.65rem] bg-black/35 px-3 py-2 font-mono text-sm select-all dark:bg-black/40">
-              {command}
-            </code>
-            <Button variant="outline" size="sm" onClick={copy}>
-              {copied ? <CheckIcon /> : <CopyIcon />} {copied ? "Copied" : "Copy"}
-            </Button>
-          </div>
-          {deepLink && (
-            <a
-              href={deepLink}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-brand"
-            >
-              <TelegramIcon className="size-4" /> Open in Telegram
-            </a>
-          )}
         </div>
       )}
       {(tokenError || error != null) && (

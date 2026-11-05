@@ -1,6 +1,5 @@
 import { TELEGRAM_NOT_LINKED } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
-import { redeemTelegramLinkCode } from "@vexis/db/queries";
 import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
@@ -59,9 +58,10 @@ export class Db extends Context.Service<
       pool: string,
       limit: number,
     ): Effect.Effect<ReadonlyArray<{ readonly minute: number; readonly volume: number | null }>, DbError>;
-    telegramChat(userId: string): Effect.Effect<Option.Option<bigint>, DbError>;
-    /** The user's own bot token, decrypted; None when alerts go through the shared bot. */
-    ownBotToken(userId: string): Effect.Effect<Option.Option<string>, DbError>;
+    /** Where the user's alerts go: their chat and their own bot's token (decrypted). None until both are linked. */
+    telegramTarget(
+      userId: string,
+    ): Effect.Effect<Option.Option<{ readonly chatId: bigint; readonly botToken: string }>, DbError>;
     pauseAgent(agentId: string, reason: string): Effect.Effect<void, DbError>;
     /**
      * In one transaction: reads `last_alert_at` under a row lock and, unless it is inside the
@@ -78,12 +78,6 @@ export class Db extends Context.Service<
     recordAlerts(alerts: ReadonlyArray<NewAlert>): Effect.Effect<ReadonlyArray<string>, DbError>;
     markDelivered(ids: ReadonlyArray<string>): Effect.Effect<void, DbError>;
     markFailed(ids: ReadonlyArray<string>, error: string): Effect.Effect<void, DbError>;
-    /** Binds a chat to the user who owns the code and unpauses their agents. None: bad or expired code. */
-    redeemLink(
-      code: string,
-      chatId: bigint,
-      username: string | undefined,
-    ): Effect.Effect<Option.Option<string>, DbError>;
   }
 >()("vexis/agents/Db") {
   static readonly layer = Layer.effect(
@@ -164,18 +158,15 @@ export class Db extends Context.Service<
               .limit(limit),
           ).pipe(Effect.map((rows) => rows.map((r) => ({ minute: r.minute.getTime(), volume: r.volume })).reverse())),
 
-        telegramChat: (userId) =>
-          run("telegramChat", () =>
-            db.select({ chatId: telegramLinks.chatId }).from(telegramLinks).where(eq(telegramLinks.userId, userId)),
-          ).pipe(Effect.map((rows) => Option.fromNullishOr(rows[0]?.chatId))),
-
-        ownBotToken: (userId) =>
-          run("ownBotToken", async () => {
+        telegramTarget: (userId) =>
+          run("telegramTarget", async () => {
             const [row] = await db
-              .select({ botToken: telegramLinks.botToken })
+              .select({ chatId: telegramLinks.chatId, botToken: telegramLinks.botToken })
               .from(telegramLinks)
               .where(eq(telegramLinks.userId, userId));
-            return row?.botToken ? decryptSecret(row.botToken) : undefined;
+            return row?.chatId != null && row.botToken
+              ? { chatId: row.chatId, botToken: decryptSecret(row.botToken) }
+              : undefined;
           }).pipe(Effect.map(Option.fromNullishOr)),
 
         pauseAgent: (agentId, reason) =>
@@ -235,20 +226,6 @@ export class Db extends Context.Service<
                   .set({ delivered: false, error })
                   .where(inArray(agentAlerts.id, [...ids])),
               ).pipe(Effect.asVoid),
-
-        redeemLink: (code, chatId, username) =>
-          run("redeemLink", async () => {
-            const userId = await redeemTelegramLinkCode(db, code, chatId, username);
-            if (userId) {
-              await db
-                .update(agents)
-                .set({ paused: false, pausedReason: null })
-                .where(
-                  and(eq(agents.userId, userId), eq(agents.paused, true), eq(agents.pausedReason, TELEGRAM_NOT_LINKED)),
-                );
-            }
-            return userId;
-          }).pipe(Effect.map(Option.fromNullishOr)),
       });
     }),
   );
