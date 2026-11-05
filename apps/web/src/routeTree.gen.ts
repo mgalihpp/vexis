@@ -15,6 +15,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TgRouteImport } from './routes/tg'
+import { Route as AgentsIndexRouteImport } from './routes/agents/index'
+import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
+import { Route as AgentsNewRouteImport } from './routes/agents/new'
 import { Route as BotsIndexRouteImport } from './routes/bots/index'
 import { Route as BotsBotIdRouteImport } from './routes/bots/$botId'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio/index'
@@ -56,6 +59,21 @@ const TermsRoute = TermsRouteImport.update({
 const TgRoute = TgRouteImport.update({
   id: '/tg',
   path: '/tg',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsIndexRoute = AgentsIndexRouteImport.update({
+  id: '/agents/',
+  path: '/agents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
+  id: '/agents/$agentId',
+  path: '/agents/$agentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsNewRoute = AgentsNewRouteImport.update({
+  id: '/agents/new',
+  path: '/agents/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BotsIndexRoute = BotsIndexRouteImport.update({
@@ -127,8 +145,11 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/tg': typeof TgRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/new': typeof AgentsNewRoute
   '/bots/$botId': typeof BotsBotIdRouteWithChildren
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
+  '/agents/': typeof AgentsIndexRoute
   '/bots/': typeof BotsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -147,6 +168,9 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/tg': typeof TgRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/new': typeof AgentsNewRoute
+  '/agents': typeof AgentsIndexRoute
   '/bots': typeof BotsIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -166,8 +190,11 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/tg': typeof TgRoute
+  '/agents/$agentId': typeof AgentsAgentIdRoute
+  '/agents/new': typeof AgentsNewRoute
   '/bots/$botId': typeof BotsBotIdRouteWithChildren
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
+  '/agents/': typeof AgentsIndexRoute
   '/bots/': typeof BotsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -188,8 +215,11 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/tg'
+    | '/agents/$agentId'
+    | '/agents/new'
     | '/bots/$botId'
     | '/portfolio/$wallet'
+    | '/agents/'
     | '/bots/'
     | '/portfolio/'
     | '/api/auth/$'
@@ -208,6 +238,9 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/tg'
+    | '/agents/$agentId'
+    | '/agents/new'
+    | '/agents'
     | '/bots'
     | '/portfolio'
     | '/api/auth/$'
@@ -226,8 +259,11 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/tg'
+    | '/agents/$agentId'
+    | '/agents/new'
     | '/bots/$botId'
     | '/portfolio/$wallet'
+    | '/agents/'
     | '/bots/'
     | '/portfolio/'
     | '/api/auth/$'
@@ -247,8 +283,11 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   TgRoute: typeof TgRoute
+  AgentsAgentIdRoute: typeof AgentsAgentIdRoute
+  AgentsNewRoute: typeof AgentsNewRoute
   BotsBotIdRoute: typeof BotsBotIdRouteWithChildren
   PortfolioWalletRoute: typeof PortfolioWalletRouteWithChildren
+  AgentsIndexRoute: typeof AgentsIndexRoute
   BotsIndexRoute: typeof BotsIndexRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -296,6 +335,27 @@ declare module '@tanstack/react-router' {
       path: '/tg'
       fullPath: '/tg'
       preLoaderRoute: typeof TgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/': {
+      id: '/agents/'
+      path: '/agents'
+      fullPath: '/agents/'
+      preLoaderRoute: typeof AgentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/$agentId': {
+      id: '/agents/$agentId'
+      path: '/agents/$agentId'
+      fullPath: '/agents/$agentId'
+      preLoaderRoute: typeof AgentsAgentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents/new': {
+      id: '/agents/new'
+      path: '/agents/new'
+      fullPath: '/agents/new'
+      preLoaderRoute: typeof AgentsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bots/': {
@@ -426,8 +486,11 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   TgRoute: TgRoute,
+  AgentsAgentIdRoute: AgentsAgentIdRoute,
+  AgentsNewRoute: AgentsNewRoute,
   BotsBotIdRoute: BotsBotIdRouteWithChildren,
   PortfolioWalletRoute: PortfolioWalletRouteWithChildren,
+  AgentsIndexRoute: AgentsIndexRoute,
   BotsIndexRoute: BotsIndexRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
