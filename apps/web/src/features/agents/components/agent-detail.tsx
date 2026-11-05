@@ -1,6 +1,16 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  PauseIcon,
+  PlayIcon,
+  PowerIcon,
+  SendIcon,
+  SlidersHorizontalIcon,
+  XIcon,
+} from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -364,44 +374,116 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
   const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { enabled } }));
   const result = parseConfigFields(fields, agent.config);
   const dirty = JSON.stringify(fields) !== JSON.stringify(configFields(agent.config));
+  const [section, setSection] = useState<SettingsSectionId>("rule");
+  const current = SETTINGS_SECTIONS.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];
+
   return (
-    <>
-      <Card title="Rule">
-        <ConfigForm
-          fields={fields}
-          errors={result.ok ? {} : result.errors}
-          onChange={(key, value) => setFields((f) => ({ ...f, [key]: value }))}
-        />
-        <div className="flex items-center justify-end gap-3">
-          <Button
-            size="sm"
-            disabled={!result.ok || !dirty || save.isPending}
-            onClick={() =>
-              result.ok && save.mutate({ data: result.config }, { onSuccess: () => onSaved("Rule saved") })
-            }
-            className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-          >
-            {save.isPending && <Spinner />}
-            {save.isPending ? "Saving" : "Save rule"}
-          </Button>
-        </div>
-        <FormError error={save.error} />
-      </Card>
-      <Card title="Agent">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <label htmlFor="agent-enabled" className="flex items-center gap-2 font-medium">
-            Turned on
-            {power.isPending && <Spinner className="size-3.5 text-muted-foreground" />}
-          </label>
-          <Switch
-            id="agent-enabled"
-            checked={agent.enabled}
-            disabled={power.isPending}
-            onCheckedChange={(on) => power.mutate(on)}
-          />
-        </div>
-        <FormError error={power.error} />
-      </Card>
-    </>
+    <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6">
+      <nav aria-label="Settings" className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:px-0">
+        {SETTINGS_SECTIONS.map((s) => {
+          const on = s.id === section;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              aria-current={on ? "page" : undefined}
+              onClick={() => setSection(s.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-medium transition-colors ${
+                on ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              }`}
+            >
+              <s.icon className={`size-3.5 ${on ? "text-brand" : ""}`} />
+              {s.label}
+              {s.id === "rule" && dirty && <span className="ml-auto size-1.5 rounded-full bg-brand" aria-hidden />}
+            </button>
+          );
+        })}
+      </nav>
+
+      <section className="min-w-0 rounded-xl border bg-card">
+        <header className="border-b px-4 py-4 sm:px-5">
+          <h2 className="text-sm font-semibold">{current.label}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{current.description}</p>
+        </header>
+
+        {section === "rule" && (
+          <>
+            <div className="p-4 sm:p-5">
+              <ConfigForm
+                fields={fields}
+                errors={result.ok ? {} : result.errors}
+                onChange={(key, value) => setFields((f) => ({ ...f, [key]: value }))}
+              />
+            </div>
+            <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
+              <span className="mr-auto text-xs text-muted-foreground">
+                {dirty ? "You have unsaved changes" : "Saved"}
+              </span>
+              <FormError error={save.error} />
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!dirty || save.isPending}
+                onClick={() => setFields(configFields(agent.config))}
+              >
+                Reset
+              </Button>
+              <Button
+                size="sm"
+                disabled={!result.ok || !dirty || save.isPending}
+                onClick={() =>
+                  result.ok && save.mutate({ data: result.config }, { onSuccess: () => onSaved("Rule saved") })
+                }
+                className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+              >
+                {save.isPending && <Spinner />}
+                {save.isPending ? "Saving" : "Save rule"}
+              </Button>
+            </footer>
+          </>
+        )}
+
+        {section === "telegram" && (
+          <div className="p-4 sm:p-5">
+            <TelegramPanel />
+          </div>
+        )}
+
+        {section === "agent" && (
+          <div className="space-y-3 p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-6">
+              <div className="min-w-0">
+                <label htmlFor="agent-enabled" className="flex items-center gap-2 text-sm font-medium">
+                  Turned on
+                  {power.isPending && <Spinner className="size-3.5 text-muted-foreground" />}
+                </label>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                  When off, the runner skips this agent: nothing is judged and no alerts are sent.
+                </p>
+              </div>
+              <Switch
+                id="agent-enabled"
+                checked={agent.enabled}
+                disabled={power.isPending}
+                onCheckedChange={(on) => power.mutate(on)}
+              />
+            </div>
+            <FormError error={power.error} />
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
+
+const SETTINGS_SECTIONS = [
+  {
+    id: "rule",
+    label: "Spike rule",
+    icon: SlidersHorizontalIcon,
+    description: "When a pool's volume counts as a spike worth an alert.",
+  },
+  { id: "telegram", label: "Telegram", icon: SendIcon, description: "Where alerts are sent." },
+  { id: "agent", label: "Agent", icon: PowerIcon, description: "Turn the agent on or off." },
+] as const;
+type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];
