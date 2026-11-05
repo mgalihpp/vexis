@@ -1,11 +1,10 @@
-import { useIsMutating, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { Notice } from "@/features/portfolio/components/notice";
 import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
@@ -82,7 +81,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   const status = agentStatus(agent);
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
   const hint = STATUS_HINT[status];
-  const saving = useIsMutating() > 0;
+  const [notice, setNotice] = useState<string | null>(null);
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-4 md:px-6">
       <nav className="flex items-center justify-between gap-2 text-xs">
@@ -114,9 +113,17 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
       {hint && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{hint}</p>}
       <FormError error={toggle.error} />
 
-      {saving && (
-        <div className="mt-4">
-          <Notice>Saving changes…</Notice>
+      {notice && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
+          <span>{notice}</span>
+          <button
+            type="button"
+            aria-label="Dismiss"
+            onClick={() => setNotice(null)}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XIcon className="size-3.5" />
+          </button>
         </div>
       )}
 
@@ -145,7 +152,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
         {tab === "overview" && <Overview agent={agent} now={now} />}
         {tab === "pools" && <PoolsTab agent={agent} />}
         {tab === "alerts" && <AlertsTab />}
-        {tab === "settings" && <SettingsTab agent={agent} />}
+        {tab === "settings" && <SettingsTab agent={agent} onSaved={setNotice} />}
       </div>
     </div>
   );
@@ -332,7 +339,7 @@ function AlertsTab() {
   );
 }
 
-function SettingsTab({ agent }: { agent: AgentView }) {
+function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: string) => void }) {
   const [fields, setFields] = useState<ConfigFields>(() => configFields(agent.config));
   const save = useAgentMutation(saveAgentConfig);
   const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { enabled } }));
@@ -349,7 +356,9 @@ function SettingsTab({ agent }: { agent: AgentView }) {
         <div className="flex items-center justify-end gap-3">
           <Button
             disabled={!result.ok || !dirty || save.isPending}
-            onClick={() => result.ok && save.mutate({ data: result.config })}
+            onClick={() =>
+              result.ok && save.mutate({ data: result.config }, { onSuccess: () => onSaved("Rule saved") })
+            }
             className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
           >
             {save.isPending && <Spinner />}
