@@ -40,6 +40,8 @@ const sol = (v: number | null) => {
   const r = Math.round(v * 1000) / 1000;
   return `${r < 0 ? "-" : r > 0 ? "+" : ""}${Math.abs(r).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
 };
+const solAmount = (v: number | null) =>
+  v == null ? NA : `${(Math.round(v * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
 const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -47,6 +49,8 @@ interface Totals {
   positions: number;
   inRange: number;
   known: number;
+  liquidityUsd: number | null;
+  liquiditySol: number | null;
   feesUsd: number | null;
   pnlUsd: number | null;
   pnlSol: number | null;
@@ -58,6 +62,8 @@ function totals(positions: readonly TrackedPosition[]): Totals {
     positions: positions.length,
     inRange: known.filter((p) => p.inRange).length,
     known: known.length,
+    liquidityUsd: sumKnown(positions.map((p) => p.liquidityUsd)),
+    liquiditySol: sumKnown(positions.map((p) => p.liquiditySol)),
     feesUsd: sumKnown(positions.map((p) => p.feesUsd)),
     pnlUsd: sumKnown(positions.map((p) => p.pnlUsd)),
     pnlSol: sumKnown(positions.map((p) => p.pnlSol)),
@@ -147,6 +153,7 @@ function PoolTotals({ data }: { data: Extract<TrackedResult, { ok: true }> }) {
       </Tile>
       <Tile label="Fees">
         <Big>{usd(t.feesUsd)}</Big>
+        <span className="text-muted-foreground tabular-nums">{solAmount(t.feesSol)}</span>
         {note}
       </Tile>
       <Tile label="Unrealized PnL">
@@ -170,7 +177,7 @@ function Cell({ label, className = "", children }: { label: string; className?: 
 
 // One grid for the header and every row, so the columns line up at the wide layout.
 const ROW_GRID =
-  "grid grid-cols-2 gap-x-3 gap-y-2 @md:grid-cols-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] @2xl:items-center @2xl:gap-y-0";
+  "grid grid-cols-2 gap-x-3 gap-y-2 @md:grid-cols-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] @2xl:items-center @2xl:gap-y-0";
 
 function PositionHeader() {
   return (
@@ -180,6 +187,7 @@ function PositionHeader() {
       <span>Position</span>
       <span>Range</span>
       <span>Deposits</span>
+      <span className="text-right">Liquidity</span>
       <span className="text-right">Fees</span>
       <span className="text-right">PnL</span>
       <span className="text-right">Created</span>
@@ -289,8 +297,13 @@ function PositionRow({
         <TokenAmount value={p.depositX} token={base} />
         <TokenAmount value={p.depositY} token={quote} />
       </Cell>
+      <Cell label="Liquidity" className="@2xl:items-end">
+        <span className="font-semibold">{usd(p.liquidityUsd)}</span>
+        <span className="text-muted-foreground">{solAmount(p.liquiditySol)}</span>
+      </Cell>
       <Cell label="Fees" className="@2xl:items-end">
         <span className="font-semibold">{usd(p.feesUsd)}</span>
+        <span className="text-muted-foreground">{solAmount(p.feesSol)}</span>
       </Cell>
       <Cell label="PnL" className="@2xl:items-end">
         <span className={`font-semibold ${tone(p.pnlUsd)}`}>{usd(p.pnlUsd, true)}</span>
@@ -306,6 +319,29 @@ function PositionRow({
         )}
       </Cell>
     </li>
+  );
+}
+
+/** A labeled USD-over-SOL column on the wallet card, fixed width so the columns line up from card to card. */
+function SummaryStat({
+  label,
+  usd,
+  sol,
+  usdClassName = "",
+  solClassName = "text-muted-foreground",
+}: {
+  label: string;
+  usd: string;
+  sol: string;
+  usdClassName?: string;
+  solClassName?: string;
+}) {
+  return (
+    <span className="flex w-20 shrink-0 flex-col items-end gap-0.5 tabular-nums @md:w-24">
+      <span className="text-[0.6875rem] text-muted-foreground">{label}</span>
+      <span className={`text-sm leading-tight font-bold ${usdClassName}`}>{usd}</span>
+      <span className={`whitespace-nowrap ${solClassName}`}>{sol}</span>
+    </span>
   );
 }
 
@@ -346,10 +382,14 @@ function WalletCard({
             <RangePill inRange={t.inRange} known={t.known} total={t.positions} />
           </span>
         </span>
-        <span className="flex flex-col items-end gap-0.5 tabular-nums">
-          <span className={`text-sm font-bold ${tone(t.pnlUsd)}`}>{usd(t.pnlUsd, true)}</span>
-          <span className={tone(sol3(t.pnlSol))}>{sol(t.pnlSol)}</span>
-        </span>
+        <SummaryStat label="Liquidity" usd={usd(t.liquidityUsd)} sol={solAmount(t.liquiditySol)} />
+        <SummaryStat
+          label="PnL"
+          usd={usd(t.pnlUsd, true)}
+          sol={sol(t.pnlSol)}
+          usdClassName={tone(t.pnlUsd)}
+          solClassName={tone(sol3(t.pnlSol))}
+        />
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>
       <div className="mb-2.5 rounded-lg bg-muted/50 px-3 pt-2 pb-0.5">

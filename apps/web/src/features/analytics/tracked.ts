@@ -15,7 +15,11 @@ export interface TrackedPosition {
   /** All-time deposits in token units. */
   depositX: number | null;
   depositY: number | null;
+  /** Current value of the position's tokens, unclaimed fees excluded. */
+  liquidityUsd: number | null;
+  liquiditySol: number | null;
   feesUsd: number | null;
+  feesSol: number | null;
   pnlUsd: number | null;
   pnlSol: number | null;
 }
@@ -30,6 +34,7 @@ export interface TrackedWallet {
 /** Fees and PnL summed over the wallets whose Meteora detail has loaded so far. */
 export interface PoolTotals {
   feesUsd: number | null;
+  feesSol: number | null;
   pnlUsd: number | null;
   pnlSol: number | null;
   /** Wallets fetched so far, failed ones included. */
