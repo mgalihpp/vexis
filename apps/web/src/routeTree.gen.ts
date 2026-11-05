@@ -14,17 +14,12 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
-import { Route as TgRouteImport } from './routes/tg'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
 import { Route as AgentsNewRouteImport } from './routes/agents/new'
-import { Route as BotsIndexRouteImport } from './routes/bots/index'
-import { Route as BotsBotIdRouteImport } from './routes/bots/$botId'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio/index'
 import { Route as PortfolioWalletRouteImport } from './routes/portfolio/$wallet'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
-import { Route as BotsBotIdIndexRouteImport } from './routes/bots/$botId/index'
-import { Route as BotsBotIdJournalRouteImport } from './routes/bots/$botId/journal'
 import { Route as PortfolioWalletIndexRouteImport } from './routes/portfolio/$wallet/index'
 import { Route as PortfolioWalletActiveRouteImport } from './routes/portfolio/$wallet/active'
 import { Route as PortfolioWalletBalancesRouteImport } from './routes/portfolio/$wallet/balances'
@@ -56,11 +51,6 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TgRoute = TgRouteImport.update({
-  id: '/tg',
-  path: '/tg',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AgentsIndexRoute = AgentsIndexRouteImport.update({
   id: '/agents/',
   path: '/agents/',
@@ -74,16 +64,6 @@ const AgentsAgentIdRoute = AgentsAgentIdRouteImport.update({
 const AgentsNewRoute = AgentsNewRouteImport.update({
   id: '/agents/new',
   path: '/agents/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BotsIndexRoute = BotsIndexRouteImport.update({
-  id: '/bots/',
-  path: '/bots/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BotsBotIdRoute = BotsBotIdRouteImport.update({
-  id: '/bots/$botId',
-  path: '/bots/$botId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortfolioIndexRoute = PortfolioIndexRouteImport.update({
@@ -100,16 +80,6 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
-} as any)
-const BotsBotIdIndexRoute = BotsBotIdIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => BotsBotIdRoute,
-} as any)
-const BotsBotIdJournalRoute = BotsBotIdJournalRouteImport.update({
-  id: '/journal',
-  path: '/journal',
-  getParentRoute: () => BotsBotIdRoute,
 } as any)
 const PortfolioWalletIndexRoute = PortfolioWalletIndexRouteImport.update({
   id: '/',
@@ -144,21 +114,16 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/tg': typeof TgRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
-  '/bots/$botId': typeof BotsBotIdRouteWithChildren
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
-  '/bots/': typeof BotsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
   '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
-  '/bots/$botId/': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet/': typeof PortfolioWalletIndexRoute
 }
 export interface FileRoutesByTo {
@@ -167,19 +132,15 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/tg': typeof TgRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
   '/agents': typeof AgentsIndexRoute
-  '/bots': typeof BotsIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
   '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
-  '/bots/$botId': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet': typeof PortfolioWalletIndexRoute
 }
 export interface FileRoutesById {
@@ -189,21 +150,16 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/tg': typeof TgRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
-  '/bots/$botId': typeof BotsBotIdRouteWithChildren
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
   '/agents/': typeof AgentsIndexRoute
-  '/bots/': typeof BotsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
-  '/bots/$botId/journal': typeof BotsBotIdJournalRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
   '/portfolio/$wallet/transactions': typeof PortfolioWalletTransactionsRoute
-  '/bots/$botId/': typeof BotsBotIdIndexRoute
   '/portfolio/$wallet/': typeof PortfolioWalletIndexRoute
 }
 export interface FileRouteTypes {
@@ -214,21 +170,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/terms'
-    | '/tg'
     | '/agents/$agentId'
     | '/agents/new'
-    | '/bots/$botId'
     | '/portfolio/$wallet'
     | '/agents/'
-    | '/bots/'
     | '/portfolio/'
     | '/api/auth/$'
-    | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
     | '/portfolio/$wallet/transactions'
-    | '/bots/$botId/'
     | '/portfolio/$wallet/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -237,19 +188,15 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/terms'
-    | '/tg'
     | '/agents/$agentId'
     | '/agents/new'
     | '/agents'
-    | '/bots'
     | '/portfolio'
     | '/api/auth/$'
-    | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
     | '/portfolio/$wallet/transactions'
-    | '/bots/$botId'
     | '/portfolio/$wallet'
   id:
     | '__root__'
@@ -258,21 +205,16 @@ export interface FileRouteTypes {
     | '/login'
     | '/privacy'
     | '/terms'
-    | '/tg'
     | '/agents/$agentId'
     | '/agents/new'
-    | '/bots/$botId'
     | '/portfolio/$wallet'
     | '/agents/'
-    | '/bots/'
     | '/portfolio/'
     | '/api/auth/$'
-    | '/bots/$botId/journal'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
     | '/portfolio/$wallet/transactions'
-    | '/bots/$botId/'
     | '/portfolio/$wallet/'
   fileRoutesById: FileRoutesById
 }
@@ -282,13 +224,10 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
-  TgRoute: typeof TgRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRoute
   AgentsNewRoute: typeof AgentsNewRoute
-  BotsBotIdRoute: typeof BotsBotIdRouteWithChildren
   PortfolioWalletRoute: typeof PortfolioWalletRouteWithChildren
   AgentsIndexRoute: typeof AgentsIndexRoute
-  BotsIndexRoute: typeof BotsIndexRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -330,13 +269,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/tg': {
-      id: '/tg'
-      path: '/tg'
-      fullPath: '/tg'
-      preLoaderRoute: typeof TgRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/agents/': {
       id: '/agents/'
       path: '/agents'
@@ -356,20 +288,6 @@ declare module '@tanstack/react-router' {
       path: '/agents/new'
       fullPath: '/agents/new'
       preLoaderRoute: typeof AgentsNewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bots/': {
-      id: '/bots/'
-      path: '/bots'
-      fullPath: '/bots/'
-      preLoaderRoute: typeof BotsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/bots/$botId': {
-      id: '/bots/$botId'
-      path: '/bots/$botId'
-      fullPath: '/bots/$botId'
-      preLoaderRoute: typeof BotsBotIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portfolio/': {
@@ -392,20 +310,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/bots/$botId/': {
-      id: '/bots/$botId/'
-      path: '/'
-      fullPath: '/bots/$botId/'
-      preLoaderRoute: typeof BotsBotIdIndexRouteImport
-      parentRoute: typeof BotsBotIdRoute
-    }
-    '/bots/$botId/journal': {
-      id: '/bots/$botId/journal'
-      path: '/journal'
-      fullPath: '/bots/$botId/journal'
-      preLoaderRoute: typeof BotsBotIdJournalRouteImport
-      parentRoute: typeof BotsBotIdRoute
     }
     '/portfolio/$wallet/': {
       id: '/portfolio/$wallet/'
@@ -445,20 +349,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface BotsBotIdRouteChildren {
-  BotsBotIdJournalRoute: typeof BotsBotIdJournalRoute
-  BotsBotIdIndexRoute: typeof BotsBotIdIndexRoute
-}
-
-const BotsBotIdRouteChildren: BotsBotIdRouteChildren = {
-  BotsBotIdJournalRoute: BotsBotIdJournalRoute,
-  BotsBotIdIndexRoute: BotsBotIdIndexRoute,
-}
-
-const BotsBotIdRouteWithChildren = BotsBotIdRoute._addFileChildren(
-  BotsBotIdRouteChildren,
-)
-
 interface PortfolioWalletRouteChildren {
   PortfolioWalletActiveRoute: typeof PortfolioWalletActiveRoute
   PortfolioWalletBalancesRoute: typeof PortfolioWalletBalancesRoute
@@ -485,13 +375,10 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
-  TgRoute: TgRoute,
   AgentsAgentIdRoute: AgentsAgentIdRoute,
   AgentsNewRoute: AgentsNewRoute,
-  BotsBotIdRoute: BotsBotIdRouteWithChildren,
   PortfolioWalletRoute: PortfolioWalletRouteWithChildren,
   AgentsIndexRoute: AgentsIndexRoute,
-  BotsIndexRoute: BotsIndexRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
