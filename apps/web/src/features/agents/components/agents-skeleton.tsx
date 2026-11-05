@@ -1,18 +1,26 @@
+function Bar() {
+  return (
+    <div className="flex items-center justify-between gap-2.5 border-b px-2 py-1.5">
+      <div className="h-7 w-28 animate-pulse rounded-md bg-card" />
+      <div className="h-7 w-24 animate-pulse rounded-md bg-card" />
+    </div>
+  );
+}
+
 /** Shown while the agents list loads, in the fleet page's layout. */
 export function FleetSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-4 md:px-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="h-[1.375rem] w-28 animate-pulse rounded-md bg-card" />
-        <div className="h-8 w-28 animate-pulse rounded-md bg-card" />
+    <div>
+      <Bar />
+      <div className="space-y-2 p-2">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-[6rem] animate-pulse rounded-lg bg-card" />
+          ))}
+        </div>
+        <div className="h-40 animate-pulse rounded-lg bg-card" />
+        <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
       </div>
-      <div className="h-[4.75rem] animate-pulse rounded-xl bg-card" />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="h-[11.5rem] animate-pulse rounded-xl bg-card" />
-        ))}
-      </div>
-      <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
     </div>
   );
 }
@@ -20,14 +28,21 @@ export function FleetSkeleton() {
 /** Shown while an agent's page (detail or wizard) loads. */
 export function AgentPageSkeleton() {
   return (
-    <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 py-4 md:px-6">
-      <div className="flex items-center gap-3">
-        <div className="size-9 animate-pulse rounded-full bg-card" />
-        <div className="h-[1.375rem] w-40 animate-pulse rounded-md bg-card" />
+    <div>
+      <Bar />
+      <div className="h-9 border-b" />
+      <div className="space-y-2 p-2">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-[6rem] animate-pulse rounded-lg bg-card" />
+          ))}
+        </div>
+        <div className="grid gap-2 xl:grid-cols-[1fr_2fr]">
+          <div className="h-[22rem] animate-pulse rounded-lg bg-card" />
+          <div className="h-[22rem] animate-pulse rounded-lg bg-card" />
+        </div>
+        <p className="text-center text-xs text-muted-foreground">Loading agent…</p>
       </div>
-      <div className="h-9 w-80 max-w-full animate-pulse rounded-md bg-card" />
-      <div className="h-[22rem] animate-pulse rounded-xl bg-card" />
-      <p className="text-center text-xs text-muted-foreground">Loading agent…</p>
     </div>
   );
 }
