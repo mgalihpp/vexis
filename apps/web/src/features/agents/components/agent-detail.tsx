@@ -355,6 +355,7 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
         />
         <div className="flex items-center justify-end gap-3">
           <Button
+            size="sm"
             disabled={!result.ok || !dirty || save.isPending}
             onClick={() =>
               result.ok && save.mutate({ data: result.config }, { onSuccess: () => onSaved("Rule saved") })

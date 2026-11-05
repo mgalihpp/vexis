@@ -611,13 +611,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
           </span>
         </span>
         {linked ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            disabled={start.isPending}
-            onClick={() => start.mutate(undefined)}
-          >
+          <Button variant="outline" size="sm" disabled={start.isPending} onClick={() => start.mutate(undefined)}>
             {start.isPending && <Spinner />}
             Link another
           </Button>
@@ -625,7 +619,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
           !tg.code && (
             <Button
               size="sm"
-              className="rounded-full bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+              className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
               disabled={start.isPending}
               onClick={() => start.mutate(undefined)}
             >
@@ -643,7 +637,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
             <code className="min-w-0 flex-1 truncate rounded-[0.65rem] bg-black/35 px-3 py-2 font-mono text-sm select-all dark:bg-black/40">
               {command}
             </code>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={copy}>
+            <Button variant="outline" size="sm" onClick={copy}>
               {copied ? <CheckIcon /> : <CopyIcon />} {copied ? "Copied" : "Copy"}
             </Button>
           </div>

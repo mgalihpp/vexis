@@ -74,10 +74,7 @@ export function AgentWizard({ step }: { step: WizardStep }) {
         <Stepper step={step} index={index} onGo={go} />
 
         <section className="flex flex-col">
-          <p className="font-mono text-[0.65rem] font-medium tracking-[0.08em] text-brand uppercase">
-            Step {index + 1} of {WIZARD_STEPS.length}
-          </p>
-          <h2 className="mt-1.5 mb-4 text-base font-semibold tracking-tight">{STEP_META[step].heading}</h2>
+          <h2 className="mb-4 text-base font-semibold tracking-tight">{STEP_META[step].heading}</h2>
 
           <div className="space-y-4">
             {step === "agent" && <AgentStep added={added} />}
@@ -95,7 +92,7 @@ export function AgentWizard({ step }: { step: WizardStep }) {
 
           <footer className="mt-auto flex items-center justify-between pt-6">
             {index > 0 ? (
-              <Button variant="ghost" className="h-10 rounded-full px-4 text-sm" onClick={back}>
+              <Button variant="ghost" size="sm" onClick={back}>
                 <ArrowLeftIcon /> Back
               </Button>
             ) : (
@@ -103,18 +100,20 @@ export function AgentWizard({ step }: { step: WizardStep }) {
             )}
             {step === "review" ? (
               <Button
+                size="sm"
                 disabled={!canAdvance || create.isPending}
                 onClick={launch}
-                className="h-10 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground hover:bg-brand/90"
+                className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
               >
                 {create.isPending && <Spinner />}
                 {create.isPending ? "Creating" : STEP_META.review.next}
               </Button>
             ) : (
               <Button
+                size="sm"
                 disabled={!canAdvance}
                 onClick={() => go(WIZARD_STEPS[index + 1] ?? "review")}
-                className="h-10 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground hover:bg-brand/90"
+                className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
               >
                 {STEP_META[step].next} <ArrowRightIcon />
               </Button>

@@ -87,7 +87,7 @@ export function EmptyAgents() {
       <section className="flex min-h-[24rem] flex-col items-center justify-center gap-4 rounded-xl border border-dashed text-center">
         <AgentIllustration />
         <h2 className="text-[1.0625rem] font-semibold tracking-tight">No agents running yet</h2>
-        <Button asChild className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90">
+        <Button asChild size="sm" className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90">
           <Link to="/agents/new" search={{ step: "agent" }}>
             <PlusIcon /> Create your first agent
           </Link>
