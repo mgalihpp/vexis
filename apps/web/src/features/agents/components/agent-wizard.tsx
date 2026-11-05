@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ChevronRightIcon, ZapIcon } from "lucide-react";
 import { useState } from "react";
@@ -31,6 +31,10 @@ export function AgentWizard({ step }: { step: WizardStep }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Draft>(defaultDraft);
   const create = useAgentMutation(createVolumeAgent);
+  const { data: fleet } = useSuspenseQuery(agentsQuery);
+  // One agent per kind for now, so a kind the user already has cannot be added again.
+  const added = new Set<string>(fleet.agents.map((a) => a.kind));
+  const available = AGENT_TYPES.filter((t) => !added.has(t.kind));
 
   const go = (to: WizardStep) => navigate({ to: "/agents/new", search: { step: to } });
   const index = WIZARD_STEPS.indexOf(step);
@@ -46,8 +50,13 @@ export function AgentWizard({ step }: { step: WizardStep }) {
   };
 
   const canAdvance =
-    step === "agent" ||
-    (step === "pools" ? draft.pools.length > 0 : step === "rules" ? parsed.ok : issues.length === 0);
+    step === "agent"
+      ? available.length > 0
+      : step === "pools"
+        ? draft.pools.length > 0
+        : step === "rules"
+          ? parsed.ok
+          : issues.length === 0;
   const back = () => go(WIZARD_STEPS[Math.max(index - 1, 0)] ?? "agent");
 
   return (
@@ -71,7 +80,7 @@ export function AgentWizard({ step }: { step: WizardStep }) {
           <h2 className="mt-1.5 mb-4 text-base font-semibold tracking-tight">{STEP_META[step].heading}</h2>
 
           <div className="space-y-4">
-            {step === "agent" && <AgentStep />}
+            {step === "agent" && <AgentStep added={added} />}
             {step === "pools" && <PoolsStep draft={draft} setDraft={setDraft} />}
             {step === "rules" && (
               <ConfigForm
@@ -167,12 +176,16 @@ function Stepper({ step, index, onGo }: { step: WizardStep; index: number; onGo:
   );
 }
 
-function AgentStep() {
+function AgentStep({ added }: { added: Set<string> }) {
   return (
     <ul className="space-y-2">
       {AGENT_TYPES.map((t) => (
         <li key={t.kind}>
-          <div className="flex items-center gap-3 rounded-lg border border-brand/50 bg-brand/5 px-3 py-3">
+          <div
+            className={`flex items-center gap-3 rounded-lg border px-3 py-3 ${
+              added.has(t.kind) ? "opacity-60" : "border-brand/50 bg-brand/5"
+            }`}
+          >
             <span className="flex size-8 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
               <ZapIcon className="size-4" />
             </span>
@@ -180,9 +193,13 @@ function AgentStep() {
               <span className="block text-sm font-medium">{t.name}</span>
               <span className="block text-xs text-muted-foreground">{t.sub}</span>
             </span>
-            <span className="flex size-5 items-center justify-center rounded-full bg-brand text-brand-foreground">
-              <CheckIcon className="size-3" />
-            </span>
+            {added.has(t.kind) ? (
+              <span className="text-xs text-muted-foreground">Added</span>
+            ) : (
+              <span className="flex size-5 items-center justify-center rounded-full bg-brand text-brand-foreground">
+                <CheckIcon className="size-3" />
+              </span>
+            )}
           </div>
         </li>
       ))}
