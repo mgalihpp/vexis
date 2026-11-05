@@ -111,15 +111,21 @@ function PoolRow({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      disabled={locked}
-      aria-pressed={picked}
-      onClick={onClick}
-      className={`group ${ROW} py-3 text-left text-xs transition-colors disabled:opacity-40 ${
-        picked ? "bg-brand/[0.07] shadow-[inset_2px_0_0_var(--brand)]" : "hover:bg-muted/50"
-      }`}
+    // The badges hold their own popover buttons, and a button cannot contain a button, so the toggle is an
+    // overlay button and the badge buttons are lifted above it.
+    <div
+      className={`group relative ${ROW} py-3 text-left text-xs transition-colors [&_button:not([aria-pressed])]:relative [&_button:not([aria-pressed])]:z-10 ${
+        locked ? "opacity-40" : ""
+      } ${picked ? "bg-brand/[0.07] shadow-[inset_2px_0_0_var(--brand)]" : "hover:bg-muted/50"}`}
     >
+      <button
+        type="button"
+        disabled={locked}
+        aria-pressed={picked}
+        aria-label={`${picked ? "Remove" : "Add"} ${hit.name}`}
+        onClick={onClick}
+        className="absolute inset-0"
+      />
       <PoolCell hit={hit} />
       <span className="hidden text-right tabular-nums md:block">{compactUsd(hit.tvl)}</span>
       <span className="text-right">
@@ -154,7 +160,7 @@ function PoolRow({
           <CheckIcon className="size-3" />
         )}
       </span>
-    </button>
+    </div>
   );
 }
 
