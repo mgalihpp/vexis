@@ -80,7 +80,7 @@ describe("wizard draft", () => {
 describe("fleet", () => {
   test("summarizes watching, attention, pools and alerts", () => {
     const s = summarizeFleet([
-      agent({ pools: [{ id: "1", address: "A", label: null, lastAlertAt: null }], alerts24h: 3 }),
+      agent({ pools: [{ id: "1", address: "A", label: null, lastAlertAt: null, tokens: null }], alerts24h: 3 }),
       agent({ id: "a2", paused: true, pausedReason: TELEGRAM_NOT_LINKED, alerts24h: 1 }),
     ]);
     expect(s).toEqual({ total: 2, live: 1, attention: 1, pools: 1, alerts24h: 4 });

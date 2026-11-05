@@ -12,6 +12,7 @@ import {
   removeAgentPool,
   updateAgent,
 } from "@vexis/db/queries";
+import { poolTokens } from "@/features/analytics/analytics.server";
 import { type AgentsData, type AgentView, type AlertsData, MAX_POOLS, type TelegramView } from "./agents";
 
 // Every function takes the signed-in user's id from the viewer middleware and goes through `forUser`, so no
@@ -30,6 +31,7 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
   if (!row) return { agents: [], now };
 
   const [pools, alerts] = await Promise.all([listAgentPools(s, row.id), listAlerts(s, { limit: 500 })]);
+  const tokens = await Promise.all(pools.map((p) => poolTokens(p.poolAddress)));
   const parsed = ConfigSchema.safeParse(row.config);
   const mine = alerts.filter((a) => a.agentId === row.id);
   const agent: AgentView = {
@@ -39,12 +41,16 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
     paused: row.paused,
     pausedReason: row.pausedReason,
     config: parsed.success ? parsed.data : defaultAgentConfig(KIND),
-    pools: pools.map((p) => ({
-      id: p.id,
-      address: p.poolAddress,
-      label: p.label,
-      lastAlertAt: p.lastAlertAt?.getTime() ?? null,
-    })),
+    pools: pools.map((p, i) => {
+      const t = tokens[i];
+      return {
+        id: p.id,
+        address: p.poolAddress,
+        label: p.label,
+        lastAlertAt: p.lastAlertAt?.getTime() ?? null,
+        tokens: t ? [t.x, t.y] : null,
+      };
+    }),
     alerts24h: mine.filter((a) => now - a.at.getTime() < DAY_MS).length,
     lastAlertAt: mine[0]?.at.getTime() ?? null,
   };

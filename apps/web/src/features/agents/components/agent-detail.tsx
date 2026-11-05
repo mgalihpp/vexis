@@ -1,6 +1,6 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
+import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -12,7 +12,6 @@ import {
   type ConfigFields,
   compactUsd,
   configFields,
-  describeRule,
   formatMinutes,
   parseConfigFields,
   ratioText,
@@ -45,7 +44,6 @@ function NotFound() {
   return (
     <div className="mx-auto max-w-sm px-4 py-20 text-center">
       <h1 className="text-lg font-semibold">Agent not found</h1>
-      <p className="mt-1.5 text-xs text-muted-foreground">It may belong to another account or no longer exist.</p>
       <Button asChild variant="outline" className="mt-4">
         <Link to="/agents">Back to agents</Link>
       </Button>
@@ -53,12 +51,28 @@ function NotFound() {
   );
 }
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="space-y-3 rounded-lg border bg-card p-4">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {children}
+    <section className="rounded-xl border bg-card">
+      <header className="flex items-center justify-between gap-3 px-4 py-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {action}
+      </header>
+      <div className="space-y-3 border-t p-4">{children}</div>
     </section>
+  );
+}
+
+function Rows({ rows }: { rows: [string, ReactNode][] }) {
+  return (
+    <dl className="-my-1 divide-y text-xs">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-baseline justify-between gap-4 py-2">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="text-right font-medium tabular-nums">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -68,13 +82,13 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   const hint = STATUS_HINT[status];
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-4 md:px-6">
-      <nav className="flex items-center justify-between gap-2 text-[0.7rem]">
-        <div className="flex items-center gap-1.5 text-muted-foreground">
-          <Link to="/agents" className="hover:text-foreground">
-            ‹ Agents
+      <nav className="flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Link to="/agents" className="flex items-center gap-1 hover:text-foreground">
+            <ArrowLeftIcon className="size-3.5" /> Agents
           </Link>
           <ChevronRightIcon className="size-3" />
-          <span className="text-foreground">Volume spike alert</span>
+          <span className="text-foreground">Volume spike</span>
         </div>
         {agent.enabled && (
           <Button variant="outline" size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(!agent.paused)}>
@@ -83,11 +97,14 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
         )}
       </nav>
 
-      <header className="mt-3 flex items-center gap-2.5">
-        <AgentAvatar status={status} className="size-9" />
-        <div className="space-y-1">
+      <header className="mt-4 flex items-center gap-3">
+        <AgentAvatar status={status} className="size-10" />
+        <div className="space-y-1.5">
           <h1 className="text-2xl leading-none font-semibold tracking-tight">Volume spike alert</h1>
-          <StatusDot status={status} />
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
+            <StatusDot status={status} />
+            <span>{agent.pools.map(poolName).join(", ") || "No pools"}</span>
+          </p>
         </div>
       </header>
       {hint && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{hint}</p>}
@@ -125,6 +142,18 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
 }
 
 function Overview({ agent, now }: { agent: AgentView; now: number }) {
+  const { data } = useSuspenseQuery(alertsQuery);
+  const edit = (
+    <Link
+      to="/agents/$agentId"
+      params={{ agentId: agent.id }}
+      search={{ tab: "settings" }}
+      className="text-xs font-medium text-brand"
+    >
+      Edit
+    </Link>
+  );
+  const recent = data.alerts.slice(0, 6);
   return (
     <>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -134,27 +163,57 @@ function Overview({ agent, now }: { agent: AgentView; now: number }) {
           ["Last alert", agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"],
           ["Cooldown", formatMinutes(agent.config.cooldownSec)],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-lg border bg-card px-3.5 py-3">
-            <p className="text-[0.6rem] tracking-[0.1em] text-muted-foreground uppercase">{label}</p>
-            <p className="mt-1 text-lg leading-none font-semibold">{value}</p>
+          <div key={label} className="rounded-xl border bg-card px-4 py-3">
+            <p className="font-mono text-[0.6rem] tracking-[0.08em] text-muted-foreground uppercase">{label}</p>
+            <p className="mt-1.5 text-lg leading-none font-semibold">{value}</p>
           </div>
         ))}
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <Card title="Rule">
-          <p className="text-xs">{describeRule(agent.config)}</p>
-          <Link
-            to="/agents/$agentId"
-            params={{ agentId: agent.id }}
-            search={{ tab: "settings" }}
-            className="text-[0.7rem] font-medium text-brand"
-          >
-            Edit rule
-          </Link>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        <Card
+          title="Recent alerts"
+          action={
+            <Link
+              to="/agents/$agentId"
+              params={{ agentId: agent.id }}
+              search={{ tab: "alerts" }}
+              className="text-xs font-medium text-brand"
+            >
+              View all
+            </Link>
+          }
+        >
+          {recent.length === 0 ? (
+            <p className="py-6 text-center text-xs text-muted-foreground">No alerts yet</p>
+          ) : (
+            <ul className="-my-1 divide-y text-xs">
+              {recent.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <span className="min-w-0 truncate font-medium">{a.poolLabel ?? shortAddr(a.poolAddress)}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    {compactUsd(a.vol1m)} · {ratioText(a.ratio)}
+                  </span>
+                  <span className="w-16 shrink-0 text-right text-muted-foreground">{timeAgo(a.at, now)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-        <Card title="Telegram">
-          <TelegramPanel />
-        </Card>
+        <div className="space-y-3">
+          <Card title="Rules" action={edit}>
+            <Rows
+              rows={[
+                ["Spike", `≥ ${agent.config.mult}×`],
+                ["Baseline", formatMinutes(agent.config.baseline * 60)],
+                ["Min volume", compactUsd(agent.config.minUsd)],
+                ["Cooldown", formatMinutes(agent.config.cooldownSec)],
+              ]}
+            />
+          </Card>
+          <Card title="Telegram">
+            <TelegramPanel />
+          </Card>
+        </div>
       </div>
     </>
   );
@@ -173,9 +232,7 @@ function PoolsTab({ agent }: { agent: AgentView }) {
       />
       <FormError error={add.error ?? remove.error} />
       {agent.pools.length === 0 ? (
-        <p className="rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">
-          This agent has no pools, so it has nothing to watch.
-        </p>
+        <p className="py-6 text-center text-xs text-muted-foreground">No pools</p>
       ) : (
         <ul className="divide-y rounded-md border">
           {agent.pools.map((p) => (
@@ -216,9 +273,7 @@ function AlertsTab() {
   return (
     <Card title="Alert history">
       {data.alerts.length === 0 ? (
-        <p className="rounded-md border border-dashed py-8 text-center text-xs text-muted-foreground">
-          No alerts yet. They show up here as soon as a watched pool spikes.
-        </p>
+        <p className="py-8 text-center text-xs text-muted-foreground">No alerts yet</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -259,7 +314,6 @@ function AlertsTab() {
           </table>
         </div>
       )}
-      <p className="text-[0.65rem] text-muted-foreground">Latest {data.alerts.length} alerts, newest first.</p>
     </Card>
   );
 }
@@ -292,12 +346,9 @@ function SettingsTab({ agent }: { agent: AgentView }) {
       </Card>
       <Card title="Agent">
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span>
-            <label htmlFor="agent-enabled" className="block font-medium">
-              Turned on
-            </label>
-            <span className="block text-muted-foreground">Off stops all checks and alerts for this agent.</span>
-          </span>
+          <label htmlFor="agent-enabled" className="font-medium">
+            Turned on
+          </label>
           <Switch
             id="agent-enabled"
             checked={agent.enabled}

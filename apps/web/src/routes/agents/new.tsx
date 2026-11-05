@@ -5,7 +5,7 @@ import { agentsQuery, telegramQuery } from "@/features/agents/agents.queries";
 import { AgentWizard } from "@/features/agents/components/agent-wizard";
 
 const NewAgentSearch = z.object({
-  step: z.enum(WIZARD_STEPS).default("pools").catch("pools"),
+  step: z.enum(WIZARD_STEPS).default("agent").catch("agent"),
 });
 
 export const Route = createFileRoute("/agents/new")({

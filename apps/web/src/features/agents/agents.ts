@@ -16,6 +16,8 @@ export interface PoolView {
   address: string;
   label: string | null;
   lastAlertAt: number | null;
+  /** Both sides of the pair with their icons; null when they could not be looked up. */
+  tokens: [{ symbol: string; icon: string | null }, { symbol: string; icon: string | null }] | null;
 }
 
 export interface AgentView {
@@ -157,8 +159,13 @@ export function parseConfigFields(fields: ConfigFields, current: VolumeWatchConf
 
 // --- wizard ------------------------------------------------------------------------------------
 
-export const WIZARD_STEPS = ["pools", "rules", "review"] as const;
+export const WIZARD_STEPS = ["agent", "pools", "rules", "review"] as const;
 export type WizardStep = (typeof WIZARD_STEPS)[number];
+
+/** Agent types the wizard offers. Adding a kind here adds a row to the first step. */
+export const AGENT_TYPES = [
+  { kind: "volume-watch", name: "Volume spike alert", sub: "Telegram alert when pool volume jumps" },
+] as const;
 
 export interface DraftPool {
   address: string;

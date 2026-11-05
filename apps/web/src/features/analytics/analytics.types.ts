@@ -85,12 +85,25 @@ export interface SiblingPool {
   fees24h: number;
 }
 
+export interface PoolSearchToken {
+  symbol: string;
+  mint: string;
+  icon: string | null;
+  verified: boolean;
+  organicScore: number | null;
+  risks: string[] | null;
+}
+
 export interface PoolSearchHit {
   address: string;
   name: string;
   binStep: number;
+  /** Percent, e.g. 0.25 for 0.25%. */
+  baseFee: number;
+  dynamicFee: number | null;
   tvl: number;
   volume24h: number;
-  tokenX: { symbol: string; icon: string | null };
-  tokenY: { symbol: string; icon: string | null };
+  fees24h: number;
+  tokenX: PoolSearchToken;
+  tokenY: PoolSearchToken;
 }
