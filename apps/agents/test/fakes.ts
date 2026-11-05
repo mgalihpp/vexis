@@ -1,7 +1,7 @@
 import { Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
-import { Db, type NewAlert, type NewMinute, TELEGRAM_NOT_LINKED, type Watch } from "../src/Db.ts";
+import { Db, type NewAlert, type NewMinute, type Watch } from "../src/Db.ts";
 import { MeteoraError, TelegramError } from "../src/errors.ts";
 import type { LinkButton } from "../src/format.ts";
 import { Meteora, type PoolReading } from "../src/Meteora.ts";
@@ -29,6 +29,8 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
     minutes: new Map<string, NewMinute[]>(),
     chats: new Map<string, bigint>(),
     ownBots: new Map<string, string>(),
+    /** Users whose stored bot token no longer decrypts. */
+    unreadable: new Set<string>(),
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
     pruned: [] as Date[],
@@ -67,11 +69,13 @@ export function fakeDb(seed: { watches?: Watch[] } = {}) {
         ),
       telegramTarget: (userId) => {
         const chatId = state.chats.get(userId);
-        return Effect.succeed(
-          chatId === undefined
-            ? Option.none()
-            : Option.some({ chatId, botToken: state.ownBots.get(userId) ?? "user-bot-token" }),
-        );
+        if (chatId === undefined) return Effect.succeed({ _tag: "missing" } as const);
+        if (state.unreadable.has(userId)) return Effect.succeed({ _tag: "unreadable" } as const);
+        return Effect.succeed({
+          _tag: "ready",
+          chatId,
+          botToken: state.ownBots.get(userId) ?? "user-bot-token",
+        } as const);
       },
       pauseAgent: (agentId, reason) => Effect.sync(() => void state.paused.set(agentId, reason)),
       claimCooldown: (agentPoolId, cooldownMs, now) =>

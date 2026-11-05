@@ -1,10 +1,16 @@
 // Agent domain shared by the server and the pages: view types and the pure helpers. The only agent kind is
 // `volume-watch`; its rows live in Postgres (`packages/db`) and are read through `agents.server.ts`.
 
-import { type AgentKind, TELEGRAM_NOT_LINKED, VolumeWatchConfig } from "@vexis/db/agents";
+import {
+  type AgentKind,
+  TELEGRAM_NOT_LINKED,
+  TELEGRAM_PAUSES,
+  TELEGRAM_RELINK,
+  VolumeWatchConfig,
+} from "@vexis/db/agents";
 
 export type { VolumeWatchConfig };
-export { TELEGRAM_NOT_LINKED };
+export { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK };
 
 /** Pools one agent may watch. The runner reads them in batches of 100, so this is a UI limit, not a hard one. */
 export const MAX_POOLS = 20;
@@ -69,11 +75,19 @@ export interface TelegramView {
 
 export type AgentStatus = "live" | "paused" | "attention" | "off";
 
-/** `attention` is a pause the runner set because the user has no Telegram chat to alert. */
+/** `attention` is a pause the runner set because it cannot alert over Telegram (no chat, or a token to re-link). */
 export function agentStatus(a: Pick<AgentView, "enabled" | "paused" | "pausedReason">): AgentStatus {
   if (!a.enabled) return "off";
-  if (a.paused) return a.pausedReason === TELEGRAM_NOT_LINKED ? "attention" : "paused";
+  if (a.paused) return a.pausedReason && TELEGRAM_PAUSES.includes(a.pausedReason) ? "attention" : "paused";
   return "live";
+}
+
+/** The status hint, worded for why the runner paused the agent. */
+export function statusHint(a: Pick<AgentView, "enabled" | "paused" | "pausedReason">): string | undefined {
+  if (agentStatus(a) === "attention" && a.pausedReason === TELEGRAM_RELINK) {
+    return "Paused because the saved bot token can no longer be read. Connect your bot again and the agent resumes.";
+  }
+  return STATUS_HINT[agentStatus(a)];
 }
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {

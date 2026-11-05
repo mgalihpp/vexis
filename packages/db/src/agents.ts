@@ -36,3 +36,12 @@ export function defaultAgentConfig<K extends AgentKind>(kind: K): AgentConfig<K>
 
 /** `agents.paused_reason` the runner sets while the user has no linked Telegram chat; linking clears it. */
 export const TELEGRAM_NOT_LINKED = "telegram_not_linked";
+
+/**
+ * `agents.paused_reason` the runner sets when the stored bot token no longer decrypts, which happens when
+ * `TOKEN_ENC_KEY` changed after the user linked. The token cannot be recovered, so linking the bot again clears it.
+ */
+export const TELEGRAM_RELINK = "telegram_relink";
+
+/** Pauses the runner sets over Telegram and that linking a chat clears. A pause the user chose is neither. */
+export const TELEGRAM_PAUSES: readonly string[] = [TELEGRAM_NOT_LINKED, TELEGRAM_RELINK];

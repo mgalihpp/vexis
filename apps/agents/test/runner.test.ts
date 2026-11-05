@@ -201,6 +201,16 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([]);
   });
 
+  test("a bot token that no longer decrypts pauses the agent for a re-link, no alert row", async () => {
+    const s = spikeScenario(5000);
+    const userId = s.db.watches[0]?.userId ?? "";
+    s.db.unreadable.add(userId);
+    await s.run(cycle());
+    expect(s.db.paused.get("agent-1")).toBe("telegram_relink");
+    expect(s.db.alerts).toEqual([]);
+    expect(s.telegram.sent).toEqual([]);
+  });
+
   test("an alert goes out through the user's own bot", async () => {
     const s = spikeScenario(5000);
     s.db.ownBots.set("user-1", "own-bot-token");

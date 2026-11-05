@@ -1,4 +1,4 @@
-import { TELEGRAM_NOT_LINKED } from "@vexis/db/agents";
+import { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
 import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
@@ -37,7 +37,16 @@ export type NewAlert = {
   readonly at: Date;
 };
 
-export { TELEGRAM_NOT_LINKED };
+export { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK };
+
+/**
+ * Where a user's alerts go. `unreadable`: a bot is linked but its token does not decrypt with this
+ * `TOKEN_ENC_KEY` (the key changed after linking), so it is useless until the user links the bot again.
+ */
+export type TelegramTarget =
+  | { readonly _tag: "missing" }
+  | { readonly _tag: "unreadable" }
+  | { readonly _tag: "ready"; readonly chatId: bigint; readonly botToken: string };
 
 /** Postgres `double precision` takes Infinity but JSON does not; a zero baseline is stored capped. */
 const MAX_STORED_RATIO = 1_000_000;
@@ -58,10 +67,8 @@ export class Db extends Context.Service<
       pool: string,
       limit: number,
     ): Effect.Effect<ReadonlyArray<{ readonly minute: number; readonly volume: number | null }>, DbError>;
-    /** Where the user's alerts go: their chat and their own bot's token (decrypted). None until both are linked. */
-    telegramTarget(
-      userId: string,
-    ): Effect.Effect<Option.Option<{ readonly chatId: bigint; readonly botToken: string }>, DbError>;
+    /** Where the user's alerts go: their chat and their own bot's token (decrypted). Missing until both are linked. */
+    telegramTarget(userId: string): Effect.Effect<TelegramTarget, DbError>;
     pauseAgent(agentId: string, reason: string): Effect.Effect<void, DbError>;
     /**
      * In one transaction: reads `last_alert_at` under a row lock and, unless it is inside the
@@ -164,10 +171,13 @@ export class Db extends Context.Service<
               .select({ chatId: telegramLinks.chatId, botToken: telegramLinks.botToken })
               .from(telegramLinks)
               .where(eq(telegramLinks.userId, userId));
-            return row?.chatId != null && row.botToken
-              ? { chatId: row.chatId, botToken: decryptSecret(row.botToken) }
-              : undefined;
-          }).pipe(Effect.map(Option.fromNullishOr)),
+            if (row?.chatId == null || !row.botToken) return { _tag: "missing" } as const;
+            try {
+              return { _tag: "ready", chatId: row.chatId, botToken: decryptSecret(row.botToken) } as const;
+            } catch {
+              return { _tag: "unreadable" } as const;
+            }
+          }),
 
         pauseAgent: (agentId, reason) =>
           run("pauseAgent", () =>

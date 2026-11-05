@@ -11,8 +11,10 @@ import {
   MAX_POOLS,
   parseConfigFields,
   ratioText,
+  statusHint,
   summarizeFleet,
   TELEGRAM_NOT_LINKED,
+  TELEGRAM_RELINK,
 } from "./agents";
 
 const agent = (over: Partial<AgentView> = {}): AgentView => ({
@@ -34,6 +36,14 @@ describe("status", () => {
     expect(agentStatus(agent({ paused: true }))).toBe("paused");
     expect(agentStatus(agent({ paused: true, pausedReason: TELEGRAM_NOT_LINKED }))).toBe("attention");
     expect(agentStatus(agent({ enabled: false, paused: true, pausedReason: TELEGRAM_NOT_LINKED }))).toBe("off");
+  });
+
+  test("an unreadable bot token needs attention and the hint asks for a re-link", () => {
+    const relink = agent({ paused: true, pausedReason: TELEGRAM_RELINK });
+    expect(agentStatus(relink)).toBe("attention");
+    expect(statusHint(relink)).toContain("Connect your bot again");
+    expect(statusHint(agent({ paused: true, pausedReason: TELEGRAM_NOT_LINKED }))).toContain("no Telegram chat");
+    expect(statusHint(agent())).toBeUndefined();
   });
 });
 

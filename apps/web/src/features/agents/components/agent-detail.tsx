@@ -19,7 +19,7 @@ import {
   type PoolView,
   parseConfigFields,
   ratioText,
-  STATUS_HINT,
+  statusHint,
 } from "../agents";
 import { addAgentPoolFn, removeAgentPoolFn, saveAgentConfig, setAgentRunning } from "../agents.functions";
 import { agentsQuery, alertsQuery } from "../agents.queries";
@@ -85,7 +85,7 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
   const status = agentStatus(agent);
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
-  const hint = STATUS_HINT[status];
+  const hint = statusHint(agent);
   const [notice, setNotice] = useState<string | null>(null);
   return (
     <div className="mx-auto w-full max-w-[1100px] px-4 py-4 md:px-6">

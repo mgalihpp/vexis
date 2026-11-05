@@ -1,7 +1,7 @@
 import { type AgentConfig, parseAgentConfig } from "@vexis/db/agents";
 import { Array as Arr, Clock, Effect, Option } from "effect";
 import { AppConfig } from "./AppConfig.ts";
-import { Db, TELEGRAM_NOT_LINKED, type Watch } from "./Db.ts";
+import { Db, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, type Watch } from "./Db.ts";
 import { BadAgentConfig } from "./errors.ts";
 import { formatMessage, linkButtons, type SpikeLine } from "./format.ts";
 import type { PoolReading } from "./Meteora.ts";
@@ -86,12 +86,17 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
   const { agentId, userId } = hits[0].watch;
 
   const target = yield* db.telegramTarget(userId);
-  if (Option.isNone(target)) {
+  if (target._tag === "missing") {
     yield* db.pauseAgent(agentId, TELEGRAM_NOT_LINKED);
     yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked a Telegram bot`);
     return;
   }
-  const { chatId, botToken } = target.value;
+  if (target._tag === "unreadable") {
+    yield* db.pauseAgent(agentId, TELEGRAM_RELINK);
+    yield* Effect.logWarning(`agent ${agentId} paused: ${userId}'s bot token does not decrypt with TOKEN_ENC_KEY`);
+    return;
+  }
+  const { chatId, botToken } = target;
 
   const at = new Date(yield* Clock.currentTimeMillis);
   const claimed = (yield* Effect.forEach(hits, (hit) =>
