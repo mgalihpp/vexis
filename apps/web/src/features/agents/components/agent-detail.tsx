@@ -4,6 +4,7 @@ import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon,
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { timeAgo, utcStamp } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
@@ -93,7 +94,8 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
         </div>
         {agent.enabled && (
           <Button variant="outline" size="sm" disabled={toggle.isPending} onClick={() => toggle.mutate(!agent.paused)}>
-            {agent.paused ? <PlayIcon /> : <PauseIcon />} {agent.paused ? "Resume" : "Pause"}
+            {toggle.isPending ? <Spinner /> : agent.paused ? <PlayIcon /> : <PauseIcon />}{" "}
+            {agent.paused ? "Resume" : "Pause"}
           </Button>
         )}
       </nav>
@@ -256,9 +258,13 @@ function PoolsTab({ agent }: { agent: AgentView }) {
                   aria-label={`Stop watching ${poolName(p)}`}
                   disabled={remove.isPending}
                   onClick={() => remove.mutate({ data: { poolId: p.id } })}
-                  className="text-muted-foreground hover:text-loss"
+                  className="text-muted-foreground hover:text-loss disabled:opacity-50"
                 >
-                  <XIcon className="size-3.5" />
+                  {remove.isPending && remove.variables?.data.poolId === p.id ? (
+                    <Spinner className="size-3.5" />
+                  ) : (
+                    <XIcon className="size-3.5" />
+                  )}
                 </button>
               </span>
             </li>
@@ -341,15 +347,17 @@ function SettingsTab({ agent }: { agent: AgentView }) {
             }
             className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
           >
-            {save.isPending ? "Saving…" : "Save rule"}
+            {save.isPending && <Spinner />}
+            {save.isPending ? "Saving" : "Save rule"}
           </Button>
         </div>
         <FormError error={save.error} />
       </Card>
       <Card title="Agent">
         <div className="flex items-center justify-between gap-3 text-xs">
-          <label htmlFor="agent-enabled" className="font-medium">
+          <label htmlFor="agent-enabled" className="flex items-center gap-2 font-medium">
             Turned on
+            {power.isPending && <Spinner className="size-3.5 text-muted-foreground" />}
           </label>
           <Switch
             id="agent-enabled"

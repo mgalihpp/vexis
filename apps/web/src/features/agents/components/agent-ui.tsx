@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-q
 import { BadgeCheckIcon, CheckIcon, CopyIcon, SearchIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { findPools } from "@/features/analytics/analytics.functions";
 import type { PoolSearchHit } from "@/features/analytics/analytics.types";
 import { usePoolHits } from "@/features/analytics/components/pool-search";
@@ -194,7 +195,11 @@ export function PoolPicker({
   return (
     <div className="space-y-3">
       <label className="flex h-10 items-center gap-2.5 rounded-lg border bg-background/60 px-3 focus-within:border-brand/60">
-        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        {busy ? (
+          <Spinner className="shrink-0 text-muted-foreground" />
+        ) : (
+          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        )}
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -607,6 +612,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
             disabled={start.isPending}
             onClick={() => start.mutate(undefined)}
           >
+            {start.isPending && <Spinner />}
             Link another
           </Button>
         ) : (
@@ -617,6 +623,7 @@ export function TelegramPanel({ children }: { children?: ReactNode }) {
               disabled={start.isPending}
               onClick={() => start.mutate(undefined)}
             >
+              {start.isPending && <Spinner />}
               Get a link code
             </Button>
           )

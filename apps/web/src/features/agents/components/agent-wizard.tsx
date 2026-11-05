@@ -3,6 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { AlertCircleIcon, ArrowLeftIcon, ArrowRightIcon, CheckIcon, ChevronRightIcon, ZapIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { compactUsd } from "@/features/portfolio/money";
 import {
   AGENT_TYPES,
@@ -97,7 +98,8 @@ export function AgentWizard({ step }: { step: WizardStep }) {
                 onClick={launch}
                 className="h-10 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground hover:bg-brand/90"
               >
-                {create.isPending ? "Creating…" : STEP_META.review.next}
+                {create.isPending && <Spinner />}
+                {create.isPending ? "Creating" : STEP_META.review.next}
               </Button>
             ) : (
               <Button

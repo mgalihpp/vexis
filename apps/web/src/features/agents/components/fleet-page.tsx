@@ -2,6 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRightIcon, PauseIcon, PlayIcon, TerminalIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { type AgentView, agentStatus, formatMinutes, summarizeFleet } from "../agents";
@@ -105,7 +106,7 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
             disabled={toggle.isPending}
             onClick={() => toggle.mutate(!agent.paused)}
           >
-            {agent.paused ? <PlayIcon /> : <PauseIcon />}
+            {toggle.isPending ? <Spinner /> : agent.paused ? <PlayIcon /> : <PauseIcon />}
           </Button>
         )}
         <Link
