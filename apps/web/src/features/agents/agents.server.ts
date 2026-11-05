@@ -59,21 +59,28 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
 
 export async function loadAlerts(userId: string): Promise<AlertsData> {
   const s = scope(userId);
-  const [alerts, pools] = await Promise.all([listAlerts(s, { limit: ALERT_PAGE }), loadPoolLabels(userId)]);
+  const [alerts, labels] = await Promise.all([listAlerts(s, { limit: ALERT_PAGE }), loadPoolLabels(userId)]);
+  const addresses = [...new Set(alerts.map((a) => a.poolAddress))];
+  const found = await Promise.all(addresses.map((a) => poolTokens(a)));
+  const tokens = new Map(addresses.map((a, i) => [a, found[i] ?? null]));
   return {
     now: Date.now(),
-    alerts: alerts.map((a) => ({
-      id: a.id,
-      agentId: a.agentId,
-      poolAddress: a.poolAddress,
-      poolLabel: pools.get(a.poolAddress) ?? null,
-      vol1m: a.vol1m,
-      baseline: a.baseline,
-      ratio: a.ratio,
-      delivered: a.delivered,
-      error: a.error,
-      at: a.at.getTime(),
-    })),
+    alerts: alerts.map((a) => {
+      const t = tokens.get(a.poolAddress) ?? null;
+      return {
+        id: a.id,
+        agentId: a.agentId,
+        poolAddress: a.poolAddress,
+        poolLabel: labels.get(a.poolAddress) ?? (t ? `${t.x.symbol}-${t.y.symbol}` : null),
+        tokens: t ? [t.x, t.y] : null,
+        vol1m: a.vol1m,
+        baseline: a.baseline,
+        ratio: a.ratio,
+        delivered: a.delivered,
+        error: a.error,
+        at: a.at.getTime(),
+      };
+    }),
   };
 }
 

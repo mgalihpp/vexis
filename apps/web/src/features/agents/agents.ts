@@ -17,13 +17,15 @@ export const MAX_POOLS = 20;
 
 export const DEFAULT_CONFIG: VolumeWatchConfig = VolumeWatchConfig.parse({});
 
+/** Both sides of a pair with their icons; null when they could not be looked up. */
+export type PairTokens = [{ symbol: string; icon: string | null }, { symbol: string; icon: string | null }] | null;
+
 export interface PoolView {
   id: string;
   address: string;
   label: string | null;
   lastAlertAt: number | null;
-  /** Both sides of the pair with their icons; null when they could not be looked up. */
-  tokens: [{ symbol: string; icon: string | null }, { symbol: string; icon: string | null }] | null;
+  tokens: PairTokens;
 }
 
 export interface AgentView {
@@ -49,7 +51,10 @@ export interface AlertView {
   id: string;
   agentId: string;
   poolAddress: string;
+  /** The watched pool's label, else the pair's symbols; null when neither is known. */
   poolLabel: string | null;
+  /** Looked up per pool, so alerts from a pool the agent no longer watches keep their logos. */
+  tokens: PairTokens;
   vol1m: number;
   baseline: number;
   ratio: number;
@@ -93,7 +98,7 @@ export function statusHint(a: Pick<AgentView, "enabled" | "paused" | "pausedReas
 }
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
-  live: "Watching",
+  live: "Active",
   paused: "Paused",
   attention: "Needs Telegram",
   off: "Off",

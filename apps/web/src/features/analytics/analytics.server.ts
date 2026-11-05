@@ -448,6 +448,8 @@ export function poolTokens(address: string): Promise<PoolTokens | null> {
   const lookup = resolvePool(address)
     .then(async (p) => {
       const meta = await loadTokenInfo([p.token_x.address, p.token_y.address]);
+      // loadTokenInfo returns an empty map when Jupiter fails, so a missing mint is not cached for good.
+      if (!meta.has(p.token_x.address) || !meta.has(p.token_y.address)) poolTokenCache.delete(address);
       const side = (t: RawPool["token_x"]) => ({ symbol: t.symbol, icon: meta.get(t.address)?.icon ?? null });
       return { x: side(p.token_x), y: side(p.token_y) };
     })
