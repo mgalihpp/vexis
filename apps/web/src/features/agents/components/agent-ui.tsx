@@ -6,9 +6,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { findPools } from "@/features/analytics/analytics.functions";
 import type { PoolSearchHit } from "@/features/analytics/analytics.types";
 import { usePoolHits } from "@/features/analytics/components/pool-search";
-import { PoolBadges, TokenIcon, TokenScores } from "@/features/portfolio/components/pool-identity";
+import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
-import type { PoolMeta } from "@/features/portfolio/portfolio";
 import { shortAddr } from "@/lib/format";
 import { type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
 import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
@@ -66,32 +65,22 @@ export function FormError({ error }: { error: unknown }) {
 const ROW =
   "grid w-full grid-cols-[minmax(0,1fr)_6rem_1.25rem] items-center gap-3 px-4 md:grid-cols-[minmax(0,1fr)_5rem_6rem_6rem_1.25rem]";
 
-/** Same identity block the Portfolio tables use: pair, token scores, DLMM / bin step / fee badges. */
+/** Pair, verified mark, and bin step / base fee as one muted line. */
 function PoolCell({ hit }: { hit: PoolSearchHit }) {
-  const pool: PoolMeta = {
-    address: hit.address,
-    pair: hit.name,
-    binStep: hit.binStep,
-    baseFee: hit.baseFee,
-    dynamicFee: hit.dynamicFee,
-    tokenX: { ...hit.tokenX, priceUsd: null },
-    tokenY: { ...hit.tokenY, priceUsd: null },
-  };
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span className="flex shrink-0 items-center">
         <TokenIcon token={hit.tokenX} className="relative z-10 size-8 text-xs ring-2 ring-card" />
         <TokenIcon token={hit.tokenY} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
       </span>
-      <span className="min-w-0 space-y-1">
-        <span className="flex flex-wrap items-center gap-1">
-          <span className="mr-0.5 flex items-center gap-1 text-[0.8rem] font-bold whitespace-nowrap">
-            {hit.name}
-            {hit.tokenX.verified && <BadgeCheckIcon aria-label="Verified" className="size-4 text-profit" />}
-          </span>
-          <TokenScores token={pool.tokenX} />
+      <span className="min-w-0 space-y-0.5">
+        <span className="flex items-center gap-1 text-[0.8rem] font-bold whitespace-nowrap">
+          {hit.name}
+          {hit.tokenX.verified && <BadgeCheckIcon aria-label="Verified" className="size-4 text-profit" />}
         </span>
-        <PoolBadges pool={pool} />
+        <span className="block truncate text-[0.7rem] text-muted-foreground tabular-nums">
+          Bin step {hit.binStep} · Fee {pct(hit.baseFee / 100)}
+        </span>
       </span>
     </span>
   );
@@ -111,10 +100,8 @@ function PoolRow({
   onClick: () => void;
 }) {
   return (
-    // The badges hold their own popover buttons, and a button cannot contain a button, so the toggle is an
-    // overlay button and the badge buttons are lifted above it.
     <div
-      className={`group relative ${ROW} py-3 text-left text-xs transition-colors [&_button:not([aria-pressed])]:relative [&_button:not([aria-pressed])]:z-10 ${
+      className={`group relative ${ROW} py-3 text-left text-xs transition-colors ${
         locked ? "opacity-40" : ""
       } ${picked ? "bg-brand/[0.07] shadow-[inset_2px_0_0_var(--brand)]" : "hover:bg-muted/50"}`}
     >
@@ -214,7 +201,7 @@ export function PoolPicker({
           className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </label>
-      <div className="overflow-hidden rounded-xl border">
+      <div>
         {pinned.length > 0 && (
           <>
             <div className={`${ROW} border-b bg-brand/10 py-2 ${label} text-brand`}>
@@ -235,7 +222,7 @@ export function PoolPicker({
             </ul>
           </>
         )}
-        <div className={`${ROW} border-b bg-muted/30 py-2 ${label} text-muted-foreground`}>
+        <div className={`${ROW} border-b py-2 ${label} text-muted-foreground`}>
           <span>{searching ? "Results" : "Top pools by volume"}</span>
           <span className="hidden text-right md:block">TVL</span>
           <span className="text-right">Vol 24h</span>
