@@ -16,7 +16,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { NotificationWatcher } from "@/features/notifications/components/notification-watcher";
 import { type Theme, useTheme } from "@/features/theme/theme";
 import { shortAddr } from "@/lib/format";
-import { useAgents } from "@/stores/agents";
 import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
@@ -51,7 +50,6 @@ interface Prices {
 
 export function AppShell({ prices, children }: { prices: Prices; children: ReactNode }) {
   useEffect(() => {
-    useAgents.persist.rehydrate();
     useWallets.persist.rehydrate();
     usePools.persist.rehydrate();
     useSettings.persist.rehydrate();

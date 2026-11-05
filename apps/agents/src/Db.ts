@@ -1,3 +1,4 @@
+import { TELEGRAM_NOT_LINKED } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
 import { redeemTelegramLinkCode } from "@vexis/db/queries";
 import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
@@ -36,8 +37,7 @@ export type NewAlert = {
   readonly at: Date;
 };
 
-/** `agents.paused_reason` the runner sets, and clears again when the user links Telegram. */
-export const TELEGRAM_NOT_LINKED = "telegram_not_linked";
+export { TELEGRAM_NOT_LINKED };
 
 /** Postgres `double precision` takes Infinity but JSON does not; a zero baseline is stored capped. */
 const MAX_STORED_RATIO = 1_000_000;
