@@ -29,6 +29,8 @@ import {
   FormError,
   PoolPicker,
   poolName,
+  RemovePoolButton,
+  SelectedPool,
   StatusDot,
   TelegramPanel,
   useAgentMutation,
@@ -296,6 +298,37 @@ function PoolsTab({ agent }: { agent: AgentView }) {
   const remove = useAgentMutation(removeAgentPoolFn);
   return (
     <Card title="Watched pools">
+      {agent.pools.length > 0 && (
+        <ul className="divide-y border-b">
+          {agent.pools.map((p) => (
+            <li key={p.id}>
+              <SelectedPool
+                logo={<PairLogo tokens={p.tokens} name={poolName(p)} />}
+                name={poolName(p)}
+                address={p.address}
+                actions={
+                  <>
+                    <Link
+                      to="/analytics"
+                      search={{ pool: p.address }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLinkIcon className="size-3.5" />
+                      <span className="sr-only">Open analytics</span>
+                    </Link>
+                    <RemovePoolButton
+                      name={poolName(p)}
+                      disabled={remove.isPending}
+                      pending={remove.isPending && remove.variables?.data.poolId === p.id}
+                      onClick={() => remove.mutate({ data: { poolId: p.id } })}
+                    />
+                  </>
+                }
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       <PoolPicker
         taken={agent.pools.map((p) => p.address)}
         count={agent.pools.length}
@@ -303,43 +336,6 @@ function PoolsTab({ agent }: { agent: AgentView }) {
         onPick={(pool) => add.mutate({ data: pool })}
       />
       <FormError error={add.error ?? remove.error} />
-      {agent.pools.length === 0 ? (
-        <p className="py-6 text-center text-xs text-muted-foreground">No pools</p>
-      ) : (
-        <ul className="divide-y rounded-md border">
-          {agent.pools.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
-              <span className="min-w-0">
-                <span className="font-medium">{poolName(p)}</span>
-                <span className="ml-2 text-muted-foreground">{shortAddr(p.address)}</span>
-              </span>
-              <span className="flex shrink-0 items-center gap-3">
-                <Link
-                  to="/analytics"
-                  search={{ pool: p.address }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <ExternalLinkIcon className="size-3.5" />
-                  <span className="sr-only">Open analytics</span>
-                </Link>
-                <button
-                  type="button"
-                  aria-label={`Stop watching ${poolName(p)}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate({ data: { poolId: p.id } })}
-                  className="text-muted-foreground hover:text-loss disabled:opacity-50"
-                >
-                  {remove.isPending && remove.variables?.data.poolId === p.id ? (
-                    <Spinner className="size-3.5" />
-                  ) : (
-                    <XIcon className="size-3.5" />
-                  )}
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </Card>
   );
 }

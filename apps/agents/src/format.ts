@@ -46,7 +46,9 @@ export type LinkButton = { readonly text: string; readonly url: string };
  */
 export function linkButtons(lines: ReadonlyArray<SpikeLine>, webUrl: string): LinkButton[] {
   const base = webUrl.replace(/\/+$/, "");
-  if (!/^https:\/\//.test(base) || /^https:\/\/(localhost|127\.|\[::1\])/.test(base)) return [];
+  if (!/^https?:\/\//.test(base) || /^https?:\/\/(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|\[::1\])/.test(base)) {
+    return [];
+  }
   return lines.map((line) => ({
     text: lines.length === 1 ? "View pool on Vexis" : `View ${line.name}`,
     url: `${base}/analytics?pool=${line.poolAddress}`,
