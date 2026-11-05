@@ -2,6 +2,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ChevronRightIcon, ExternalLinkIcon, PauseIcon, PlayIcon, XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { timeAgo, utcStamp } from "@/features/portfolio/money";
@@ -332,15 +333,16 @@ function SettingsTab({ agent }: { agent: AgentView }) {
           errors={result.ok ? {} : result.errors}
           onChange={(key, value) => setFields((f) => ({ ...f, [key]: value }))}
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-3">
           <Button
             disabled={!result.ok || !dirty || save.isPending}
-            onClick={() => result.ok && save.mutate({ data: result.config })}
+            onClick={() =>
+              result.ok && save.mutate({ data: result.config }, { onSuccess: () => toast.success("Rule saved") })
+            }
             className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
           >
             {save.isPending ? "Saving…" : "Save rule"}
           </Button>
-          {save.isSuccess && !dirty && <span className="text-[0.7rem] text-profit">Saved</span>}
         </div>
         <FormError error={save.error} />
       </Card>

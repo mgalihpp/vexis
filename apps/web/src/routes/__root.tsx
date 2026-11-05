@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/app-shell";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { isPublicPath } from "@/features/auth/auth";
 import { viewerQuery } from "@/features/auth/auth.queries";
@@ -53,6 +54,7 @@ function RootDocument({ children }: { children: ReactNode }) {
       </head>
       <body>
         <TooltipProvider>{children}</TooltipProvider>
+        <Toaster position="bottom-center" />
         <Scripts />
       </body>
     </html>
