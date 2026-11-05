@@ -151,6 +151,56 @@ function PoolRow({
   );
 }
 
+/** One chosen pool: logo, name, short address and actions, with a brand accent on the left. */
+export function SelectedPool({
+  logo,
+  name,
+  address,
+  actions,
+}: {
+  logo: ReactNode;
+  name: string;
+  address: string;
+  actions: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 pl-3 text-xs shadow-[inset_2px_0_0_var(--brand)]">
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="flex shrink-0 items-center">{logo}</span>
+        <span className="min-w-0">
+          <span className="block text-[0.8rem] font-bold">{name}</span>
+          <span className="block font-mono text-[0.7rem] text-muted-foreground">{shortAddr(address)}</span>
+        </span>
+      </span>
+      <span className="flex shrink-0 items-center gap-3">{actions}</span>
+    </div>
+  );
+}
+
+export function RemovePoolButton({
+  name,
+  onClick,
+  pending = false,
+  disabled = false,
+}: {
+  name: string;
+  onClick: () => void;
+  pending?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Stop watching ${name}`}
+      disabled={disabled}
+      onClick={onClick}
+      className="text-muted-foreground hover:text-loss disabled:opacity-50"
+    >
+      {pending ? <Spinner className="size-3.5" /> : <XIcon className="size-3.5" />}
+    </button>
+  );
+}
+
 /** Pool list to pick from: the busiest pools by default, narrowed by the search box. */
 export function PoolPicker({
   taken,
@@ -187,6 +237,25 @@ export function PoolPicker({
   const label = "font-mono text-[0.6rem] tracking-[0.08em] uppercase";
   return (
     <div className="space-y-3">
+      {pinned.length > 0 && (
+        <ul className="divide-y border-b">
+          {pinned.map((h) => (
+            <li key={h.address}>
+              <SelectedPool
+                logo={
+                  <>
+                    <TokenIcon token={h.tokenX} className="relative z-10 size-8 text-xs ring-2 ring-card" />
+                    <TokenIcon token={h.tokenY} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
+                  </>
+                }
+                name={h.name}
+                address={h.address}
+                actions={<RemovePoolButton name={h.name} onClick={() => onRemove?.(h.address)} />}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       <label className="flex h-10 items-center gap-2.5 rounded-lg border bg-background/60 px-3 focus-within:border-brand/60">
         {busy ? (
           <Spinner className="shrink-0 text-muted-foreground" />
@@ -235,35 +304,6 @@ export function PoolPicker({
       <p className={`text-right ${label} text-muted-foreground`}>
         {count} of {MAX_POOLS} selected
       </p>
-      {pinned.length > 0 && (
-        <ul className="divide-y border-t">
-          {pinned.map((h) => (
-            <li
-              key={h.address}
-              className="flex items-center justify-between gap-3 py-3 pl-3 text-xs shadow-[inset_2px_0_0_var(--brand)]"
-            >
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="flex shrink-0 items-center">
-                  <TokenIcon token={h.tokenX} className="relative z-10 size-8 text-xs ring-2 ring-card" />
-                  <TokenIcon token={h.tokenY} className="-ml-2.5 size-8 text-xs ring-2 ring-card" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[0.8rem] font-bold">{h.name}</span>
-                  <span className="block font-mono text-[0.7rem] text-muted-foreground">{shortAddr(h.address)}</span>
-                </span>
-              </span>
-              <button
-                type="button"
-                aria-label={`Remove ${h.name}`}
-                onClick={() => onRemove?.(h.address)}
-                className="text-muted-foreground hover:text-loss"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
