@@ -348,16 +348,49 @@ export function RebalanceRuleSection({
 const INPUT =
   "h-8 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-mono text-xs outline-none focus:border-brand/60";
 
+const HINT = "text-xs leading-relaxed text-muted-foreground";
+
 const RPC_HINT = (
-  <>
-    Your own Solana mainnet RPC, used for every read and transaction of this wallet's agents. Use a{" "}
+  <p className={HINT}>
+    Solana mainnet. A{" "}
     <a href="https://helius.dev" target="_blank" rel="noreferrer" className="text-brand hover:underline">
       Helius
     </a>{" "}
-    URL: priority fees come from Helius <code>getPriorityFeeEstimate</code>, and another RPC sends with no priority fee.
-    The URL is stored encrypted; only its host is shown again.
-  </>
+    URL is recommended: other RPCs send transactions without a priority fee. Stored encrypted; only the host is shown
+    again.
+  </p>
 );
+
+/** What has to be true on-chain before an agent can act, in the order the user does it. */
+function BeforeTheAgentActs() {
+  const steps: [string, string][] = [
+    [
+      "Open one position yourself.",
+      "In each agent's pool, from this wallet. The agent moves it back into range but never opens one.",
+    ],
+    [
+      "Leave 0.1 to 0.2 SOL spare.",
+      "It pays transaction fees and one-time rent (a new bin array is about 0.07 SOL). Live actions pause while the wallet holds less than the agent's SOL reserve.",
+    ],
+  ];
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="text-xs font-medium">Before the agent can act</p>
+      <ol className="space-y-2">
+        {steps.map(([title, detail], i) => (
+          <li key={title} className="flex gap-2.5">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border text-[0.7rem] font-semibold tabular-nums">
+              {i + 1}
+            </span>
+            <p className={HINT}>
+              <span className="font-medium text-foreground">{title}</span> {detail}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 const isHttpsUrl = (v: string) => URL.canParse(v) && new URL(v).protocol === "https:";
 
@@ -430,18 +463,20 @@ export function WalletPanel() {
     setRpcUrl("");
   };
 
+  const error = inputError ? (
+    <p className="text-[0.7rem] text-loss">{inputError}</p>
+  ) : (
+    <FormError error={save.error ?? remove.error} />
+  );
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center gap-3">
         <SolIcon className="size-8 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-sm font-medium">
-            {data.publicKey ? shortAddr(data.publicKey) : "No wallet"}
-          </p>
+          <p className="text-sm font-medium">Agent wallet</p>
           <p className="truncate text-xs text-muted-foreground">
-            {data.publicKey
-              ? "Its one funded position in each agent's pool is kept in range"
-              : "The agent needs a wallet to manage"}
+            {data.publicKey ? <span className="font-mono">{shortAddr(data.publicKey)}</span> : "Not connected yet"}
           </p>
         </div>
         {data.publicKey && (
@@ -452,14 +487,14 @@ export function WalletPanel() {
         )}
       </div>
 
-      {data.publicKey && (
-        <div className="space-y-2 rounded-lg border px-3 py-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">RPC</span>
+      {data.publicKey ? (
+        <div className="space-y-2 rounded-lg border px-3 py-2.5">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="w-14 shrink-0 text-muted-foreground">RPC</span>
             <span
-              className={`min-w-0 flex-1 truncate font-mono ${data.rpcHost ? "" : "text-amber-600 dark:text-amber-400"}`}
+              className={`min-w-0 flex-1 truncate ${data.rpcHost ? "font-mono" : "text-amber-700 dark:text-amber-400"}`}
             >
-              {data.rpcHost ?? "None. Add an RPC URL"}
+              {data.rpcHost ?? "Not set. The agents wait until you add one."}
             </span>
             {data.rpcHost && !replacingRpc && (
               <Button variant="ghost" size="sm" onClick={() => setReplacingRpc(true)}>
@@ -467,44 +502,54 @@ export function WalletPanel() {
               </Button>
             )}
           </div>
-          {(!data.rpcHost || replacingRpc) && <RpcForm onDone={() => setReplacingRpc(false)} />}
           {(!data.rpcHost || replacingRpc) && (
-            <p className="text-xs leading-relaxed text-muted-foreground">{RPC_HINT}</p>
+            <>
+              <RpcForm onDone={() => setReplacingRpc(false)} />
+              {RPC_HINT}
+            </>
           )}
         </div>
-      )}
-
-      {!data.publicKey && (
+      ) : (
         <>
           <p className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              Use a separate hot wallet that holds only the positions these agents manage, never your main wallet. The
-              key is stored encrypted on the Vexis server so the agent can act without you.
+              Use a separate hot wallet that holds only these positions, never your main wallet. Its key is stored
+              encrypted so the agent can sign without you.
             </span>
           </p>
           <form
-            className="space-y-2"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               void submit().catch(() => {});
             }}
           >
-            <input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={secret}
-              onChange={(e) => {
-                setSecret(e.target.value);
-                setInputError(null);
-              }}
-              placeholder="Wallet secret key (base58)"
-              aria-label="Wallet secret key"
-              className={`${INPUT} w-full`}
-            />
-            <div className="flex items-center gap-2">
+            <div className="space-y-1.5">
+              <label htmlFor="agent-wallet-secret" className="text-xs font-medium">
+                Secret key
+              </label>
               <input
+                id="agent-wallet-secret"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={secret}
+                onChange={(e) => {
+                  setSecret(e.target.value);
+                  setInputError(null);
+                }}
+                placeholder="Base58 private key"
+                className={`${INPUT} w-full`}
+              />
+              <p className={HINT}>Exported from your wallet app. It is never shown again after you save.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="agent-wallet-rpc" className="text-xs font-medium">
+                RPC URL
+              </label>
+              <input
+                id="agent-wallet-rpc"
                 type="password"
                 autoComplete="off"
                 spellCheck={false}
@@ -513,10 +558,13 @@ export function WalletPanel() {
                   setRpcUrl(e.target.value);
                   setInputError(null);
                 }}
-                placeholder="RPC URL, https://mainnet.helius-rpc.com/?api-key=…"
-                aria-label="RPC URL"
-                className={INPUT}
+                placeholder="https://mainnet.helius-rpc.com/?api-key=…"
+                className={`${INPUT} w-full`}
               />
+              {RPC_HINT}
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <div className="min-w-0 flex-1">{error}</div>
               <Button
                 type="submit"
                 size="sm"
@@ -524,24 +572,15 @@ export function WalletPanel() {
                 disabled={busy || secret.trim() === "" || rpcUrl.trim() === ""}
               >
                 {save.isPending && <Spinner />}
-                Save
+                Save wallet
               </Button>
             </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">{RPC_HINT}</p>
           </form>
         </>
       )}
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        The agent never opens a position: open exactly one funded position in the pool with this wallet first.{" "}
-        {WALLET_NEEDS} Live actions pause while the wallet holds less than the agent's SOL reserve.
-      </p>
-
-      {inputError ? (
-        <p className="text-[0.7rem] text-loss">{inputError}</p>
-      ) : (
-        <FormError error={save.error ?? remove.error} />
-      )}
+      {data.publicKey && error}
+      <BeforeTheAgentActs />
     </div>
   );
 }
