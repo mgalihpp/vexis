@@ -18,10 +18,21 @@ const timeFmt = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
+// The feed is 4-hour buckets, so the shortest range that is more than one point is 12h.
+const SPARK_RANGES = [
+  { value: "12h", label: "12h", bars: 3 },
+  { value: "24h", label: "24h", bars: 6 },
+  { value: "3d", label: "3d", bars: 18 },
+  { value: "7d", label: "7d", bars: Number.POSITIVE_INFINITY },
+] as const;
+
+export function VolumeSparkline({ points: allPoints }: { points: VolumePoint[] }) {
   const offset = useTzOffset();
   const local = (t: number) => t + offset * 60_000;
   const [hover, setHover] = useState<number | null>(null);
+  const [range, setRange] = useState<(typeof SPARK_RANGES)[number]["value"]>("7d");
+  const bars = SPARK_RANGES.find((r) => r.value === range)?.bars ?? Number.POSITIVE_INFINITY;
+  const points = bars >= allPoints.length ? allPoints : allPoints.slice(-bars);
   const w = 276;
   const h = 76;
   const max = Math.max(...points.map((p) => p.volume), 1e-12);
@@ -32,7 +43,18 @@ export function VolumeSparkline({ points }: { points: VolumePoint[] }) {
   const point = hover === null ? undefined : points[hover];
   return (
     <Panel className="gap-1.5">
-      <Label>Volume (7d)</Label>
+      <div className="flex items-center justify-between gap-2">
+        <Label>Volume ({range})</Label>
+        <Segmented
+          variant="muted"
+          value={range}
+          onChange={(value) => {
+            setRange(value);
+            setHover(null);
+          }}
+          options={SPARK_RANGES}
+        />
+      </div>
       <span className="num text-lg font-bold">
         <AnimatedNumber value={sumVolume(points)} format={compactUsd} />
       </span>
