@@ -1,15 +1,19 @@
-import { type AgentKind, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
+import { AGENT_KINDS, type AgentKind, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   addAgentPool,
-  ensureAgent,
+  deleteAgent,
   forUser,
   getAgent,
   getRebalanceWallet,
-  getTelegramLink,
+  getTelegramLinks,
+  insertAgent,
   listAgentPools,
+  listAgents,
   listAlerts,
+  listPoolsOfKind,
   listRebalances,
+  lockUserAgents,
   removeAgentPool,
   updateAgent,
 } from "@vexis/db/queries";
@@ -21,12 +25,15 @@ import {
   type AlertsData,
   MAX_POOLS,
   type PoolView,
+  poolLimit,
   type RebalancesData,
   type TelegramView,
 } from "./agents";
+import { rpcHost } from "./wallet.server";
 
 // Every function takes the signed-in user's id from the viewer middleware and goes through `forUser`, so no
-// query can touch another user's rows.
+// query can touch another user's rows. Writes address an agent by id: a user has one volume-watch agent but
+// may have many auto-rebalance agents.
 
 const DAY_MS = 24 * 3_600_000;
 const ALERT_PAGE = 100;
@@ -36,55 +43,53 @@ const scope = (userId: string) => forUser(getDb(), userId);
 export async function loadAgents(userId: string): Promise<AgentsData> {
   const s = scope(userId);
   const now = Date.now();
-  const [volume, rebalance] = await Promise.all([getAgent(s, "volume-watch"), getAgent(s, "auto-rebalance")]);
+  const rows = await listAgents(s);
+  const has = (kind: AgentKind) => rows.some((r) => r.kind === kind);
   const [alerts, rebalances, wallet] = await Promise.all([
-    volume ? listAlerts(s, { limit: 500 }) : [],
-    rebalance ? listRebalances(s, { limit: 500 }) : [],
-    rebalance ? getRebalanceWallet(s) : undefined,
+    has("volume-watch") ? listAlerts(s, { limit: 500 }) : [],
+    has("auto-rebalance") ? listRebalances(s, { limit: 500 }) : [],
+    has("auto-rebalance") ? getRebalanceWallet(s) : undefined,
   ]);
 
-  const view = async (row: NonNullable<typeof volume>, events: { agentId: string; at: Date }[]) => {
-    const pools = await listAgentPools(s, row.id);
-    const tokens = await Promise.all(pools.map((p) => poolTokens(p.poolAddress)));
-    const mine = events.filter((e) => e.agentId === row.id);
-    return {
-      id: row.id,
-      enabled: row.enabled,
-      paused: row.paused,
-      pausedReason: row.pausedReason,
-      pools: pools.map((p, i): PoolView => {
-        const t = tokens[i];
-        return {
-          id: p.id,
-          address: p.poolAddress,
-          label: p.label,
-          lastAlertAt: p.lastAlertAt?.getTime() ?? null,
-          tokens: t ? [t.x, t.y] : null,
-        };
-      }),
-      alerts24h: mine.filter((e) => now - e.at.getTime() < DAY_MS).length,
-      lastAlertAt: mine[0]?.at.getTime() ?? null,
-    };
-  };
-
-  const agents: AgentView[] = [];
-  if (volume) {
-    const parsed = VolumeWatchConfig.safeParse(volume.config);
-    agents.push({
-      ...(await view(volume, alerts)),
-      kind: "volume-watch",
-      config: parsed.success ? parsed.data : VolumeWatchConfig.parse({}),
-    });
-  }
-  if (rebalance) {
-    const parsed = AutoRebalanceConfig.safeParse(rebalance.config);
-    agents.push({
-      ...(await view(rebalance, rebalances)),
-      kind: "auto-rebalance",
-      config: parsed.success ? parsed.data : AutoRebalanceConfig.parse({}),
-      wallet: wallet?.publicKey ?? null,
-    });
-  }
+  const agents = await Promise.all(
+    rows.map(async (row): Promise<AgentView> => {
+      const pools = await listAgentPools(s, row.id);
+      const tokens = await Promise.all(pools.map((p) => poolTokens(p.poolAddress)));
+      // An in-range fee claim is not an out-of-range event, so it stays out of the counts.
+      const events = row.kind === "volume-watch" ? alerts : rebalances.filter((r) => r.action === "rebalance");
+      const mine = events.filter((e) => e.agentId === row.id);
+      const base = {
+        id: row.id,
+        enabled: row.enabled,
+        paused: row.paused,
+        pausedReason: row.pausedReason,
+        pools: pools.map((p, i): PoolView => {
+          const t = tokens[i];
+          return {
+            id: p.id,
+            address: p.poolAddress,
+            label: p.label,
+            lastAlertAt: p.lastAlertAt?.getTime() ?? null,
+            tokens: t ? [t.x, t.y] : null,
+          };
+        }),
+        alerts24h: mine.filter((e) => now - e.at.getTime() < DAY_MS).length,
+        lastAlertAt: mine[0]?.at.getTime() ?? null,
+      };
+      if (row.kind === "volume-watch") {
+        const parsed = VolumeWatchConfig.safeParse(row.config);
+        return { ...base, kind: "volume-watch", config: parsed.success ? parsed.data : VolumeWatchConfig.parse({}) };
+      }
+      const parsed = AutoRebalanceConfig.safeParse(row.config);
+      return {
+        ...base,
+        kind: "auto-rebalance",
+        config: parsed.success ? parsed.data : AutoRebalanceConfig.parse({}),
+        wallet: wallet?.publicKey ?? null,
+        rpcHost: rpcHost(wallet?.rpcUrl ?? null),
+      };
+    }),
+  );
   return { agents, now };
 }
 
@@ -95,19 +100,31 @@ async function tokensFor(addresses: string[]) {
   return new Map(unique.map((a, i) => [a, found[i] ?? null]));
 }
 
-export async function loadRebalances(userId: string): Promise<RebalancesData> {
+/** The agent's own pool labels, so a history row names its pool the way the agent does. */
+async function poolLabels(userId: string, agentId: string) {
+  const pools = await listAgentPools(scope(userId), agentId);
+  return new Map(pools.flatMap((p) => (p.label ? [[p.poolAddress, p.label] as const] : [])));
+}
+
+/** One agent's history; an agent the user does not own reads as empty. */
+export async function loadRebalances(userId: string, agentId: string): Promise<RebalancesData> {
   const s = scope(userId);
-  const [rows, labels] = await Promise.all([
-    listRebalances(s, { limit: ALERT_PAGE }),
-    loadPoolLabels(userId, "auto-rebalance"),
+  const [agent, rows, labels] = await Promise.all([
+    getAgent(s, agentId),
+    listRebalances(s, { limit: ALERT_PAGE, agentId }),
+    poolLabels(userId, agentId),
   ]);
+  const config = AutoRebalanceConfig.safeParse(agent?.config);
   const tokens = await tokensFor(rows.map((r) => r.poolAddress));
   return {
     now: Date.now(),
+    feeMode: config.success ? config.data.feeMode : "keep",
     rebalances: rows.map((r) => {
       const t = tokens.get(r.poolAddress) ?? null;
       return {
         id: r.id,
+        action: r.action,
+        feeSol: r.feeSol,
         poolAddress: r.poolAddress,
         poolLabel: labels.get(r.poolAddress) ?? (t ? `${t.x.symbol}-${t.y.symbol}` : null),
         tokens: t ? [t.x, t.y] : null,
@@ -130,11 +147,11 @@ export async function loadRebalances(userId: string): Promise<RebalancesData> {
 
 export async function loadAlerts(userId: string): Promise<AlertsData> {
   const s = scope(userId);
-  const [alerts, labels] = await Promise.all([
-    listAlerts(s, { limit: ALERT_PAGE }),
-    loadPoolLabels(userId, "volume-watch"),
+  const [alerts, [agent]] = await Promise.all([listAlerts(s, { limit: ALERT_PAGE }), listAgents(s, "volume-watch")]);
+  const [labels, tokens] = await Promise.all([
+    agent ? poolLabels(userId, agent.id) : new Map<string, string>(),
+    tokensFor(alerts.map((a) => a.poolAddress)),
   ]);
-  const tokens = await tokensFor(alerts.map((a) => a.poolAddress));
   return {
     now: Date.now(),
     alerts: alerts.map((a) => {
@@ -156,23 +173,20 @@ export async function loadAlerts(userId: string): Promise<AlertsData> {
   };
 }
 
-async function loadPoolLabels(userId: string, kind: AgentKind) {
-  const s = scope(userId);
-  const row = await getAgent(s, kind);
-  const pools = row ? await listAgentPools(s, row.id) : [];
-  return new Map(pools.flatMap((p) => (p.label ? [[p.poolAddress, p.label] as const] : [])));
-}
-
-export async function loadTelegram(userId: string): Promise<TelegramView> {
-  const link = await getTelegramLink(scope(userId));
-  if (!link) return { bot: null, relink: null };
-  // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks for
-  // the token once more, and connecting overwrites the row.
-  if (!readable(link.botToken)) return { bot: null, relink: link.botUsername };
-  return {
-    bot: { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username },
-    relink: null,
+export async function loadTelegram(userId: string): Promise<Record<AgentKind, TelegramView>> {
+  const links = await getTelegramLinks(scope(userId));
+  const view = (kind: AgentKind): TelegramView => {
+    const link = links.find((l) => l.kind === kind);
+    if (!link) return { bot: null, relink: null };
+    // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks
+    // for the token once more, and connecting overwrites the row.
+    if (!readable(link.botToken)) return { bot: null, relink: link.botUsername };
+    return {
+      bot: { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username },
+      relink: null,
+    };
   };
+  return Object.fromEntries(AGENT_KINDS.map((k) => [k, view(k)])) as Record<AgentKind, TelegramView>;
 }
 
 function readable(encrypted: string) {
@@ -192,49 +206,73 @@ export interface NewAgentInput {
   config: unknown;
 }
 
-/** Creates the user's agent of this kind (or reuses it), saves the config, adds the pools and turns it on. */
+/**
+ * Creates an agent with its pools, turned on, and returns its id. A user has one volume-watch agent, and any number of
+ * auto-rebalance agents with one pool each, never two on the same pool (both would act on the same position).
+ */
 export async function createAgent(userId: string, input: NewAgentInput) {
-  const { kind } = input;
-  if (input.pools.length === 0 || input.pools.length > MAX_POOLS) {
-    throw new Error(`Pick between 1 and ${MAX_POOLS} pools`);
+  const { kind, pools } = input;
+  const max = poolLimit(kind);
+  if (pools.length === 0 || pools.length > max) {
+    throw new Error(max === 1 ? "An auto-rebalance agent manages exactly one pool" : `Pick between 1 and ${max} pools`);
   }
   if (kind === "auto-rebalance" && !(await getRebalanceWallet(scope(userId)))) {
     throw new Error("Save the wallet this agent manages first");
   }
-  await getDb().transaction(async (tx) => {
+  return getDb().transaction(async (tx) => {
     const s = forUser(tx, userId);
-    const agent = await ensureAgent(s, kind);
-    await updateAgent(s, kind, { config: input.config, enabled: true, paused: false, pausedReason: null });
-    for (const pool of input.pools) await addAgentPool(s, agent.id, pool.address, pool.label);
+    await lockUserAgents(s);
+    if (kind === "volume-watch" && (await listAgents(s, kind)).length > 0) {
+      throw new Error("You already have a volume spike agent; add pools to it instead");
+    }
+    if (kind === "auto-rebalance") {
+      const managed = new Set((await listPoolsOfKind(s, kind)).map((p) => p.poolAddress));
+      if (pools.some((p) => managed.has(p.address))) {
+        throw new Error("Another auto-rebalance agent already manages this pool");
+      }
+    }
+    const agent = await insertAgent(s, kind, { enabled: true, config: input.config });
+    for (const pool of pools) await addAgentPool(s, agent.id, pool.address, pool.label);
+    return agent.id;
   });
 }
 
 /** Turning on or resuming clears the runner's pause reason; pausing by hand has none. */
-export async function setAgentState(userId: string, kind: AgentKind, patch: { enabled?: boolean; paused?: boolean }) {
+export async function setAgentState(userId: string, agentId: string, patch: { enabled?: boolean; paused?: boolean }) {
   const resuming = patch.enabled === true || patch.paused === false;
-  const row = await updateAgent(scope(userId), kind, {
-    ...patch,
-    ...(resuming ? { pausedReason: null } : {}),
-  });
-  if (!row) throw new Error("No agent yet");
+  const row = await updateAgent(scope(userId), agentId, { ...patch, ...(resuming ? { pausedReason: null } : {}) });
+  if (!row) throw new Error("Agent not found");
 }
 
-export async function saveConfig(userId: string, kind: AgentKind, config: unknown) {
-  const row = await updateAgent(scope(userId), kind, { config });
-  if (!row) throw new Error("No agent yet");
+export async function saveConfig(userId: string, agentId: string, config: unknown) {
+  const row = await updateAgent(scope(userId), agentId, { config });
+  if (!row) throw new Error("Agent not found");
 }
 
-export async function addPool(userId: string, kind: AgentKind, pool: { address: string; label: string }) {
+export async function removeAgent(userId: string, agentId: string) {
+  if (!(await deleteAgent(scope(userId), agentId))) throw new Error("Agent not found");
+}
+
+/** Only a volume-watch agent's pools change after creation; an auto-rebalance agent's pool is fixed. */
+async function watchedPools(userId: string, agentId: string) {
   const s = scope(userId);
-  const agent = await getAgent(s, kind);
-  if (!agent) throw new Error("No agent yet");
-  const existing = await listAgentPools(s, agent.id);
+  const agent = await getAgent(s, agentId);
+  if (!agent) throw new Error("Agent not found");
+  if (agent.kind === "auto-rebalance") {
+    throw new Error("An auto-rebalance agent keeps its pool; create another agent for a new pool");
+  }
+  return listAgentPools(s, agentId);
+}
+
+export async function addPool(userId: string, agentId: string, pool: { address: string; label: string }) {
+  const existing = await watchedPools(userId, agentId);
   if (existing.length >= MAX_POOLS && !existing.some((p) => p.poolAddress === pool.address)) {
     throw new Error(`An agent watches at most ${MAX_POOLS} pools`);
   }
-  await addAgentPool(s, agent.id, pool.address, pool.label);
+  await addAgentPool(scope(userId), agentId, pool.address, pool.label);
 }
 
-export async function removePool(userId: string, poolId: string) {
-  await removeAgentPool(scope(userId), poolId);
+export async function removePool(userId: string, agentId: string, poolId: string) {
+  await watchedPools(userId, agentId);
+  await removeAgentPool(scope(userId), agentId, poolId);
 }

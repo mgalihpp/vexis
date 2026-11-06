@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tile } from "@/features/portfolio/components/active-figures";
 import { SCROLL_TABLE, type View, ViewToggle } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
-import { AGENT_NAME, type AgentView, agentStatus, formatMinutes, ruleSummary, summarizeFleet } from "../agents";
+import { type AgentView, agentName, agentStatus, formatMinutes, ruleSummary, summarizeFleet } from "../agents";
 import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
 import { AgentsBar, BarPill, PairLogo, StatCard } from "./agent-layout";
@@ -82,7 +82,7 @@ function NewAgentButton() {
 
 function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   const [first, ...rest] = agent.pools;
   return (
     <TableRow>
@@ -95,7 +95,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
         >
           <AgentAvatar status={status} className="size-8" />
           <div>
-            <div className="text-xs font-semibold group-hover:text-brand">{AGENT_NAME[agent.kind]}</div>
+            <div className="text-xs font-semibold group-hover:text-brand">{agentName(agent)}</div>
             <StatusDot status={status} />
           </div>
         </Link>
@@ -155,7 +155,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
 
 function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   return (
     <article className="rounded-lg border bg-card p-2.5 text-xs tabular-nums">
       <div className="flex items-start justify-between gap-1.5">
@@ -167,7 +167,7 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
         >
           <AgentAvatar status={status} className="size-9" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold group-hover:text-brand">{AGENT_NAME[agent.kind]}</div>
+            <div className="truncate text-sm font-semibold group-hover:text-brand">{agentName(agent)}</div>
             <StatusDot status={status} />
           </div>
         </Link>

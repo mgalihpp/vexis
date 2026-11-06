@@ -1,5 +1,5 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BotIcon,
   ChevronRightIcon,
@@ -9,10 +9,21 @@ import {
   PowerIcon,
   SendIcon,
   SlidersHorizontalIcon,
+  Trash2Icon,
   WalletIcon,
   XIcon,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -27,8 +38,8 @@ import {
 } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
 import {
-  AGENT_NAME,
   type AgentView,
+  agentName,
   agentStatus,
   type ConfigFields,
   compactUsd,
@@ -39,7 +50,13 @@ import {
   statusHint,
   type VolumeAgentView,
 } from "../agents";
-import { addAgentPoolFn, removeAgentPoolFn, saveAgentConfig, setAgentRunning } from "../agents.functions";
+import {
+  addAgentPoolFn,
+  deleteAgentFn,
+  removeAgentPoolFn,
+  saveAgentConfig,
+  setAgentRunning,
+} from "../agents.functions";
 import { agentsQuery, alertsQuery } from "../agents.queries";
 import {
   AgentsBar,
@@ -69,7 +86,7 @@ export type DetailTab = (typeof DETAIL_TABS)[number];
 const tabLabel = (tab: DetailTab, agent: AgentView) =>
   ({
     overview: "Overview",
-    pools: "Pools",
+    pools: agent.kind === "auto-rebalance" ? "Pool" : "Pools",
     alerts: agent.kind === "auto-rebalance" ? "Rebalance History" : "Alert History",
     settings: "Settings",
   })[tab];
@@ -109,7 +126,7 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   const hint = statusHint(agent);
   const [notice, setNotice] = useState<string | null>(null);
   // Like the portfolio's tables, the alert history fills the viewport and scrolls inside its table.
@@ -135,7 +152,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
           <BarPill icon={<BotIcon className="size-[0.9rem] text-brand" />}>Agents</BarPill>
         </Link>
         <ChevronRightIcon className="size-3.25 shrink-0 text-muted-foreground" />
-        <BarPill>{AGENT_NAME[agent.kind]}</BarPill>
+        <BarPill>{agentName(agent)}</BarPill>
       </AgentsBar>
 
       <nav className="flex shrink-0 overflow-x-auto border-b px-2">
@@ -149,7 +166,9 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
             aria-current={t === tab ? "page" : undefined}
           >
             {tabLabel(t, agent)}
-            {t === "pools" && <span className="ml-1 text-muted-foreground">{agent.pools.length}</span>}
+            {t === "pools" && agent.kind === "volume-watch" && (
+              <span className="ml-1 text-muted-foreground">{agent.pools.length}</span>
+            )}
           </Link>
         ))}
       </nav>
@@ -178,7 +197,8 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
               <Overview agent={agent} now={now} />
             ))}
           {tab === "pools" && <PoolsTab agent={agent} now={now} />}
-          {tab === "alerts" && (agent.kind === "auto-rebalance" ? <RebalanceHistory /> : <AlertsTab now={now} />)}
+          {tab === "alerts" &&
+            (agent.kind === "auto-rebalance" ? <RebalanceHistory agentId={agent.id} /> : <AlertsTab now={now} />)}
           {tab === "settings" && <SettingsTab agent={agent} onSaved={setNotice} />}
         </div>
       </div>
@@ -223,7 +243,7 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
           </Panel>
           <Panel title="Telegram">
             <div className="px-3.25 pb-3.25">
-              <TelegramPanel />
+              <TelegramPanel kind="volume-watch" />
             </div>
           </Panel>
         </div>
@@ -240,6 +260,8 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
 function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
   const add = useAgentMutation(addAgentPoolFn);
   const remove = useAgentMutation(removeAgentPoolFn);
+  // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
+  const editable = agent.kind === "volume-watch";
   return (
     <div className="flex flex-col gap-2">
       <div className="-mx-2 overflow-x-auto">
@@ -279,12 +301,14 @@ function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
                       <ExternalLinkIcon className="size-3.5" />
                       <span className="sr-only">Open analytics</span>
                     </Link>
-                    <RemovePoolButton
-                      name={poolName(p)}
-                      disabled={remove.isPending}
-                      pending={remove.isPending && remove.variables?.data.poolId === p.id}
-                      onClick={() => remove.mutate({ data: { poolId: p.id } })}
-                    />
+                    {editable && (
+                      <RemovePoolButton
+                        name={poolName(p)}
+                        disabled={remove.isPending}
+                        pending={remove.isPending && remove.variables?.data.poolId === p.id}
+                        onClick={() => remove.mutate({ data: { agentId: agent.id, poolId: p.id } })}
+                      />
+                    )}
                   </div>
                 </TableCell>
               </TableRow>
@@ -292,17 +316,24 @@ function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
           </TableBody>
         </Table>
       </div>
-      <Panel title="Add a pool">
-        <div className="px-3.25 pb-3.25">
-          <PoolPicker
-            taken={agent.pools.map((p) => p.address)}
-            count={agent.pools.length}
-            busy={add.isPending}
-            onPick={(pool) => add.mutate({ data: { ...pool, kind: agent.kind } })}
-          />
-          <FormError error={add.error ?? remove.error} />
-        </div>
-      </Panel>
+      {editable ? (
+        <Panel title="Add a pool">
+          <div className="px-3.25 pb-3.25">
+            <PoolPicker
+              taken={agent.pools.map((p) => p.address)}
+              count={agent.pools.length}
+              busy={add.isPending}
+              onPick={(pool) => add.mutate({ data: { ...pool, agentId: agent.id } })}
+            />
+            <FormError error={add.error ?? remove.error} />
+          </div>
+        </Panel>
+      ) : (
+        <p className="px-1 text-xs text-muted-foreground">
+          An auto-rebalance agent keeps the pool it was created for. Create another agent for another pool, or delete
+          this one in Settings.
+        </p>
+      )}
     </div>
   );
 }
@@ -367,7 +398,7 @@ function AlertsTab({ now }: { now: number }) {
 }
 
 function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: string) => void }) {
-  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { kind: agent.kind, enabled } }));
+  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { agentId: agent.id, enabled } }));
   const [dirty, setDirty] = useState(false);
   const [section, setSection] = useState<SettingsSectionId>("rule");
   const sections = SETTINGS_SECTIONS.filter((s) => s.id !== "wallet" || agent.kind === "auto-rebalance").map((s) =>
@@ -415,7 +446,7 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
 
         {section === "telegram" && (
           <div className="p-4 sm:p-5">
-            <TelegramPanel />
+            <TelegramPanel kind={agent.kind} />
           </div>
         )}
 
@@ -445,9 +476,52 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
               />
             </div>
             <FormError error={power.error} />
+            <DeleteAgent agent={agent} />
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Deletes the agent with its pools and history, after a confirmation. */
+function DeleteAgent({ agent }: { agent: AgentView }) {
+  const navigate = useNavigate();
+  const remove = useAgentMutation(() => deleteAgentFn({ data: { agentId: agent.id } }));
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="flex items-center justify-between gap-6 border-t pt-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">Delete agent</p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+          Removes the agent, its pools and its history. Positions and funds in the wallet stay where they are.
+        </p>
+        <FormError error={remove.error} />
+      </div>
+      <Button variant="outline" size="sm" disabled={remove.isPending} onClick={() => setConfirming(true)}>
+        {remove.isPending ? <Spinner /> : <Trash2Icon />}
+        Delete
+      </Button>
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {agentName(agent)}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The agent stops at once and its {agent.kind === "auto-rebalance" ? "rebalance" : "alert"} history is
+              deleted. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => remove.mutate(undefined, { onSuccess: () => navigate({ to: "/agents" }) })}
+            >
+              Delete agent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -495,7 +569,7 @@ function VolumeRuleSection({
           onClick={() =>
             result.ok &&
             save.mutate(
-              { data: { kind: "volume-watch", config: result.config } },
+              { data: { agentId: agent.id, kind: "volume-watch", config: result.config } },
               {
                 onSuccess: () => {
                   onDirty(false);
@@ -528,6 +602,6 @@ const SETTINGS_SECTIONS = [
     icon: WalletIcon,
     description: "The wallet whose position the agent keeps in range.",
   },
-  { id: "agent", label: "Agent", icon: PowerIcon, description: "Turn the agent on or off." },
+  { id: "agent", label: "Agent", icon: PowerIcon, description: "Turn the agent on or off, or delete it." },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];

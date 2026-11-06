@@ -1,4 +1,4 @@
-import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircleIcon,
@@ -21,11 +21,15 @@ import {
   COMING_SOON,
   type Draft,
   defaultDraft,
+  describeFees,
   describeWidth,
   draftIssues,
   formatMinutes,
+  managedPools,
   parseConfigFields,
   parseRebalanceFields,
+  poolLimit,
+  solText,
   WIZARD_STEPS,
   type WizardStep,
 } from "../agents";
@@ -43,41 +47,42 @@ const STEP_META: Record<WizardStep, { title: string; sub: string; heading: strin
 
 export function AgentWizard({ step }: { step: WizardStep }) {
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const create = useAgentMutation(createAgentFn);
   const { data: fleet } = useSuspenseQuery(agentsQuery);
   const { data: wallet } = useSuspenseQuery(walletQuery);
-  // One agent per kind for now, so a kind the user already has cannot be added again.
-  const added = new Set<string>(fleet.agents.map((a) => a.kind));
+  // One volume-watch agent per user; auto-rebalance agents are one per pool, so that kind is always available.
+  const added = new Set<string>(fleet.agents.flatMap((a) => (a.kind === "volume-watch" ? [a.kind] : [])));
+  const managed = managedPools(fleet.agents);
   const available = AGENT_TYPES.filter((t) => !added.has(t.kind));
   const [draft, setDraft] = useState<Draft>(() => defaultDraft(available[0]?.kind));
 
   const go = (to: WizardStep) => navigate({ to: "/agents/new", search: { step: to } });
   const index = WIZARD_STEPS.indexOf(step);
-  const issues = draftIssues(draft, wallet.publicKey);
+  const issues = draftIssues(draft, { wallet: wallet.publicKey, rpcHost: wallet.rpcHost, managed });
   const rebalance = draft.kind === "auto-rebalance";
   const rulesOk = rebalance ? parseRebalanceFields(draft.rebalanceFields).ok : parseConfigFields(draft.fields).ok;
 
   const launch = async () => {
+    let created: { id: string };
     if (rebalance) {
       const parsed = parseRebalanceFields(draft.rebalanceFields);
       if (!parsed.ok) return;
-      await create.mutateAsync({ data: { kind: "auto-rebalance", pools: draft.pools, config: parsed.config } });
+      created = await create.mutateAsync({
+        data: { kind: "auto-rebalance", pools: draft.pools, config: parsed.config },
+      });
     } else {
       const parsed = parseConfigFields(draft.fields);
       if (!parsed.ok) return;
-      await create.mutateAsync({ data: { kind: "volume-watch", pools: draft.pools, config: parsed.config } });
+      created = await create.mutateAsync({ data: { kind: "volume-watch", pools: draft.pools, config: parsed.config } });
     }
-    const { agents } = await qc.fetchQuery({ ...agentsQuery, staleTime: 0 });
-    const agent = agents.find((a) => a.kind === draft.kind);
-    if (agent) await navigate({ to: "/agents/$agentId", params: { agentId: agent.id }, search: { tab: "overview" } });
+    await navigate({ to: "/agents/$agentId", params: { agentId: created.id }, search: { tab: "overview" } });
   };
 
   const canAdvance =
     step === "agent"
       ? !added.has(draft.kind)
       : step === "pools"
-        ? draft.pools.length > 0
+        ? draft.pools.length > 0 && !draft.pools.some((p) => rebalance && managed.has(p.address))
         : step === "rules"
           ? rulesOk
           : issues.length === 0;
@@ -99,14 +104,22 @@ export function AgentWizard({ step }: { step: WizardStep }) {
 
         <section className="flex flex-col">
           <h2 className="mb-4 text-base font-semibold tracking-tight">
-            {step === "rules" && rebalance ? "Rebalance rule" : STEP_META[step].heading}
+            {rebalance && step === "rules"
+              ? "Rebalance rule"
+              : rebalance && step === "pools"
+                ? "Choose the pool"
+                : STEP_META[step].heading}
           </h2>
 
           <div className="space-y-4">
             {step === "agent" && (
-              <AgentStep added={added} selected={draft.kind} onSelect={(kind) => setDraft((d) => ({ ...d, kind }))} />
+              <AgentStep
+                added={added}
+                selected={draft.kind}
+                onSelect={(kind) => setDraft((d) => ({ ...d, kind, pools: d.pools.slice(0, poolLimit(kind)) }))}
+              />
             )}
-            {step === "pools" && <PoolsStep draft={draft} setDraft={setDraft} />}
+            {step === "pools" && <PoolsStep draft={draft} managed={managed} setDraft={setDraft} />}
             {step === "rules" && rebalance && (
               <RebalanceConfigForm
                 fields={draft.rebalanceFields}
@@ -114,9 +127,7 @@ export function AgentWizard({ step }: { step: WizardStep }) {
                   const r = parseRebalanceFields(draft.rebalanceFields);
                   return r.ok ? {} : r.errors;
                 })()}
-                onChange={(key, value) =>
-                  setDraft((d) => ({ ...d, rebalanceFields: { ...d.rebalanceFields, [key]: value } }))
-                }
+                onChange={(patch) => setDraft((d) => ({ ...d, rebalanceFields: { ...d.rebalanceFields, ...patch } }))}
               />
             )}
             {step === "rules" && !rebalance && (
@@ -284,14 +295,33 @@ function AgentStep({
   );
 }
 
-function PoolsStep({ draft, setDraft }: { draft: Draft; setDraft: (f: (d: Draft) => Draft) => void }) {
+function PoolsStep({
+  draft,
+  managed,
+  setDraft,
+}: {
+  draft: Draft;
+  managed: ReadonlySet<string>;
+  setDraft: (f: (d: Draft) => Draft) => void;
+}) {
+  const max = poolLimit(draft.kind);
   return (
-    <PoolPicker
-      taken={draft.pools.map((p) => p.address)}
-      count={draft.pools.length}
-      onPick={(pool) => setDraft((d) => ({ ...d, pools: [...d.pools, pool] }))}
-      onRemove={(address) => setDraft((d) => ({ ...d, pools: d.pools.filter((x) => x.address !== address) }))}
-    />
+    <>
+      {max === 1 && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          An auto-rebalance agent manages the one funded position the agent wallet holds in one pool. Pools another
+          agent already manages are left out.
+        </p>
+      )}
+      <PoolPicker
+        taken={draft.pools.map((p) => p.address)}
+        hidden={max === 1 ? [...managed] : []}
+        count={draft.pools.length}
+        max={max}
+        onPick={(pool) => setDraft((d) => ({ ...d, pools: max === 1 ? [pool] : [...d.pools, pool] }))}
+        onRemove={(address) => setDraft((d) => ({ ...d, pools: d.pools.filter((x) => x.address !== address) }))}
+      />
+    </>
   );
 }
 
@@ -304,7 +334,9 @@ function ruleRows(draft: Draft): { label: string; value: string }[] {
       { label: "Strategy", value: c ? c.strategy : dash },
       { label: "Range width", value: c ? describeWidth(c.halfWidth) : dash },
       { label: "Slippage", value: c ? `${c.slippageBps} bps` : dash },
-      { label: "Cooldown", value: c ? `${formatMinutes(c.cooldownSec)} per pool` : dash },
+      { label: "Cooldown", value: c ? formatMinutes(c.cooldownSec) : dash },
+      { label: "Fees", value: c ? describeFees(c) : dash },
+      { label: "SOL reserve", value: c ? solText(c.solReserve) : dash },
     ];
   }
   const parsed = parseConfigFields(draft.fields);
@@ -326,7 +358,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
         ? names.join(", ")
         : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
   const rows: { label: string; value: string; step: WizardStep }[] = [
-    { label: "Pools", value: pools, step: "pools" },
+    { label: draft.kind === "auto-rebalance" ? "Pool" : "Pools", value: pools, step: "pools" },
     ...ruleRows(draft).map((r) => ({ ...r, step: "rules" as const })),
   ];
   return (
@@ -365,7 +397,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
         </div>
       )}
       <div className="rounded-2xl bg-muted/40 p-4">
-        <TelegramPanel />
+        <TelegramPanel kind={draft.kind} />
       </div>
     </>
   );

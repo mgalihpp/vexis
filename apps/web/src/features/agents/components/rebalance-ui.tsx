@@ -2,8 +2,9 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { TriangleAlertIcon, WalletIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { SolIcon } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,9 +23,14 @@ import { useStamp } from "@/features/timezone/timezone";
 import { shortAddr } from "@/lib/format";
 import {
   agentStatus,
+  describeFees,
   describeWidth,
+  FEE_MODE_LABEL,
+  FEE_MODES,
+  type FeeMode,
   formatMinutes,
   modeLabel,
+  pairName,
   parseRebalanceFields,
   REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
@@ -34,8 +40,14 @@ import {
   rebalanceFields,
   SECRET_KEY_PATTERN,
   STATUS_LABEL,
+  solText,
 } from "../agents";
-import { removeRebalanceWalletFn, saveAgentConfig, saveRebalanceWalletFn } from "../agents.functions";
+import {
+  removeRebalanceWalletFn,
+  saveAgentConfig,
+  saveRebalanceRpcUrlFn,
+  saveRebalanceWalletFn,
+} from "../agents.functions";
 import { rebalancesQuery, walletQuery } from "../agents.queries";
 import { Delivery, Panel, PoolCell, StatCard } from "./agent-layout";
 import {
@@ -55,6 +67,14 @@ const SLIPPAGE_PRESETS = [10, 50, 100, 300];
 /** 0 stands for "keep the current width"; a real half width is at least 1. */
 const WIDTH_PRESETS = [0, 10, 34, 69];
 const COOLDOWN_PRESETS = [1, 5, 15, 60];
+/** 0 stands for "off": fees are then claimed only when a rebalance does. */
+const CLAIM_PRESETS = [0, 0.01, 0.05, 0.1];
+const RESERVE_PRESETS = [0.05, 0.1, 0.2, 0.5];
+
+/** What the agent wallet has to hold, shown under the reserve field and in the wallet panel. */
+export const WALLET_NEEDS =
+  "Keep about 0.1 to 0.2 SOL beyond the position for transaction and priority fees plus one-time rent: a new bin " +
+  "array is about 0.07 SOL, a token account about 0.002 SOL.";
 
 /** A preset row whose value lives in a form string; Custom turns into a number field in place. */
 function PresetField({
@@ -65,6 +85,7 @@ function PresetField({
   presets,
   fmt,
   suffix,
+  step = "1",
   error,
   onChange,
 }: {
@@ -75,6 +96,7 @@ function PresetField({
   presets: number[];
   fmt: (n: number) => string;
   suffix?: string;
+  step?: string;
   error?: string;
   onChange: (value: string) => void;
 }) {
@@ -97,7 +119,7 @@ function PresetField({
           setCustomOn(false);
           onChange(v === 0 && presets.includes(0) ? "" : String(v));
         }}
-        custom={{ id, value, suffix, step: "1", invalid: Boolean(error), autoFocus: focus, onChange }}
+        custom={{ id, value, suffix, step, invalid: Boolean(error), autoFocus: focus, onChange }}
       />
     </SettingRow>
   );
@@ -111,7 +133,7 @@ export function RebalanceConfigForm({
 }: {
   fields: RebalanceFields;
   errors: Partial<Record<keyof RebalanceFields, string>>;
-  onChange: (key: Exclude<keyof RebalanceFields, "dryRun">, value: string) => void;
+  onChange: (patch: Partial<Omit<RebalanceFields, "dryRun">>) => void;
 }) {
   return (
     <div className="@container divide-y divide-border">
@@ -120,7 +142,7 @@ export function RebalanceConfigForm({
           label="Strategy"
           options={REBALANCE_STRATEGIES.map((s, i) => ({ value: i, label: s === "BidAsk" ? "Bid-Ask" : s }))}
           value={REBALANCE_STRATEGIES.indexOf(fields.strategy)}
-          onChange={(i) => onChange("strategy", REBALANCE_STRATEGIES[i] ?? "Curve")}
+          onChange={(i) => onChange({ strategy: REBALANCE_STRATEGIES[i] ?? "Curve" })}
         />
       </SettingRow>
       <PresetField
@@ -132,7 +154,7 @@ export function RebalanceConfigForm({
         fmt={(n) => (n === 0 ? "Same" : `±${n}`)}
         suffix="bins"
         error={errors.halfWidth}
-        onChange={(v) => onChange("halfWidth", v)}
+        onChange={(halfWidth) => onChange({ halfWidth })}
       />
       <PresetField
         id="rb-slippage"
@@ -143,7 +165,7 @@ export function RebalanceConfigForm({
         fmt={(n) => `${n} bps`}
         suffix="bps"
         error={errors.slippageBps}
-        onChange={(v) => onChange("slippageBps", v)}
+        onChange={(slippageBps) => onChange({ slippageBps })}
       />
       <PresetField
         id="rb-cooldown"
@@ -154,7 +176,49 @@ export function RebalanceConfigForm({
         fmt={minutesLabel}
         suffix="min"
         error={errors.cooldownMin}
-        onChange={(v) => onChange("cooldownMin", v)}
+        onChange={(cooldownMin) => onChange({ cooldownMin })}
+      />
+      <SettingRow
+        label="Fees"
+        hint="What happens to the fees a rebalance claims. Compound deposits them back into the new range; sweep swaps them to SOL."
+        error={errors.feeMode}
+      >
+        <Segmented
+          label="Fees"
+          options={FEE_MODES.map((m, i) => ({ value: i, label: FEE_MODE_LABEL[m] }))}
+          value={FEE_MODES.indexOf(fields.feeMode)}
+          onChange={(i) => {
+            const feeMode: FeeMode = FEE_MODES[i] ?? "keep";
+            // Kept fees are never claimed in range, so a threshold would only be an error to clear.
+            onChange(feeMode === "keep" ? { feeMode, feeClaimThresholdSol: "" } : { feeMode });
+          }}
+        />
+      </SettingRow>
+      {fields.feeMode !== "keep" && (
+        <PresetField
+          id="rb-claim"
+          label="Claim in range"
+          hint="Also claim while the position stays in range, once its unclaimed fees are worth this much. Needs a pool with SOL on one side."
+          value={fields.feeClaimThresholdSol}
+          presets={CLAIM_PRESETS}
+          fmt={(n) => (n === 0 ? "Off" : `${n} SOL`)}
+          suffix="SOL"
+          step="0.01"
+          error={errors.feeClaimThresholdSol}
+          onChange={(feeClaimThresholdSol) => onChange({ feeClaimThresholdSol })}
+        />
+      )}
+      <PresetField
+        id="rb-reserve"
+        label="SOL reserve"
+        hint={`SOL the agent leaves in the wallet. ${WALLET_NEEDS} Live actions pause while the wallet holds less than this.`}
+        value={fields.solReserve}
+        presets={RESERVE_PRESETS}
+        fmt={(n) => `${n} SOL`}
+        suffix="SOL"
+        step="0.01"
+        error={errors.solReserve}
+        onChange={(solReserve) => onChange({ solReserve })}
       />
     </div>
   );
@@ -244,7 +308,7 @@ export function RebalanceRuleSection({
           <RebalanceConfigForm
             fields={fields}
             errors={result.ok ? {} : result.errors}
-            onChange={(key, value) => update({ ...fields, [key]: value })}
+            onChange={(patch) => update({ ...fields, ...patch })}
           />
         </div>
       </div>
@@ -260,7 +324,7 @@ export function RebalanceRuleSection({
           onClick={() =>
             result.ok &&
             save.mutate(
-              { data: { kind: "auto-rebalance", config: result.config } },
+              { data: { agentId: agent.id, kind: "auto-rebalance", config: result.config } },
               {
                 onSuccess: () => {
                   onDirty(false);
@@ -281,15 +345,106 @@ export function RebalanceRuleSection({
 
 // --- wallet ------------------------------------------------------------------------------------
 
+const INPUT =
+  "h-8 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-mono text-xs outline-none focus:border-brand/60";
+
+const HINT = "text-xs leading-relaxed text-muted-foreground";
+
+const RPC_HINT = (
+  <p className={HINT}>
+    Solana mainnet. A{" "}
+    <a href="https://helius.dev" target="_blank" rel="noreferrer" className="text-brand hover:underline">
+      Helius
+    </a>{" "}
+    URL is recommended: other RPCs send transactions without a priority fee. Stored encrypted; only the host is shown
+    again.
+  </p>
+);
+
+/** What has to be true on-chain before an agent can act, in the order the user does it. */
+function BeforeTheAgentActs() {
+  const steps: [string, string][] = [
+    [
+      "Open one position yourself.",
+      "In each agent's pool, from this wallet. The agent moves it back into range but never opens one.",
+    ],
+    [
+      "Leave 0.1 to 0.2 SOL spare.",
+      "It pays transaction fees and one-time rent (a new bin array is about 0.07 SOL). Live actions pause while the wallet holds less than the agent's SOL reserve.",
+    ],
+  ];
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="text-xs font-medium">Before the agent can act</p>
+      <ol className="space-y-2">
+        {steps.map(([title, detail], i) => (
+          <li key={title} className="flex gap-2.5">
+            <span className="flex size-5 shrink-0 items-center justify-center rounded-full border text-[0.7rem] font-semibold tabular-nums">
+              {i + 1}
+            </span>
+            <p className={HINT}>
+              <span className="font-medium text-foreground">{title}</span> {detail}
+            </p>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+const isHttpsUrl = (v: string) => URL.canParse(v) && new URL(v).protocol === "https:";
+
+/** Replaces only the RPC URL. Inline, under the host it replaces. */
+function RpcForm({ onDone }: { onDone: () => void }) {
+  const save = useAgentMutation((rpcUrl: string) => saveRebalanceRpcUrlFn({ data: { rpcUrl } }));
+  const [url, setUrl] = useState("");
+  return (
+    <form
+      className="space-y-1.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate(url.trim(), { onSuccess: onDone });
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <input
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://mainnet.helius-rpc.com/?api-key=…"
+          aria-label="RPC URL"
+          className={INPUT}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+          disabled={save.isPending || !isHttpsUrl(url.trim())}
+        >
+          {save.isPending && <Spinner />}
+          Save
+        </Button>
+      </div>
+      <FormError error={save.error} />
+    </form>
+  );
+}
+
 /**
- * The wallet the agent manages. The secret key goes to the server once and is never shown again; only the public
- * key comes back. No padding of its own, like `TelegramPanel`.
+ * The wallet the agents manage and the RPC they use. The secret key and the RPC URL go to the server once and are
+ * never shown again; only the public key and the RPC's host come back. No padding of its own, like `TelegramPanel`.
  */
 export function WalletPanel() {
   const { data } = useSuspenseQuery(walletQuery);
-  const save = useAgentMutation((secretKey: string) => saveRebalanceWalletFn({ data: { secretKey } }));
+  const save = useAgentMutation((input: { secretKey: string; rpcUrl: string }) =>
+    saveRebalanceWalletFn({ data: input }),
+  );
   const remove = useAgentMutation(() => removeRebalanceWalletFn());
   const [secret, setSecret] = useState("");
+  const [rpcUrl, setRpcUrl] = useState("");
+  const [replacingRpc, setReplacingRpc] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
   const busy = save.isPending || remove.isPending;
 
@@ -298,25 +453,30 @@ export function WalletPanel() {
       setInputError("That does not look like a base58 secret key");
       return;
     }
+    if (!isHttpsUrl(rpcUrl.trim())) {
+      setInputError("The RPC URL must start with https://");
+      return;
+    }
     setInputError(null);
-    await save.mutateAsync(secret.trim());
+    await save.mutateAsync({ secretKey: secret.trim(), rpcUrl: rpcUrl.trim() });
     setSecret("");
+    setRpcUrl("");
   };
 
+  const error = inputError ? (
+    <p className="text-[0.7rem] text-loss">{inputError}</p>
+  ) : (
+    <FormError error={save.error ?? remove.error} />
+  );
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <WalletIcon className="size-4" />
-        </span>
+        <SolIcon className="size-8 shrink-0" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-sm font-medium">
-            {data.publicKey ? shortAddr(data.publicKey) : "No wallet"}
-          </p>
+          <p className="text-sm font-medium">Agent wallet</p>
           <p className="truncate text-xs text-muted-foreground">
-            {data.publicKey
-              ? "Its funded position in each pool is kept in range"
-              : "The agent needs a wallet to manage"}
+            {data.publicKey ? <span className="font-mono">{shortAddr(data.publicKey)}</span> : "Not connected yet"}
           </p>
         </div>
         {data.publicKey && (
@@ -327,53 +487,100 @@ export function WalletPanel() {
         )}
       </div>
 
-      {!data.publicKey && (
+      {data.publicKey ? (
+        <div className="space-y-2 rounded-lg border px-3 py-2.5">
+          <div className="flex items-center gap-3 text-xs">
+            <span className="w-14 shrink-0 text-muted-foreground">RPC</span>
+            <span
+              className={`min-w-0 flex-1 truncate ${data.rpcHost ? "font-mono" : "text-amber-700 dark:text-amber-400"}`}
+            >
+              {data.rpcHost ?? "Not set. The agents wait until you add one."}
+            </span>
+            {data.rpcHost && !replacingRpc && (
+              <Button variant="ghost" size="sm" onClick={() => setReplacingRpc(true)}>
+                Replace
+              </Button>
+            )}
+          </div>
+          {(!data.rpcHost || replacingRpc) && (
+            <>
+              <RpcForm onDone={() => setReplacingRpc(false)} />
+              {RPC_HINT}
+            </>
+          )}
+        </div>
+      ) : (
         <>
           <p className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
             <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
             <span>
-              Use a separate hot wallet that holds only the positions this agent manages, never your main wallet. The
-              key is stored encrypted on the Vexis server so the agent can act without you.
+              Use a separate hot wallet that holds only these positions, never your main wallet. Its key is stored
+              encrypted so the agent can sign without you.
             </span>
           </p>
           <form
-            className="flex items-center gap-2"
+            className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               void submit().catch(() => {});
             }}
           >
-            <input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              value={secret}
-              onChange={(e) => {
-                setSecret(e.target.value);
-                setInputError(null);
-              }}
-              placeholder="Wallet secret key (base58)"
-              aria-label="Wallet secret key"
-              className="h-8 min-w-0 flex-1 rounded-lg border bg-background/60 px-3 font-mono text-xs outline-none focus:border-brand/60"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-              disabled={busy || secret.trim() === ""}
-            >
-              {save.isPending && <Spinner />}
-              Save
-            </Button>
+            <div className="space-y-1.5">
+              <label htmlFor="agent-wallet-secret" className="text-xs font-medium">
+                Secret key
+              </label>
+              <input
+                id="agent-wallet-secret"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={secret}
+                onChange={(e) => {
+                  setSecret(e.target.value);
+                  setInputError(null);
+                }}
+                placeholder="Base58 private key"
+                className={`${INPUT} w-full`}
+              />
+              <p className={HINT}>Exported from your wallet app. It is never shown again after you save.</p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="agent-wallet-rpc" className="text-xs font-medium">
+                RPC URL
+              </label>
+              <input
+                id="agent-wallet-rpc"
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                value={rpcUrl}
+                onChange={(e) => {
+                  setRpcUrl(e.target.value);
+                  setInputError(null);
+                }}
+                placeholder="https://mainnet.helius-rpc.com/?api-key=…"
+                className={`${INPUT} w-full`}
+              />
+              {RPC_HINT}
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <div className="min-w-0 flex-1">{error}</div>
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+                disabled={busy || secret.trim() === "" || rpcUrl.trim() === ""}
+              >
+                {save.isPending && <Spinner />}
+                Save wallet
+              </Button>
+            </div>
           </form>
         </>
       )}
 
-      {inputError ? (
-        <p className="text-[0.7rem] text-loss">{inputError}</p>
-      ) : (
-        <FormError error={save.error ?? remove.error} />
-      )}
+      {data.publicKey && error}
+      <BeforeTheAgentActs />
     </div>
   );
 }
@@ -394,7 +601,8 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; now: number }) {
-  const { data } = useSuspenseQuery(rebalancesQuery);
+  const { data } = useSuspenseQuery(rebalancesQuery(agent.id));
+  const [pool] = agent.pools;
   const status = agentStatus(agent);
   const c = agent.config;
   const tabLink = (tab: "settings" | "alerts", label: string) => (
@@ -411,7 +619,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
         <StatCard label="Status" value={STATUS_LABEL[status]} tone={STATUS_STYLE[status].text} />
-        <StatCard label="Pools" value={agent.pools.length} />
+        <StatCard label="Pool" value={pool ? pairName(pool) : "None"} />
         <StatCard label="Out of range, 24h" value={agent.alerts24h} />
         <StatCard label="Last out of range" value={agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"} />
         <StatCard label="Mode" value={modeLabel(c)} tone={c.dryRun ? "" : "text-brand"} />
@@ -425,6 +633,8 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
                 ["Range width", describeWidth(c.halfWidth)],
                 ["Slippage", `${c.slippageBps} bps`],
                 ["Cooldown", formatMinutes(c.cooldownSec)],
+                ["Fees", describeFees(c)],
+                ["SOL reserve", solText(c.solReserve)],
               ]}
             />
           </Panel>
@@ -435,7 +645,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
           </Panel>
           <Panel title="Telegram">
             <div className="px-3.25 pb-3.25">
-              <TelegramPanel />
+              <TelegramPanel kind="auto-rebalance" />
             </div>
           </Panel>
         </div>
@@ -446,7 +656,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
               : "Live: the agent rebalances on-chain with the saved wallet and links each transaction."}
           </p>
           <div className="overflow-x-auto border-t">
-            <RebalanceTable rows={data.rebalances.slice(0, 8)} now={data.now} />
+            <RebalanceTable rows={data.rebalances.slice(0, 8)} feeMode={data.feeMode} now={data.now} />
           </div>
         </Panel>
       </div>
@@ -454,11 +664,11 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
   );
 }
 
-export function RebalanceHistory() {
-  const { data } = useSuspenseQuery(rebalancesQuery);
+export function RebalanceHistory({ agentId }: { agentId: string }) {
+  const { data } = useSuspenseQuery(rebalancesQuery(agentId));
   return (
     <div className="-mx-2 overflow-x-auto">
-      <RebalanceTable rows={data.rebalances} now={data.now} />
+      <RebalanceTable rows={data.rebalances} feeMode={data.feeMode} now={data.now} />
     </div>
   );
 }
@@ -489,7 +699,20 @@ function Transaction({ row }: { row: RebalanceView }) {
   return <span className={`${TAG} bg-muted text-muted-foreground`}>Sending</span>;
 }
 
-function RebalanceTable({ rows, now }: { rows: RebalanceView[]; now: number }) {
+/** A claim keeps the range, so its "new range" cell says what was claimed and what happened to it. */
+function ClaimCell({ row, feeMode }: { row: RebalanceView; feeMode: FeeMode }) {
+  const mode = feeMode === "sweep" ? "swept to SOL" : feeMode === "compound" ? "compounded" : null;
+  return (
+    <>
+      Fees claimed
+      <span className="block text-[0.625rem] font-normal text-muted-foreground">
+        {[row.feeSol === null ? null : solText(row.feeSol), mode].filter(Boolean).join(", ")}
+      </span>
+    </>
+  );
+}
+
+function RebalanceTable({ rows, feeMode, now }: { rows: RebalanceView[]; feeMode: FeeMode; now: number }) {
   const stamp = useStamp();
   return (
     <Table className="min-w-[44rem]">
@@ -526,7 +749,13 @@ function RebalanceTable({ rows, now }: { rows: RebalanceView[]; now: number }) {
               {r.lowerBin} to {r.upperBin}
             </TableCell>
             <TableCell className="text-right font-semibold text-brand">
-              {r.newLowerBin} to {r.newUpperBin}
+              {r.action === "claim" ? (
+                <ClaimCell row={r} feeMode={feeMode} />
+              ) : (
+                <>
+                  {r.newLowerBin} to {r.newUpperBin}
+                </>
+              )}
             </TableCell>
             <TableCell className="text-right">
               <Transaction row={r} />

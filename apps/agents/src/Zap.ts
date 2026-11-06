@@ -1,51 +1,75 @@
-import { Connection, type Keypair } from "@solana/web3.js";
+import type { Keypair } from "@solana/web3.js";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { ZapError } from "./errors.ts";
+import {
+  type ClaimRequest,
+  type CompoundRequest,
+  executeClaimFees,
+  executeCompoundTopUp,
+  executeSweepToSol,
+  type SweepRequest,
+} from "./fee-execute.ts";
+import { connections, redactRpc } from "./rpc.ts";
 import { DEFAULT_PRIORITY_LEVEL, type SendLog } from "./send.ts";
-import { executeZapRebalance, type ZapRequest } from "./zap-execute.ts";
+import { executeZapRebalance, type ZapContext, type ZapRequest } from "./zap-execute.ts";
 
-export type { ZapRequest };
+export type { ClaimRequest, CompoundRequest, SweepRequest, ZapRequest };
 
-/** Signs and sends a rebalance. The only service that moves funds; tests replace it with a fake. */
+/**
+ * Signs and sends with the agent wallet, over the RPC the user gave. The only service that moves funds; tests replace
+ * it with a fake. Every call resolves to its last confirmed signature; the fee steps resolve to null when there was
+ * nothing to do.
+ */
 export class Zap extends Context.Service<
   Zap,
   {
-    /** Remove -> swap -> zap-in for the position; succeeds with the last leg's signature once it confirmed. */
-    rebalance(signer: Keypair, request: ZapRequest): Effect.Effect<string, ZapError>;
+    /** Remove -> swap -> zap-in for the position. */
+    rebalance(rpcUrl: string, signer: Keypair, request: ZapRequest): Effect.Effect<string, ZapError>;
+    /** Claims the position's fees to the wallet, leaving its range alone. */
+    claimFees(rpcUrl: string, signer: Keypair, request: ClaimRequest): Effect.Effect<string | null, ZapError>;
+    /** Deposits claimed fees back into the position. */
+    compound(rpcUrl: string, signer: Keypair, request: CompoundRequest): Effect.Effect<string | null, ZapError>;
+    /** Swaps claimed fees to SOL. */
+    sweep(rpcUrl: string, signer: Keypair, request: SweepRequest): Effect.Effect<string | null, ZapError>;
   }
 >()("vexis/agents/Zap") {
   static readonly layer = Layer.effect(
     Zap,
     Effect.gen(function* () {
-      // Priority fees come from Helius `getPriorityFeeEstimate`; another RPC sends with no priority fee.
-      const rpc = yield* Config.String("SOLANA_RPC_URL").pipe(
-        Config.withDefault("https://api.mainnet-beta.solana.com"),
+      const jupiterApiKey = Option.getOrUndefined(
+        Option.map(yield* Config.Redacted("JUPITER_API_KEY").pipe(Config.option), Redacted.value),
       );
-      const jupiterApiKey = yield* Config.Redacted("JUPITER_API_KEY").pipe(Config.option);
-      const connection = new Connection(rpc, "confirmed");
+      const connectionFor = connections();
 
-      const rebalance = (signer: Keypair, request: ZapRequest) => {
-        const prefix = `zap ${request.positionAddress}`;
-        const log: SendLog = {
-          info: (message) => Effect.runSync(Effect.logInfo(`${prefix}: ${message}`)),
-          warn: (message) => Effect.runSync(Effect.logWarning(`${prefix}: ${message}`)),
+      const run =
+        <R, A>(name: string, execute: (ctx: ZapContext, request: R) => Promise<A>, subject: (request: R) => string) =>
+        (rpcUrl: string, signer: Keypair, request: R) => {
+          const prefix = `${name} ${subject(request)}`;
+          // Priority fees come from Helius `getPriorityFeeEstimate`; another RPC sends with no priority fee.
+          const log: SendLog = {
+            info: (message) => Effect.runSync(Effect.logInfo(`${prefix}: ${redactRpc(message, rpcUrl)}`)),
+            warn: (message) => Effect.runSync(Effect.logWarning(`${prefix}: ${redactRpc(message, rpcUrl)}`)),
+          };
+          const ctx: ZapContext = {
+            connection: connectionFor(rpcUrl),
+            signer,
+            log,
+            priorityLevel: DEFAULT_PRIORITY_LEVEL,
+            jupiterApiKey,
+          };
+          return Effect.tryPromise({
+            try: () => execute(ctx, request),
+            catch: (cause) =>
+              new ZapError({ message: redactRpc(cause instanceof Error ? cause.message : String(cause), rpcUrl) }),
+          });
         };
-        return Effect.tryPromise({
-          try: () =>
-            executeZapRebalance(
-              {
-                connection,
-                signer,
-                log,
-                priorityLevel: DEFAULT_PRIORITY_LEVEL,
-                jupiterApiKey: Option.getOrUndefined(Option.map(jupiterApiKey, Redacted.value)),
-              },
-              request,
-            ),
-          catch: (cause) => new ZapError({ message: cause instanceof Error ? cause.message : String(cause) }),
-        });
-      };
-      return Zap.of({ rebalance });
+
+      return Zap.of({
+        rebalance: run("zap", executeZapRebalance, (r) => r.positionAddress),
+        claimFees: run("claim", executeClaimFees, (r) => r.positionAddress),
+        compound: run("compound", executeCompoundTopUp, (r) => r.positionAddress),
+        sweep: run("sweep", executeSweepToSol, (r) => r.poolAddress),
+      });
     }),
   );
 }

@@ -85,7 +85,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
   const { webUrl } = yield* AppConfig;
   const { agentId, userId } = hits[0].watch;
 
-  const target = yield* db.telegramTarget(userId);
+  const target = yield* db.telegramTarget(userId, "volume-watch");
   if (target._tag === "missing") {
     yield* db.pauseAgent(agentId, TELEGRAM_NOT_LINKED);
     yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked a Telegram bot`);

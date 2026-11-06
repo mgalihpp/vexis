@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { type AgentKind, defaultAgentConfig, parseAgentConfig } from "./agents.ts";
 import type { Db } from "./client.server.ts";
 import {
@@ -73,39 +73,89 @@ export async function removeWallet({ db, userId }: UserScope, walletId: string) 
   return rows.length > 0;
 }
 
-// --- agents -----------------------------------------------------------------------------------
+// --- agents ---------------------------------------------------------------------------------
 
-export async function getAgent({ db, userId }: UserScope, kind: AgentKind) {
+/** The user's agents, oldest first; only those of `kind` when given. */
+export function listAgents({ db, userId }: UserScope, kind?: AgentKind) {
+  return db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.userId, userId), kind ? eq(agents.kind, kind) : undefined))
+    .orderBy(agents.createdAt, agents.id);
+}
+
+export async function getAgent({ db, userId }: UserScope, agentId: string) {
   const [row] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.userId, userId), eq(agents.kind, kind)));
+    .where(and(eq(agents.id, agentId), eq(agents.userId, userId)));
   return row;
 }
 
-/** Creates the user's agent of this kind with the default config if it does not exist yet. */
-export async function ensureAgent({ db, userId }: UserScope, kind: AgentKind) {
-  await db
-    .insert(agents)
-    .values({ userId, kind, config: defaultAgentConfig(kind) })
-    .onConflictDoNothing({ target: [agents.userId, agents.kind] });
-  const row = await getAgent({ db, userId }, kind);
-  if (!row) throw new Error(`ensureAgent: ${kind} missing after insert`);
-  return row;
-}
-
-export async function updateAgent(
+/** Inserts a new agent. A second volume-watch agent for the user fails on `agents_user_volume_watch_unique`. */
+export async function insertAgent(
   { db, userId }: UserScope,
   kind: AgentKind,
+  patch: { enabled?: boolean; config?: unknown } = {},
+) {
+  const [row] = await db
+    .insert(agents)
+    .values({
+      userId,
+      kind,
+      enabled: patch.enabled ?? false,
+      config: patch.config === undefined ? defaultAgentConfig(kind) : parseAgentConfig(kind, patch.config),
+    })
+    .returning();
+  if (!row) throw new Error(`insertAgent: ${kind} not inserted`);
+  return row;
+}
+
+/** Undefined when the agent is not the user's. A `config` is validated against the agent's own kind. */
+export async function updateAgent(
+  { db, userId }: UserScope,
+  agentId: string,
   patch: { enabled?: boolean; paused?: boolean; pausedReason?: string | null; config?: unknown },
 ) {
   const { config, ...rest } = patch;
+  const agent = config === undefined ? undefined : await getAgent({ db, userId }, agentId);
+  if (config !== undefined && !agent) return undefined;
   const [row] = await db
     .update(agents)
-    .set({ ...rest, ...(config === undefined ? {} : { config: parseAgentConfig(kind, config) }) })
-    .where(and(eq(agents.userId, userId), eq(agents.kind, kind)))
+    .set({ ...rest, ...(agent ? { config: parseAgentConfig(agent.kind, config) } : {}) })
+    .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
     .returning();
   return row;
+}
+
+/** Deletes the agent with its pools and history (cascade). False when it is not the user's. */
+export async function deleteAgent({ db, userId }: UserScope, agentId: string) {
+  const rows = await db
+    .delete(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.userId, userId)))
+    .returning({ id: agents.id });
+  return rows.length > 0;
+}
+
+/** Resumes every agent of `kind` the runner paused for one of `reasons`. A pause the user chose has no reason and stays. */
+export async function resumeAgentsPausedFor({ db, userId }: UserScope, kind: AgentKind, reasons: readonly string[]) {
+  if (reasons.length === 0) return;
+  await db
+    .update(agents)
+    .set({ paused: false, pausedReason: null })
+    .where(
+      and(
+        eq(agents.userId, userId),
+        eq(agents.kind, kind),
+        eq(agents.paused, true),
+        inArray(agents.pausedReason, [...reasons]),
+      ),
+    );
+}
+
+/** Serializes agent creation per user inside a transaction, so two creates cannot both pass a uniqueness check. */
+export async function lockUserAgents({ db, userId }: UserScope) {
+  await db.execute(sql`select pg_advisory_xact_lock(hashtext(${`agents:${userId}`}))`);
 }
 
 // --- agent pools ------------------------------------------------------------------------------
@@ -131,10 +181,19 @@ export async function addAgentPool({ db, userId }: UserScope, agentId: string, p
   return row;
 }
 
-export async function removeAgentPool({ db, userId }: UserScope, poolId: string) {
+/** Every pool of the user's agents of `kind`, with the agent that runs on it. */
+export function listPoolsOfKind({ db, userId }: UserScope, kind: AgentKind) {
+  return db
+    .select({ agentId: agentPools.agentId, poolAddress: agentPools.poolAddress })
+    .from(agentPools)
+    .innerJoin(agents, and(eq(agents.id, agentPools.agentId), eq(agents.userId, agentPools.userId)))
+    .where(and(eq(agentPools.userId, userId), eq(agents.kind, kind)));
+}
+
+export async function removeAgentPool({ db, userId }: UserScope, agentId: string, poolId: string) {
   const rows = await db
     .delete(agentPools)
-    .where(and(eq(agentPools.id, poolId), eq(agentPools.userId, userId)))
+    .where(and(eq(agentPools.id, poolId), eq(agentPools.agentId, agentId), eq(agentPools.userId, userId)))
     .returning({ id: agentPools.id });
   return rows.length > 0;
 }
@@ -162,30 +221,52 @@ export async function getAlert({ db, userId }: UserScope, alertId: string) {
 
 // --- auto-rebalance --------------------------------------------------------------------------
 
-export function listRebalances({ db, userId }: UserScope, options: { limit?: number } = {}) {
+export function listRebalances({ db, userId }: UserScope, options: { limit?: number; agentId?: string } = {}) {
   return db
     .select()
     .from(agentRebalances)
-    .where(eq(agentRebalances.userId, userId))
+    .where(
+      and(
+        eq(agentRebalances.userId, userId),
+        options.agentId ? eq(agentRebalances.agentId, options.agentId) : undefined,
+      ),
+    )
     .orderBy(desc(agentRebalances.at))
     .limit(Math.min(options.limit ?? 50, 500));
 }
 
-/** The public key only: the encrypted secret is read by the runner, never by the web app. */
+/**
+ * The public key and the encrypted RPC URL (the web app shows only its host). The encrypted secret is read by the
+ * runner, never by the web app.
+ */
 export function getRebalanceWallet({ db, userId }: UserScope) {
   return db
-    .select({ publicKey: rebalanceWallets.publicKey })
+    .select({ publicKey: rebalanceWallets.publicKey, rpcUrl: rebalanceWallets.rpcUrl })
     .from(rebalanceWallets)
     .where(eq(rebalanceWallets.userId, userId))
     .then((rows) => rows[0]);
 }
 
-export async function saveRebalanceWallet({ db, userId }: UserScope, publicKey: string, encryptedSecret: string) {
-  const row = { publicKey, secretKey: encryptedSecret };
+/** Saves or replaces the wallet. Secret and RPC URL arrive encrypted. */
+export async function saveRebalanceWallet(
+  { db, userId }: UserScope,
+  wallet: { publicKey: string; encryptedSecret: string; encryptedRpcUrl: string },
+) {
+  const row = { publicKey: wallet.publicKey, secretKey: wallet.encryptedSecret, rpcUrl: wallet.encryptedRpcUrl };
   await db
     .insert(rebalanceWallets)
     .values({ userId, ...row })
     .onConflictDoUpdate({ target: rebalanceWallets.userId, set: row });
+}
+
+/** Replaces only the RPC URL (encrypted). False when the user has no wallet saved. */
+export async function saveRebalanceRpcUrl({ db, userId }: UserScope, encryptedRpcUrl: string) {
+  const rows = await db
+    .update(rebalanceWallets)
+    .set({ rpcUrl: encryptedRpcUrl })
+    .where(eq(rebalanceWallets.userId, userId))
+    .returning({ userId: rebalanceWallets.userId });
+  return rows.length > 0;
 }
 
 export async function removeRebalanceWallet({ db, userId }: UserScope) {
@@ -194,36 +275,46 @@ export async function removeRebalanceWallet({ db, userId }: UserScope) {
 
 // --- telegram ---------------------------------------------------------------------------------
 
-export function getTelegramLink({ db, userId }: UserScope) {
+/** Every Telegram link the user has, one per agent kind at most. */
+export function getTelegramLinks({ db, userId }: UserScope) {
+  return db.select().from(telegramLinks).where(eq(telegramLinks.userId, userId));
+}
+
+export function getTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
   return db
     .select()
     .from(telegramLinks)
-    .where(eq(telegramLinks.userId, userId))
+    .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)))
     .then((rows) => rows[0]);
 }
 
-/** Stores the user's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
-export async function saveOwnBot({ db, userId }: UserScope, encryptedToken: string, botUsername: string) {
+/** Stores the kind's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
+export async function saveOwnBot(
+  { db, userId }: UserScope,
+  kind: AgentKind,
+  encryptedToken: string,
+  botUsername: string,
+) {
   const fresh = { botToken: encryptedToken, botUsername, chatId: null, username: null, linkedAt: null };
   await db
     .insert(telegramLinks)
-    .values({ userId, ...fresh })
-    .onConflictDoUpdate({ target: telegramLinks.userId, set: fresh });
+    .values({ userId, kind, ...fresh })
+    .onConflictDoUpdate({ target: [telegramLinks.userId, telegramLinks.kind], set: fresh });
 }
 
-/** Binds the chat found on the user's own bot. False when the user has no bot saved. */
-export async function linkOwnBotChat({ db, userId }: UserScope, chatId: bigint, username?: string) {
+/** Binds the chat found on the kind's bot. False when no bot is saved for that kind. */
+export async function linkOwnBotChat({ db, userId }: UserScope, kind: AgentKind, chatId: bigint, username?: string) {
   const rows = await db
     .update(telegramLinks)
     .set({ chatId, username: username ?? null, linkedAt: new Date() })
-    .where(eq(telegramLinks.userId, userId))
+    .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)))
     .returning({ userId: telegramLinks.userId });
   return rows.length > 0;
 }
 
-/** Forgets the bot and the chat. The runner pauses the user's agents at the next alert. */
-export async function removeTelegramLink({ db, userId }: UserScope) {
-  await db.delete(telegramLinks).where(eq(telegramLinks.userId, userId));
+/** Forgets the kind's bot and chat. The runner pauses that agent at its next alert. */
+export async function removeTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
+  await db.delete(telegramLinks).where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)));
 }
 
 // --- invites (not user-scoped: used before the user exists, or by admins) ---------------------

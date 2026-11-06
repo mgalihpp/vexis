@@ -1,9 +1,9 @@
 import { Keypair } from "@solana/web3.js";
-import { REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
+import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
 import { Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
-import { Chain, type PoolState } from "../src/Chain.ts";
+import { Chain, type ChainPosition, type PoolState } from "../src/Chain.ts";
 import {
   Db,
   leadingFailures,
@@ -15,10 +15,11 @@ import {
   type Watch,
 } from "../src/Db.ts";
 import { ChainError, MeteoraError, TelegramError, ZapError } from "../src/errors.ts";
+import { WSOL_MINT } from "../src/fees.ts";
 import type { LinkButton } from "../src/format.ts";
 import { Meteora, type PoolReading } from "../src/Meteora.ts";
 import { Telegram } from "../src/Telegram.ts";
-import { Zap, type ZapRequest } from "../src/Zap.ts";
+import { type ClaimRequest, type CompoundRequest, type SweepRequest, Zap, type ZapRequest } from "../src/Zap.ts";
 
 export const MINUTE = 60_000;
 /** A whole minute, so test readings land on a minute boundary. */
@@ -42,6 +43,9 @@ export type StoredRebalance = NewRebalance & {
   error: string | null;
 };
 
+/** Key for the fake's Telegram state: a link belongs to one user and one agent kind. */
+export const link = (userId: string, kind: AgentKind) => `${userId}/${kind}`;
+
 /** In-memory `Db`: same contract as the Postgres one, state exposed for assertions. */
 export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] } = {}) {
   const state = {
@@ -49,9 +53,10 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
     rebalanceWatches: seed.rebalances ?? [],
     rebalances: [] as StoredRebalance[],
     minutes: new Map<string, NewMinute[]>(),
+    /** Telegram state by `link(userId, kind)`. */
     chats: new Map<string, bigint>(),
     ownBots: new Map<string, string>(),
-    /** Users whose stored bot token no longer decrypts. */
+    /** Links whose stored bot token no longer decrypts. */
     unreadable: new Set<string>(),
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
@@ -60,6 +65,7 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
     wallets: new Map<string, WalletSigner>(),
   };
   const rowsOf = (pool: string) => state.minutes.get(pool) ?? [];
+  let rebalanceIds = 0;
 
   const layer = Layer.succeed(
     Db,
@@ -68,7 +74,7 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
       runnableRebalances: () => Effect.succeed(state.rebalanceWatches.filter((w) => !state.paused.has(w.agentId))),
       recordRebalance: (row) =>
         Effect.sync(() => {
-          const id = `rebalance-${state.rebalances.length + 1}`;
+          const id = `rebalance-${++rebalanceIds}`;
           state.rebalances.push({ ...row, id, signature: null, txError: null, delivered: false, error: null });
           return id;
         }),
@@ -86,11 +92,15 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
             else Object.assign(r, { signature: null, txError: outcome.error });
           }
         }),
+      dropRebalance: (id) =>
+        Effect.sync(() => {
+          state.rebalances = state.rebalances.filter((r) => r.id !== id);
+        }),
       failureStreak: (agentId) =>
         Effect.sync(() =>
           leadingFailures(
             state.rebalances
-              .filter((r) => r.agentId === agentId && r.live)
+              .filter((r) => r.agentId === agentId && r.live && r.action === "rebalance")
               .reverse()
               .slice(0, REBALANCE_FAILURE_LIMIT),
           ),
@@ -122,14 +132,15 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
             .slice(-limit)
             .map((r) => ({ minute: r.minute.getTime(), volume: r.volume })),
         ),
-      telegramTarget: (userId) => {
-        const chatId = state.chats.get(userId);
+      telegramTarget: (userId, kind) => {
+        const key = link(userId, kind);
+        const chatId = state.chats.get(key);
         if (chatId === undefined) return Effect.succeed({ _tag: "missing" } as const);
-        if (state.unreadable.has(userId)) return Effect.succeed({ _tag: "unreadable" } as const);
+        if (state.unreadable.has(key)) return Effect.succeed({ _tag: "unreadable" } as const);
         return Effect.succeed({
           _tag: "ready",
           chatId,
-          botToken: state.ownBots.get(userId) ?? "user-bot-token",
+          botToken: state.ownBots.get(key) ?? "user-bot-token",
         } as const);
       },
       pauseAgent: (agentId, reason) => Effect.sync(() => void state.paused.set(agentId, reason)),
@@ -238,14 +249,38 @@ export function reading(overrides: Partial<PoolReading> = {}): PoolReading {
   return { address: "POOL1", name: "DOGE-SOL", binStep: 25, tvl: 1_000_000, cumulativeVolume: 0, ...overrides };
 }
 
+export const TEST_RPC = "https://rpc.test/?api-key=secret-key";
+
+/** A funded position spanning bins 100..120 with no unclaimed fees. */
+export const chainPosition = (overrides: Partial<ChainPosition> = {}): ChainPosition => ({
+  address: "POS1",
+  lowerBinId: 100,
+  upperBinId: 120,
+  funded: true,
+  feeX: 0n,
+  feeY: 0n,
+  ...overrides,
+});
+
+/** A JUP-SOL pool (SOL on Y) at 0.5 lamports per X lamport, read for a wallet holding 1 SOL. */
+export const poolState = (overrides: Partial<PoolState> = {}): PoolState => ({
+  activeBinId: 110,
+  pricePerLamport: "0.5",
+  mintX: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+  mintY: WSOL_MINT,
+  positions: [chainPosition()],
+  nativeLamports: 1_000_000_000n,
+  ...overrides,
+});
+
 /** Chain stand-in: `pools` maps a pool address to what the next read returns; a missing pool fails. */
 export function fakeChain(pools: Record<string, PoolState> = {}) {
-  const state = { pools, calls: [] as { pool: string; owner: string }[] };
+  const state = { pools, calls: [] as { rpcUrl: string; pool: string; owner: string }[] };
   const layer = Layer.succeed(
     Chain,
     Chain.of({
-      pool: (poolAddress, owner) => {
-        state.calls.push({ pool: poolAddress, owner });
+      pool: (rpcUrl, poolAddress, owner) => {
+        state.calls.push({ rpcUrl, pool: poolAddress, owner });
         const found = state.pools[poolAddress];
         return found
           ? Effect.succeed(found)
@@ -261,27 +296,51 @@ export function rebalanceWatch(overrides: Partial<RebalanceWatch> = {}): Rebalan
     ...watch({ agentId: "rb-agent-1", agentPoolId: "rb-ap-1", label: "SOL-USDC" }),
     config: { strategy: "Curve", slippageBps: 50, halfWidth: null, cooldownSec: 300 },
     owner: "OWNER1",
+    rpc: { _tag: "ready", url: TEST_RPC },
     ...overrides,
   };
 }
 
 /**
- * Zap stand-in: never signs or sends. `fail` makes the next calls fail with that message. `inFlight` and `maxInFlight`
- * measure overlap: each call yields a few times while counted, so concurrent calls would interleave.
+ * Zap stand-in: never signs or sends. `fail` makes the next rebalances fail with that message, `failClaim` and
+ * `failFees` the claims and the compound or sweep steps; `noFee` makes a claim find nothing. `inFlight` and
+ * `maxInFlight` measure overlap: each rebalance yields a few times while counted, so concurrent calls would interleave.
  */
 export function fakeZap() {
   const state = {
-    calls: [] as { owner: string; request: ZapRequest }[],
+    calls: [] as { rpcUrl: string; owner: string; request: ZapRequest }[],
+    claims: [] as ClaimRequest[],
+    compounds: [] as CompoundRequest[],
+    sweeps: [] as SweepRequest[],
     fail: null as string | null,
+    failClaim: null as string | null,
+    failFees: null as string | null,
+    noFee: false,
     inFlight: 0,
     maxInFlight: 0,
   };
+  const feeStep = <R>(list: R[], request: R, signature: string) =>
+    Effect.suspend(() => {
+      list.push(request);
+      return state.failFees === null
+        ? Effect.succeed(signature)
+        : Effect.fail(new ZapError({ message: state.failFees }));
+    });
   const layer = Layer.succeed(
     Zap,
     Zap.of({
-      rebalance: (signer, request) =>
+      claimFees: (_rpcUrl, _signer, request) =>
+        Effect.suspend(() => {
+          state.claims.push(request);
+          if (state.failClaim !== null) return Effect.fail(new ZapError({ message: state.failClaim }));
+          return Effect.succeed(state.noFee ? null : `CLAIM${state.claims.length}`);
+        }),
+      compound: (_rpcUrl, _signer, request) =>
+        feeStep(state.compounds, request, `COMPOUND${state.compounds.length + 1}`),
+      sweep: (_rpcUrl, _signer, request) => feeStep(state.sweeps, request, `SWEEP${state.sweeps.length + 1}`),
+      rebalance: (rpcUrl, signer, request) =>
         Effect.gen(function* () {
-          state.calls.push({ owner: signer.publicKey.toBase58(), request });
+          state.calls.push({ rpcUrl, owner: signer.publicKey.toBase58(), request });
           state.inFlight++;
           state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
           for (let i = 0; i < 5; i++) yield* Effect.yieldNow;

@@ -65,14 +65,14 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `BETTER_AUTH_URL`      | web         | none                                 | Public origin; requests from another origin are rejected  |
 | `TOKEN_ENC_KEY`        | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
 | `WALLET_ENC_KEY`       | web, runner | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
-| `SOLANA_RPC_URL`       | web, runner | public mainnet endpoint              | RPC for on-chain bin, fee and position reads              |
+| `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for the analytics page's on-chain bin and fee reads   |
 | `JUPITER_API_KEY`      | web, runner | none, uses `lite-api.jup.ag`         | Switches Jupiter calls (prices, balances, zap swaps)      |
 | `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
 | `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
 | `NITRO_PRESET`         | build       | `bun`                                | Build target, for example `node-server`                   |
 
-There is no shared Telegram bot. Each user pastes their own BotFather token in Settings, sends `/start` to it, and presses Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
+There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 
 ## Scripts
 
@@ -114,21 +114,21 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 
 ## Routes
 
-| Route                | Page                                                                         |
-| -------------------- | ---------------------------------------------------------------------------- |
-| `/`                  | Redirects to `/portfolio`                                                    |
-| `/portfolio`         | Wallet search with favorites and recent wallets                              |
-| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions                          |
-| `/analytics`         | Pool analytics; `?pool=` picks the pool                                      |
-| `/agents`            | Alert agents; `/agents/new` and `/agents/$agentId` for the wizard and detail |
-| `/login`             | Sign in, or join with an invite                                              |
-| `/terms`, `/privacy` | Public pages, readable without an account                                    |
+| Route                | Page                                                                   |
+| -------------------- | ---------------------------------------------------------------------- |
+| `/`                  | Redirects to `/portfolio`                                              |
+| `/portfolio`         | Wallet search with favorites and recent wallets                        |
+| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions                    |
+| `/analytics`         | Pool analytics; `?pool=` picks the pool                                |
+| `/agents`            | Agents; `/agents/new` and `/agents/$agentId` for the wizard and detail |
+| `/login`             | Sign in, or join with an invite                                        |
+| `/terms`, `/privacy` | Public pages, readable without an account                              |
 
 ## The runner
 
-The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with each user's own bot token, so the runner never polls Telegram.
+The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with the bot the user linked for that agent, so the runner never polls Telegram.
 
-Auto-rebalance agents run on the same minute. For each watched pool the runner reads the agent wallet's position on-chain (`SOLANA_RPC_URL`); when its one funded position has left its range, it acts on it. A new agent starts in preview: it records the range it would move to and sends a Telegram preview, and nothing is signed. Once the user switches it to Live in its settings, the runner decrypts the agent wallet and rebalances the position on-chain (withdraw, balancing swap, deposit around the active bin), stores the signature and sends a Solscan link. A failed rebalance is reported and retried after the cooldown; three failures in a row pause the agent.
+Auto-rebalance agents run on the same minute. A user can run one per pool; each reads the agent wallet's position in its pool on-chain, through the RPC URL the user saved with the wallet. When the wallet's one funded position has left its range, the agent acts on it. A new agent starts in preview: it records the range it would move to and sends a Telegram preview, and nothing is signed. Once the user switches it to Live in its settings, the runner decrypts the agent wallet and rebalances the position on-chain (withdraw, balancing swap, deposit around the active bin), then compounds or sweeps the claimed fees if the agent is set to, stores the signature and sends a Solscan link. In range, a live agent with a claim threshold claims its fees once they are worth that much SOL. A failed rebalance is reported and retried after the cooldown; three failures in a row pause the agent. A wallet holding less SOL than the agent's reserve pauses it until the user tops up and resumes.
 
 On a VPS it runs next to the web process under pm2:
 
@@ -136,7 +136,7 @@ On a VPS it runs next to the web process under pm2:
 pm2 start "bun apps/agents/src/main.ts" --name vexis-agents
 ```
 
-It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, the same values the web app uses, and refuses to start without a valid `WALLET_ENC_KEY`. Once anyone runs an auto-rebalance agent it also needs a paid RPC in `SOLANA_RPC_URL`: the public endpoint rate limits the per-minute position reads, and live rebalances take their priority fee from Helius `getPriorityFeeEstimate` (another RPC sends with no priority fee).
+It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, the same values the web app uses, and refuses to start without a valid `WALLET_ENC_KEY`. It has no RPC of its own: every auto-rebalance read and send goes through the RPC URL each user saved with their agent wallet. Users should give a Helius URL, since live sends take their priority fee from Helius `getPriorityFeeEstimate` and another RPC sends with no priority fee.
 
 ## Deploy
 

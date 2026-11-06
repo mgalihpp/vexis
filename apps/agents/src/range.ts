@@ -9,13 +9,13 @@ export type OnChainPosition = {
   readonly funded: boolean;
 };
 
-export type PositionPick =
+export type PositionPick<P extends OnChainPosition = OnChainPosition> =
   | { readonly _tag: "none" }
   | { readonly _tag: "many"; readonly addresses: ReadonlyArray<string> }
-  | { readonly _tag: "one"; readonly position: OnChainPosition };
+  | { readonly _tag: "one"; readonly position: P };
 
 /** The agent manages exactly one funded position per pool; it never guesses between several. */
-export function pickPosition(positions: ReadonlyArray<OnChainPosition>): PositionPick {
+export function pickPosition<P extends OnChainPosition>(positions: ReadonlyArray<P>): PositionPick<P> {
   const funded = positions.filter((p) => p.funded);
   const [only] = funded;
   if (!only) return { _tag: "none" };

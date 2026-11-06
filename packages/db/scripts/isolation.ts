@@ -8,9 +8,11 @@ import { closeDb, createDb } from "../src/client.server.ts";
 import {
   addAgentPool,
   addWallet,
-  ensureAgent,
+  deleteAgent,
   forUser,
+  getAgent,
   getAlert,
+  insertAgent,
   listAgentPools,
   listAlerts,
   listWallets,
@@ -36,6 +38,7 @@ function check(name: string, ok: boolean) {
   if (!ok) failures++;
 }
 
+let rejected = false;
 try {
   await db.insert(users).values([
     { id: ids.a, name: "Isolation A", email: `${ids.a}@example.test` },
@@ -44,9 +47,20 @@ try {
   const A = forUser(db, ids.a);
   const B = forUser(db, ids.b);
 
-  const agentA = await ensureAgent(A, "volume-watch");
-  const agentB = await ensureAgent(B, "volume-watch");
-  check("ensureAgent stores the default config", (agentA.config as { mult?: number }).mult === 3);
+  const agentA = await insertAgent(A, "volume-watch");
+  const agentB = await insertAgent(B, "volume-watch");
+  check("insertAgent stores the default config", (agentA.config as { mult?: number }).mult === 3);
+
+  rejected = false;
+  try {
+    await insertAgent(A, "volume-watch");
+  } catch {
+    rejected = true;
+  }
+  check("a second volume-watch agent is rejected", rejected);
+  const rebalanceA = await insertAgent(A, "auto-rebalance");
+  await insertAgent(A, "auto-rebalance");
+  check("several auto-rebalance agents are allowed", (await getAgent(A, rebalanceA.id))?.id === rebalanceA.id);
 
   const poolB = await addAgentPool(B, agentB.id, "PoolB111111111111111111111111111111111111111");
   await addAgentPool(A, agentA.id, "PoolA111111111111111111111111111111111111111");
@@ -67,9 +81,9 @@ try {
   check("B still reads B's alert", (await getAlert(B, alertB.id))?.id === alertB.id);
 
   check("A cannot list B's agent pools", (await listAgentPools(A, agentB.id)).length === 0);
-  check("A cannot delete B's agent pool", (await removeAgentPool(A, poolB.id)) === false);
+  check("A cannot delete B's agent pool", (await removeAgentPool(A, agentB.id, poolB.id)) === false);
 
-  let rejected = false;
+  rejected = false;
   try {
     await addAgentPool(A, agentB.id, "Sneaky1111111111111111111111111111111111111");
   } catch {
@@ -96,13 +110,14 @@ try {
   );
   check("A cannot delete B's wallet", (await removeWallet(A, walletB.id)) === false);
 
-  check("A cannot update B's agent", (await updateAgent(A, "volume-watch", { enabled: true }))?.id === agentA.id);
-  const bAgent = await ensureAgent(B, "volume-watch");
-  check("B's agent is untouched", bAgent.enabled === false);
+  check("A cannot update B's agent", (await updateAgent(A, agentB.id, { enabled: true })) === undefined);
+  check("A cannot read B's agent", (await getAgent(A, agentB.id)) === undefined);
+  check("A cannot delete B's agent", (await deleteAgent(A, agentB.id)) === false);
+  check("B's agent is untouched", (await getAgent(B, agentB.id))?.enabled === false);
 
   rejected = false;
   try {
-    await updateAgent(A, "volume-watch", { config: { mult: -1 } });
+    await updateAgent(A, agentA.id, { config: { mult: -1 } });
   } catch {
     rejected = true;
   }

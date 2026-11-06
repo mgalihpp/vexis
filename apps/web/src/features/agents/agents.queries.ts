@@ -9,10 +9,11 @@ export const agentsQuery = queryOptions({ queryKey: [...AGENTS_KEY, "list"], que
 
 export const alertsQuery = queryOptions({ queryKey: [...AGENTS_KEY, "alerts"], queryFn: () => getAlerts() });
 
-export const rebalancesQuery = queryOptions({
-  queryKey: [...AGENTS_KEY, "rebalances"],
-  queryFn: () => getRebalances(),
-});
+export const rebalancesQuery = (agentId: string) =>
+  queryOptions({
+    queryKey: [...AGENTS_KEY, "rebalances", agentId],
+    queryFn: () => getRebalances({ data: { agentId } }),
+  });
 
 export const walletQuery = queryOptions({ queryKey: [...AGENTS_KEY, "wallet"], queryFn: () => getRebalanceWallet() });
 
@@ -22,5 +23,6 @@ const LINK_POLL_MS = 3000;
 export const telegramQuery = queryOptions({
   queryKey: [...AGENTS_KEY, "telegram"],
   queryFn: () => getTelegram(),
-  refetchInterval: (q) => (q.state.data?.bot && !q.state.data.bot.linked ? LINK_POLL_MS : LIVE_MS),
+  refetchInterval: (q) =>
+    Object.values(q.state.data ?? {}).some((tg) => tg.bot && !tg.bot.linked) ? LINK_POLL_MS : LIVE_MS,
 });
