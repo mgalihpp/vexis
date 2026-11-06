@@ -36,11 +36,11 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 | `user_settings`                                  | user   | `timezone` (IANA), `currency` (`usd`/`sol`).                                                |
 | `wallets`                                        | user   | Unique per `(user_id, address)`.                                                            |
 | `telegram_links`                                 | user   | One bot (encrypted token) and linked chat per `(user_id, kind)`.                            |
-| `agents`                                         | user   | One per `(user_id, kind)`; `enabled`, `paused`, `config` jsonb (zod-validated).             |
+| `agents`                                         | user   | One volume-watch per user, many auto-rebalance; `enabled`, `paused`, `config` jsonb.        |
 | `agent_pools`                                    | user   | Pools an agent watches; `last_alert_at` for the cooldown.                                   |
 | `agent_alerts`                                   | user   | `vol_1m`, `baseline`, `ratio`, `delivered`, `error`, `at`.                                  |
-| `rebalance_wallets`                              | user   | One per user: public key, secret key encrypted with `WALLET_ENC_KEY`.                       |
-| `agent_rebalances`                               | user   | Old and new bin range, `live`, `signature`, `tx_error`, `delivered`, `error`, `at`.         |
+| `rebalance_wallets`                              | user   | One per user: public key; secret key and `rpc_url` encrypted with `WALLET_ENC_KEY`.         |
+| `agent_rebalances`                               | user   | `action` (rebalance, claim), bin ranges, `fee_sol`, `live`, `signature`, `tx_error`, `at`.  |
 | `pool_minutes`                                   | global | Per-minute volume per pool, shared by everyone.                                             |
 
 ## Isolation
@@ -51,4 +51,4 @@ RLS is enabled on every table with no policies. The server connects as `postgres
 
 ## Agents runner
 
-The runner (`apps/agents`) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. Auto-rebalance agents join `rebalance_wallets` for the public key, read each pool on-chain and write `agent_rebalances`, sharing `last_alert_at` as their cooldown. A live agent (`config.dryRun` false) is the only reader of `rebalance_wallets.secret_key`: the runner decrypts it with `WALLET_ENC_KEY` to sign, then stores the `signature` or `tx_error` on the row. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.
+The runner (`apps/agents`) reads `agents` where `enabled and not paused` (partial index `agents_runnable_idx`), collects the distinct `agent_pools.pool_address`, polls each pool once per interval into `pool_minutes`, evaluates each user's rule against those shared rows, and writes `agent_alerts` plus `agent_pools.last_alert_at`. Auto-rebalance agents (one pool each) join `rebalance_wallets` for the public key and the RPC URL, read their pool on-chain through that RPC and write `agent_rebalances` (rebalances and in-range fee claims), sharing `last_alert_at` as their cooldown. A live agent (`config.dryRun` false) is the only reader of `rebalance_wallets.secret_key`: the runner decrypts it with `WALLET_ENC_KEY` to sign, then stores the `signature` or `tx_error` on the row. It runs as a trusted process, so it reads across users by design; anything it does on a user's behalf still carries that row's `user_id`.
