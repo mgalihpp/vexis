@@ -28,6 +28,9 @@ describe("auto-rebalance config", () => {
       halfWidth: null,
       cooldownSec: 300,
       dryRun: true,
+      feeMode: "keep",
+      feeClaimThresholdSol: null,
+      solReserve: 0.1,
     });
   });
 
@@ -37,5 +40,9 @@ describe("auto-rebalance config", () => {
     expect(() => parseAgentConfig("auto-rebalance", { slippageBps: 10_001 })).toThrow();
     expect(() => parseAgentConfig("auto-rebalance", { strategy: "Wide" })).toThrow();
     expect(() => parseAgentConfig("auto-rebalance", { dryRun: "false" })).toThrow();
+    expect(() => parseAgentConfig("auto-rebalance", { feeMode: "both" })).toThrow();
+    expect(() => parseAgentConfig("auto-rebalance", { feeClaimThresholdSol: 0 })).toThrow();
+    expect(() => parseAgentConfig("auto-rebalance", { solReserve: -0.1 })).toThrow();
+    expect(parseAgentConfig("auto-rebalance", { solReserve: 0 }).solReserve).toBe(0);
   });
 });

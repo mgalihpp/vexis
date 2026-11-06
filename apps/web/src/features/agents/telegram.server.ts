@@ -2,12 +2,11 @@ import { type AgentKind, TELEGRAM_PAUSES } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
-  getAgent,
   getTelegramLink,
   linkOwnBotChat,
   removeTelegramLink,
+  resumeAgentsPausedFor,
   saveOwnBot,
-  updateAgent,
 } from "@vexis/db/queries";
 import { decryptSecret, encryptSecret } from "@vexis/db/secret";
 import { z } from "zod";
@@ -70,11 +69,9 @@ export async function detectOwnBotChat(userId: string, kind: AgentKind) {
 
   const linked = await linkOwnBotChat(s, kind, BigInt(latest.chat.id), latest.from?.username);
   if (!linked) throw new Error("Connect your bot first");
-  // The runner paused the agent while it had no usable chat or token; now it has both. A pause the user chose stays.
-  const agent = await getAgent(s, kind);
-  if (agent?.paused && agent.pausedReason && TELEGRAM_PAUSES.includes(agent.pausedReason)) {
-    await updateAgent(s, kind, { paused: false, pausedReason: null });
-  }
+  // The runner paused this kind's agents while they had no usable chat or token; now they have both. A pause the
+  // user chose stays.
+  await resumeAgentsPausedFor(s, kind, TELEGRAM_PAUSES);
 }
 
 export async function disconnectTelegram(userId: string, kind: AgentKind) {

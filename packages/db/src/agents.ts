@@ -22,6 +22,13 @@ export type VolumeWatchConfig = z.infer<typeof VolumeWatchConfig>;
 
 export const REBALANCE_STRATEGIES = ["Spot", "Curve", "BidAsk"] as const;
 
+/**
+ * What happens to the position's fees: left in the wallet, deposited back into the position (`compound`), or swapped
+ * to SOL (`sweep`). One field because the two actions exclude each other.
+ */
+export const FEE_MODES = ["keep", "compound", "sweep"] as const;
+export type FeeMode = (typeof FEE_MODES)[number];
+
 export const AutoRebalanceConfig = z.object({
   /** Liquidity shape of the re-centered position. */
   strategy: z.enum(REBALANCE_STRATEGIES).default("Curve"),
@@ -33,6 +40,11 @@ export const AutoRebalanceConfig = z.object({
   cooldownSec: z.number().int().min(0).max(86_400).default(300),
   /** True records and reports the move only; false signs and sends it with the agent wallet. */
   dryRun: z.boolean().default(true),
+  feeMode: z.enum(FEE_MODES).default("keep"),
+  /** Claim in range once unclaimed fees are worth this many SOL; null claims only when a rebalance does. */
+  feeClaimThresholdSol: z.number().positive().max(1000).nullable().default(null),
+  /** SOL left in the agent wallet for transaction fees and rent; live actions pause below it. */
+  solReserve: z.number().min(0).max(100).default(0.1),
 });
 export type AutoRebalanceConfig = z.infer<typeof AutoRebalanceConfig>;
 
@@ -72,3 +84,10 @@ export const WALLET_UNREADABLE = "wallet_unreadable";
 /** `agents.paused_reason` the runner sets after `REBALANCE_FAILURE_LIMIT` live rebalances failed in a row. Resuming clears it. */
 export const REBALANCE_FAILING = "rebalance_failing";
 export const REBALANCE_FAILURE_LIMIT = 3;
+
+/** `agents.paused_reason` the runner sets when the agent wallet holds less SOL than `solReserve`. Resuming clears it. */
+export const LOW_SOL = "low_sol";
+
+/** `agent_rebalances.action`: a range move, or an in-range fee claim (which keeps the range). */
+export const REBALANCE_ACTIONS = ["rebalance", "claim"] as const;
+export type RebalanceAction = (typeof REBALANCE_ACTIONS)[number];

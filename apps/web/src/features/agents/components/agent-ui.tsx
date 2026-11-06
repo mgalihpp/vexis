@@ -9,7 +9,14 @@ import { usePoolHits } from "@/features/analytics/components/pool-search";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
-import { type AgentKind, type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
+import {
+  type AgentKind,
+  type AgentStatus,
+  BOT_TOKEN_PATTERN,
+  type ConfigFields,
+  MAX_POOLS,
+  STATUS_LABEL,
+} from "../agents";
 import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
 
@@ -208,13 +215,20 @@ export function PoolPicker({
   onPick,
   onRemove,
   busy = false,
+  max = MAX_POOLS,
+  hidden = [],
 }: {
+  /** Pools already picked; they leave the list (and are pinned above it with `onRemove`). */
   taken: string[];
   count: number;
   onPick: (pool: { address: string; label: string }) => void;
   /** When set, picked pools are pinned above the list and a click on one removes it. */
   onRemove?: (address: string) => void;
   busy?: boolean;
+  /** With 1 the picker is single-select: a pick replaces the current one instead of filling up. */
+  max?: number;
+  /** Pools that cannot be picked here at all. */
+  hidden?: string[];
 }) {
   const [query, setQuery] = useState("");
   const [top, setTop] = useState<PoolSearchHit[]>([]);
@@ -230,10 +244,10 @@ export function PoolPicker({
     };
   }, []);
   const searching = query.trim().length > 0;
-  const hits = (searching ? found : top).filter((h) => !taken.includes(h.address));
+  const hits = (searching ? found : top).filter((h) => !taken.includes(h.address) && !hidden.includes(h.address));
   const pinned = onRemove ? taken.map((a) => seen[a]).filter((h): h is PoolSearchHit => Boolean(h)) : [];
   const maxVol = Math.max(1, ...hits.map((h) => h.volume24h), ...pinned.map((h) => h.volume24h));
-  const full = count >= MAX_POOLS;
+  const full = max > 1 && count >= max;
   const label = "font-mono text-[0.6rem] tracking-[0.08em] uppercase";
   return (
     <div className="space-y-3">
@@ -302,7 +316,7 @@ export function PoolPicker({
         </ul>
       </div>
       <p className={`text-right ${label} text-muted-foreground`}>
-        {count} of {MAX_POOLS} selected
+        {count} of {max} selected
       </p>
     </div>
   );

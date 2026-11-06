@@ -13,9 +13,10 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { AGENT_KINDS, type AgentKind } from "./agents.ts";
+import { AGENT_KINDS, type AgentKind, REBALANCE_ACTIONS, type RebalanceAction } from "./agents.ts";
 
 // Two kinds of tables live here:
 //
@@ -221,7 +222,8 @@ export const telegramLinks = pgTable(
 ).enableRLS();
 
 /**
- * One row per user per agent kind. The runner runs rows where `enabled and not paused`.
+ * A user's agents: at most one `volume-watch` (it watches up to 20 pools), and any number of `auto-rebalance` agents,
+ * each with exactly one pool. The runner runs rows where `enabled and not paused`.
  * `config` matches `AGENT_CONFIG[kind]` (zod) and is validated on every write and read.
  * `enabled` is the user's switch; `paused` is set by the user or the runner (for example while the
  * Telegram link is missing) without losing the enabled choice.
@@ -241,7 +243,7 @@ export const agents = pgTable(
   },
   (t) => [
     index("agents_user_id_idx").on(t.userId),
-    unique("agents_user_kind_unique").on(t.userId, t.kind),
+    uniqueIndex("agents_user_volume_watch_unique").on(t.userId, t.kind).where(sql`${t.kind} = 'volume-watch'`),
     // Target for the composite FKs below, so a child row's user_id always equals its agent's.
     unique("agents_id_user_unique").on(t.id, t.userId),
     index("agents_runnable_idx").on(t.kind).where(sql`${t.enabled} and not ${t.paused}`),
@@ -298,9 +300,10 @@ export const agentAlerts = pgTable(
 ).enableRLS();
 
 /**
- * The wallet the user's auto-rebalance agent manages: a hot wallet the user hands us, one per user. The
- * secret key is AES-256-GCM encrypted with `WALLET_ENC_KEY` (`secret.ts`) and never leaves the server;
- * the public key is kept in the clear so reads and previews never decrypt it.
+ * The wallet the user's auto-rebalance agents manage: a hot wallet the user hands us, one per user. The secret key
+ * and the RPC URL (which usually carries an API key) are AES-256-GCM encrypted with `WALLET_ENC_KEY` (`secret.ts`)
+ * and never leave the server; the public key is kept in the clear so reads and previews never decrypt the secret.
+ * `rpc_url` is null on rows saved before it was required; the runner skips those until the user adds one.
  */
 export const rebalanceWallets = pgTable("rebalance_wallets", {
   userId: text("user_id")
@@ -308,13 +311,15 @@ export const rebalanceWallets = pgTable("rebalance_wallets", {
     .references(() => users.id, { onDelete: "cascade" }),
   publicKey: text("public_key").notNull(),
   secretKey: text("secret_key").notNull(),
+  rpcUrl: text("rpc_url"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }).enableRLS();
 
 /**
  * Rebalance history, written by the runner: the range the position left, the range it moves to, and the
- * outcome. `live` rows were sent on-chain: `signature` once it confirmed, `tx_error` when it failed, neither
+ * outcome. A `claim` row is an in-range fee claim: both ranges are the current one and `fee_sol` is what the
+ * fees were worth when the runner decided to claim. `live` rows were sent on-chain: `signature` once it confirmed, `tx_error` when it failed, neither
  * while in flight (or if the runner died mid-send). A preview has `live` false and no signature.
  * `delivered` / `error` record the Telegram send.
  */
@@ -331,6 +336,9 @@ export const agentRebalances = pgTable(
     upperBin: integer("upper_bin").notNull(),
     newLowerBin: integer("new_lower_bin").notNull(),
     newUpperBin: integer("new_upper_bin").notNull(),
+    action: text("action").$type<RebalanceAction>().notNull().default("rebalance"),
+    /** Unclaimed fees valued in SOL at the active bin price; null when the pool has no SOL side or it was not read. */
+    feeSol: doublePrecision("fee_sol"),
     live: boolean("live").notNull().default(false),
     signature: text("signature"),
     txError: text("tx_error"),
@@ -341,6 +349,7 @@ export const agentRebalances = pgTable(
   (t) => [
     foreignKey({ columns: [t.agentId, t.userId], foreignColumns: [agents.id, agents.userId] }).onDelete("cascade"),
     index("agent_rebalances_user_at_idx").on(t.userId, t.at.desc()),
+    check("agent_rebalances_action_check", sql.raw(`action in (${REBALANCE_ACTIONS.map((a) => `'${a}'`).join(", ")})`)),
   ],
 ).enableRLS();
 

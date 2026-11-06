@@ -4,18 +4,25 @@
 import {
   type AgentKind,
   AutoRebalanceConfig,
+  FEE_MODES,
+  type FeeMode,
+  LOW_SOL,
   REBALANCE_FAILING,
   REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
+  type RebalanceAction,
   TELEGRAM_NOT_LINKED,
   TELEGRAM_PAUSES,
   TELEGRAM_RELINK,
   VolumeWatchConfig,
   WALLET_UNREADABLE,
 } from "@vexis/db/agents";
+import { shortAddr } from "@/lib/format";
 
-export type { AgentKind, AutoRebalanceConfig, VolumeWatchConfig };
+export type { AgentKind, AutoRebalanceConfig, FeeMode, VolumeWatchConfig };
 export {
+  FEE_MODES,
+  LOW_SOL,
   REBALANCE_FAILING,
   REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
@@ -24,8 +31,11 @@ export {
   WALLET_UNREADABLE,
 };
 
-/** Pools one agent may watch. The runner reads them in batches of 100, so this is a UI limit, not a hard one. */
+/** Pools a volume-watch agent may watch. The runner reads them in batches of 100, so this is a UI limit, not a hard one. */
 export const MAX_POOLS = 20;
+
+/** An auto-rebalance agent manages one position in one pool, fixed when it is created. */
+export const poolLimit = (kind: AgentKind) => (kind === "auto-rebalance" ? 1 : MAX_POOLS);
 
 export const DEFAULT_CONFIG: VolumeWatchConfig = VolumeWatchConfig.parse({});
 export const DEFAULT_REBALANCE_CONFIG: AutoRebalanceConfig = AutoRebalanceConfig.parse({});
@@ -58,6 +68,8 @@ export type RebalanceAgentView = AgentBase & {
   config: AutoRebalanceConfig;
   /** Public key of the wallet the agent manages; null until the user saves one. */
   wallet: string | null;
+  /** Host of the wallet's RPC URL; null until the user adds one (or it can no longer be read). */
+  rpcHost: string | null;
 };
 export type AgentView = VolumeAgentView | RebalanceAgentView;
 
@@ -65,6 +77,16 @@ export const AGENT_NAME: Record<AgentKind, string> = {
   "volume-watch": "Volume spike",
   "auto-rebalance": "Auto-rebalance",
 };
+
+/** The pool's label, else the pair's symbols, else its short address. */
+export const pairName = (p: Pick<PoolView, "address" | "label" | "tokens">) =>
+  p.label ?? (p.tokens ? `${p.tokens[0].symbol}-${p.tokens[1].symbol}` : shortAddr(p.address));
+
+/** A user may run several auto-rebalance agents, so each is named by its pool. */
+export function agentName(a: AgentView) {
+  const pool = a.kind === "auto-rebalance" ? a.pools[0] : undefined;
+  return pool ? `${AGENT_NAME[a.kind]} ${pairName(pool)}` : AGENT_NAME[a.kind];
+}
 
 export interface AgentsData {
   agents: AgentView[];
@@ -95,6 +117,10 @@ export interface AlertsData {
 
 export interface RebalanceView {
   id: string;
+  /** A range move, or an in-range fee claim (whose old and new range are the same). */
+  action: RebalanceAction;
+  /** Unclaimed fees in SOL when the runner acted; null when unknown. */
+  feeSol: number | null;
   poolAddress: string;
   poolLabel: string | null;
   tokens: PairTokens;
@@ -117,6 +143,8 @@ export interface RebalanceView {
 
 export interface RebalancesData {
   rebalances: RebalanceView[];
+  /** The agent's fee mode, which names what a claim row did. */
+  feeMode: FeeMode;
   now: number;
 }
 
@@ -137,20 +165,26 @@ export interface TelegramView {
 
 export type AgentStatus = "live" | "paused" | "attention" | "off";
 
-type StatusInput = Pick<AgentView, "enabled" | "paused" | "pausedReason"> & { wallet?: string | null };
-
-/** Runner pauses that the user's setup clears on its own: linking Telegram, or saving the wallet again. */
-const SETUP_PAUSES: readonly string[] = [...TELEGRAM_PAUSES, WALLET_UNREADABLE];
+type StatusInput = Pick<AgentView, "enabled" | "paused" | "pausedReason"> & {
+  wallet?: string | null;
+  rpcHost?: string | null;
+};
 
 /**
- * `attention` is a pause the runner set because its setup is broken (no Telegram chat, a bot token to re-link, a
- * wallet whose key no longer decrypts), or an auto-rebalance agent with no wallet, which the runner skips until one
- * is saved.
+ * Runner pauses the user has to act on. Linking Telegram or saving the wallet again clears those on its own; a low
+ * SOL balance needs a top-up and then a resume.
+ */
+const ATTENTION_PAUSES: readonly string[] = [...TELEGRAM_PAUSES, WALLET_UNREADABLE, LOW_SOL];
+
+/**
+ * `attention` is a pause the runner set because the setup is broken (no Telegram chat, a bot token to re-link, a
+ * wallet whose key no longer decrypts, too little SOL), or an auto-rebalance agent with no wallet or RPC URL, which
+ * the runner skips until both are saved.
  */
 export function agentStatus(a: StatusInput): AgentStatus {
   if (!a.enabled) return "off";
-  if (a.wallet === null) return "attention";
-  if (a.paused) return a.pausedReason && SETUP_PAUSES.includes(a.pausedReason) ? "attention" : "paused";
+  if (a.wallet === null || a.rpcHost === null) return "attention";
+  if (a.paused) return a.pausedReason && ATTENTION_PAUSES.includes(a.pausedReason) ? "attention" : "paused";
   return "live";
 }
 
@@ -158,6 +192,12 @@ export function agentStatus(a: StatusInput): AgentStatus {
 export function statusHint(a: StatusInput): string | undefined {
   if (agentStatus(a) === "attention" && a.wallet === null) {
     return "Waiting for a wallet. Save the wallet whose position this agent manages and it starts checking.";
+  }
+  if (agentStatus(a) === "attention" && a.rpcHost === null) {
+    return "Add an RPC URL. The agent reads and sends through your own Solana RPC and is skipped until it has one.";
+  }
+  if (agentStatus(a) === "attention" && a.pausedReason === LOW_SOL) {
+    return "Low SOL, top up then resume. The agent wallet held less SOL than the reserve it keeps for fees and rent.";
   }
   if (agentStatus(a) === "attention" && a.pausedReason === TELEGRAM_RELINK) {
     return "Paused because the saved bot token can no longer be read. Connect your bot again and the agent resumes.";
@@ -292,14 +332,33 @@ export const defaultDraft = (kind: AgentKind = "volume-watch"): Draft => ({
   rebalanceFields: rebalanceFields(DEFAULT_REBALANCE_CONFIG),
 });
 
-/** `wallet` is the saved wallet's public key; only an auto-rebalance agent needs one. */
-export function draftIssues(d: Draft, wallet: string | null = null): string[] {
+/** Pools the user's auto-rebalance agents already manage; a second agent on one would act on the same position. */
+export const managedPools = (agents: AgentView[]) =>
+  new Set(agents.flatMap((a) => (a.kind === "auto-rebalance" ? a.pools.map((p) => p.address) : [])));
+
+/**
+ * `wallet` and `rpcHost` describe the saved agent wallet, which only an auto-rebalance agent needs. `managed` holds
+ * the pools another auto-rebalance agent already runs on.
+ */
+export function draftIssues(
+  d: Draft,
+  setup: { wallet?: string | null; rpcHost?: string | null; managed?: ReadonlySet<string> } = {},
+): string[] {
   const issues: string[] = [];
-  if (d.pools.length === 0) issues.push("Pick at least one pool to watch");
-  if (d.pools.length > MAX_POOLS) issues.push(`Watch at most ${MAX_POOLS} pools`);
+  const max = poolLimit(d.kind);
+  if (d.pools.length === 0) issues.push(max === 1 ? "Pick the pool to manage" : "Pick at least one pool to watch");
+  if (d.pools.length > max) {
+    issues.push(max === 1 ? "An auto-rebalance agent manages one pool" : `Watch at most ${max} pools`);
+  }
   const config = d.kind === "auto-rebalance" ? parseRebalanceFields(d.rebalanceFields) : parseConfigFields(d.fields);
   if (!config.ok) issues.push(...Object.values(config.errors));
-  if (d.kind === "auto-rebalance" && !wallet) issues.push("Save the wallet this agent manages");
+  if (d.kind === "auto-rebalance") {
+    if (d.pools.some((p) => setup.managed?.has(p.address))) {
+      issues.push("Another auto-rebalance agent already manages this pool");
+    }
+    if (!setup.wallet) issues.push("Save the wallet this agent manages");
+    else if (!setup.rpcHost) issues.push("Add the RPC URL the agent sends through");
+  }
   return issues;
 }
 
@@ -313,6 +372,10 @@ export interface RebalanceFields {
   cooldownMin: string;
   /** True records and reports moves only; false signs and sends them with the agent wallet. */
   dryRun: boolean;
+  feeMode: FeeMode;
+  /** SOL; empty claims fees only when a rebalance does. */
+  feeClaimThresholdSol: string;
+  solReserve: string;
 }
 
 export const rebalanceFields = (c: AutoRebalanceConfig): RebalanceFields => ({
@@ -321,6 +384,9 @@ export const rebalanceFields = (c: AutoRebalanceConfig): RebalanceFields => ({
   halfWidth: c.halfWidth === null ? "" : String(c.halfWidth),
   cooldownMin: String(c.cooldownSec / 60),
   dryRun: c.dryRun,
+  feeMode: c.feeMode,
+  feeClaimThresholdSol: c.feeClaimThresholdSol === null ? "" : String(c.feeClaimThresholdSol),
+  solReserve: String(c.solReserve),
 });
 
 export type RebalanceResult =
@@ -335,18 +401,42 @@ export function parseRebalanceFields(fields: RebalanceFields): RebalanceResult {
     halfWidth: fields.halfWidth.trim() === "" ? null : num(fields.halfWidth),
     cooldownSec: Math.round(num(fields.cooldownMin) * 60),
     dryRun: fields.dryRun,
+    feeMode: fields.feeMode,
+    feeClaimThresholdSol: fields.feeClaimThresholdSol.trim() === "" ? null : num(fields.feeClaimThresholdSol),
+    solReserve: num(fields.solReserve),
   });
-  if (parsed.success) return { ok: true, config: parsed.data };
   const errors: Partial<Record<keyof RebalanceFields, string>> = {};
-  for (const issue of parsed.error.issues) {
+  for (const issue of parsed.success ? [] : parsed.error.issues) {
     const key = String(issue.path[0]);
     const field = (key === "cooldownSec" ? "cooldownMin" : key) as keyof RebalanceFields;
     if (!errors[field]) errors[field] = issue.message;
   }
+  if (fields.feeMode === "keep" && fields.feeClaimThresholdSol.trim() !== "") {
+    errors.feeClaimThresholdSol ??= "Fees kept in the position are never claimed in range; pick compound or sweep";
+  }
+  if (parsed.success && Object.keys(errors).length === 0) return { ok: true, config: parsed.data };
   return { ok: false, errors };
 }
 
 export const modeLabel = (c: Pick<AutoRebalanceConfig, "dryRun">) => (c.dryRun ? "Preview" : "Live");
+
+export const FEE_MODE_LABEL: Record<FeeMode, string> = {
+  keep: "Keep in wallet",
+  compound: "Compound into the position",
+  sweep: "Sweep to SOL",
+};
+
+/** `0.05 SOL`, up to 4 decimals. */
+export const solText = (v: number) => `${v.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`;
+
+/** What happens to the fees, and whether they are also claimed in range. */
+export function describeFees(c: Pick<AutoRebalanceConfig, "feeMode" | "feeClaimThresholdSol">) {
+  if (c.feeMode === "keep") return FEE_MODE_LABEL.keep;
+  const action = c.feeMode === "compound" ? "Compound" : "Sweep to SOL";
+  return c.feeClaimThresholdSol === null
+    ? `${action} on rebalance`
+    : `${action}, claim at ${solText(c.feeClaimThresholdSol)}`;
+}
 
 /** `Same width` or `±34 bins`. */
 export const describeWidth = (halfWidth: number | null) => (halfWidth === null ? "Same width" : `±${halfWidth} bins`);
@@ -358,8 +448,8 @@ export function ruleSummary(a: AgentView): [string, string][] {
   if (a.kind === "auto-rebalance") {
     return [
       ["Mode", modeLabel(a.config)],
-      ["Strategy", a.config.strategy],
       ["Width", describeWidth(a.config.halfWidth)],
+      ["Fees", { keep: "Keep", compound: "Compound", sweep: "Sweep" }[a.config.feeMode]],
     ];
   }
   return [

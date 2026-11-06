@@ -16,11 +16,11 @@ const DetailSearch = z.object({
 
 export const Route = createFileRoute("/agents/$agentId")({
   validateSearch: DetailSearch,
-  loader: async ({ context }) => {
+  loader: async ({ context, params }) => {
     // The histories, the wallet and the Telegram state fill their own tabs; only the agent itself blocks the page.
     void context.queryClient.prefetchQuery(alertsQuery);
     void context.queryClient.prefetchQuery(telegramQuery);
-    void context.queryClient.prefetchQuery(rebalancesQuery);
+    void context.queryClient.prefetchQuery(rebalancesQuery(params.agentId));
     void context.queryClient.prefetchQuery(walletQuery);
     await context.queryClient.ensureQueryData(agentsQuery);
   },
