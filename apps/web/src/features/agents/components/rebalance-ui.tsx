@@ -2,8 +2,9 @@
 
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { TriangleAlertIcon, WalletIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { SolIcon } from "@/components/icons";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -306,9 +307,7 @@ export function WalletPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <WalletIcon className="size-4" />
-        </span>
+        <SolIcon className="size-8 shrink-0" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-mono text-sm font-medium">
             {data.publicKey ? shortAddr(data.publicKey) : "No wallet"}
@@ -435,7 +434,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
           </Panel>
           <Panel title="Telegram">
             <div className="px-3.25 pb-3.25">
-              <TelegramPanel />
+              <TelegramPanel kind="auto-rebalance" />
             </div>
           </Panel>
         </div>

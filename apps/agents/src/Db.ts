@@ -1,5 +1,6 @@
 import type { Keypair } from "@solana/web3.js";
 import {
+  type AgentKind,
   REBALANCE_FAILING,
   REBALANCE_FAILURE_LIMIT,
   TELEGRAM_NOT_LINKED,
@@ -133,8 +134,8 @@ export class Db extends Context.Service<
       pool: string,
       limit: number,
     ): Effect.Effect<ReadonlyArray<{ readonly minute: number; readonly volume: number | null }>, DbError>;
-    /** Where the user's alerts go: their chat and their own bot's token (decrypted). Missing until both are linked. */
-    telegramTarget(userId: string): Effect.Effect<TelegramTarget, DbError>;
+    /** Where a kind's alerts go: the chat and the bot token (decrypted) the user linked for it. Missing until both are. */
+    telegramTarget(userId: string, kind: AgentKind): Effect.Effect<TelegramTarget, DbError>;
     pauseAgent(agentId: string, reason: string): Effect.Effect<void, DbError>;
     /**
      * In one transaction: reads `last_alert_at` under a row lock and, unless it is inside the
@@ -311,12 +312,12 @@ export class Db extends Context.Service<
               .limit(limit),
           ).pipe(Effect.map((rows) => rows.map((r) => ({ minute: r.minute.getTime(), volume: r.volume })).reverse())),
 
-        telegramTarget: (userId) =>
+        telegramTarget: (userId, kind) =>
           run("telegramTarget", async () => {
             const [row] = await db
               .select({ chatId: telegramLinks.chatId, botToken: telegramLinks.botToken })
               .from(telegramLinks)
-              .where(eq(telegramLinks.userId, userId));
+              .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)));
             if (row?.chatId == null || !row.botToken) return { _tag: "missing" } as const;
             try {
               return { _tag: "ready", chatId: row.chatId, botToken: decryptSecret(row.botToken) } as const;

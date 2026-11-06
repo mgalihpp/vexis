@@ -9,7 +9,7 @@ import { usePoolHits } from "@/features/analytics/components/pool-search";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
-import { type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
+import { type AgentKind, type AgentStatus, BOT_TOKEN_PATTERN, type ConfigFields, MAX_POOLS, STATUS_LABEL } from "../agents";
 import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
 
@@ -604,12 +604,13 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
   );
 }
 
-/** Shows whether alerts have a chat to go to, and runs the one-time-code link flow when they do not. */
-export function TelegramPanel() {
-  const { data: tg } = useSuspenseQuery(telegramQuery);
-  const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { token } }));
-  const detect = useAgentMutation(() => detectTelegramChat());
-  const disconnect = useAgentMutation(() => disconnectTelegramLink());
+/** Shows whether this agent's alerts have a chat to go to, and runs the bot link flow when they do not. */
+export function TelegramPanel({ kind }: { kind: AgentKind }) {
+  const { data } = useSuspenseQuery(telegramQuery);
+  const tg = data[kind];
+  const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { kind, token } }));
+  const detect = useAgentMutation(() => detectTelegramChat({ data: { kind } }));
+  const disconnect = useAgentMutation(() => disconnectTelegramLink({ data: { kind } }));
   const [token, setToken] = useState("");
   const [tokenError, setTokenError] = useState<string | null>(null);
   const bot = tg.bot;

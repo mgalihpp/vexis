@@ -22,5 +22,6 @@ const LINK_POLL_MS = 3000;
 export const telegramQuery = queryOptions({
   queryKey: [...AGENTS_KEY, "telegram"],
   queryFn: () => getTelegram(),
-  refetchInterval: (q) => (q.state.data?.bot && !q.state.data.bot.linked ? LINK_POLL_MS : LIVE_MS),
+  refetchInterval: (q) =>
+    Object.values(q.state.data ?? {}).some((tg) => tg.bot && !tg.bot.linked) ? LINK_POLL_MS : LIVE_MS,
 });

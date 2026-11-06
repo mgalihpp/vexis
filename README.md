@@ -72,7 +72,7 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
 | `NITRO_PRESET`         | build       | `bun`                                | Build target, for example `node-server`                   |
 
-There is no shared Telegram bot. Each user pastes their own BotFather token in Settings, sends `/start` to it, and presses Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
+There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 
 ## Scripts
 
@@ -126,7 +126,7 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 
 ## The runner
 
-The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with each user's own bot token, so the runner never polls Telegram.
+The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with the bot the user linked for that agent, so the runner never polls Telegram.
 
 Auto-rebalance agents run on the same minute. For each watched pool the runner reads the agent wallet's position on-chain (`SOLANA_RPC_URL`); when its one funded position has left its range, it acts on it. A new agent starts in preview: it records the range it would move to and sends a Telegram preview, and nothing is signed. Once the user switches it to Live in its settings, the runner decrypts the agent wallet and rebalances the position on-chain (withdraw, balancing swap, deposit around the active bin), stores the signature and sends a Solscan link. A failed rebalance is reported and retried after the cooldown; three failures in a row pause the agent.
 

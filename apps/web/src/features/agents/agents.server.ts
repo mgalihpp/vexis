@@ -1,4 +1,4 @@
-import { type AgentKind, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
+import { AGENT_KINDS, type AgentKind, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   addAgentPool,
@@ -6,7 +6,7 @@ import {
   forUser,
   getAgent,
   getRebalanceWallet,
-  getTelegramLink,
+  getTelegramLinks,
   listAgentPools,
   listAlerts,
   listRebalances,
@@ -163,16 +163,20 @@ async function loadPoolLabels(userId: string, kind: AgentKind) {
   return new Map(pools.flatMap((p) => (p.label ? [[p.poolAddress, p.label] as const] : [])));
 }
 
-export async function loadTelegram(userId: string): Promise<TelegramView> {
-  const link = await getTelegramLink(scope(userId));
-  if (!link) return { bot: null, relink: null };
-  // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks for
-  // the token once more, and connecting overwrites the row.
-  if (!readable(link.botToken)) return { bot: null, relink: link.botUsername };
-  return {
-    bot: { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username },
-    relink: null,
+export async function loadTelegram(userId: string): Promise<Record<AgentKind, TelegramView>> {
+  const links = await getTelegramLinks(scope(userId));
+  const view = (kind: AgentKind): TelegramView => {
+    const link = links.find((l) => l.kind === kind);
+    if (!link) return { bot: null, relink: null };
+    // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks
+    // for the token once more, and connecting overwrites the row.
+    if (!readable(link.botToken)) return { bot: null, relink: link.botUsername };
+    return {
+      bot: { username: link.botUsername, linked: link.chatId != null, chatUsername: link.username },
+      relink: null,
+    };
   };
+  return Object.fromEntries(AGENT_KINDS.map((k) => [k, view(k)])) as Record<AgentKind, TelegramView>;
 }
 
 function readable(encrypted: string) {

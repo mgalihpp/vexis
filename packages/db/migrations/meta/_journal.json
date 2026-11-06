@@ -36,6 +36,13 @@
       "when": 1793947412010,
       "tag": "0004_rebalance_live",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793951070340,
+      "tag": "0005_telegram_per_kind",
+      "breakpoints": true
     }
   ]
 }

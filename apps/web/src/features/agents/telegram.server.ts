@@ -1,4 +1,4 @@
-import { AGENT_KINDS, TELEGRAM_PAUSES } from "@vexis/db/agents";
+import { type AgentKind, TELEGRAM_PAUSES } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
@@ -13,7 +13,7 @@ import { decryptSecret, encryptSecret } from "@vexis/db/secret";
 import { z } from "zod";
 import { BOT_TOKEN_PATTERN } from "./agents";
 
-// A user's own Telegram bot. The token is checked with `getMe`, stored encrypted, and the chat is read from the
+// A user's own Telegram bot, one per agent kind. The token is checked with `getMe`, stored encrypted, and the chat is read from the
 // messages waiting on that bot, so no per-bot polling is needed. The runner sends with the same token.
 
 export const BotToken = z.string().trim().regex(BOT_TOKEN_PATTERN, "That does not look like a bot token");
@@ -50,15 +50,15 @@ async function call<T>(token: string, method: string, schema: z.ZodType<T>, para
   return parsed.data;
 }
 
-export async function connectOwnBot(userId: string, token: string) {
+export async function connectOwnBot(userId: string, kind: AgentKind, token: string) {
   const me = await call(BotToken.parse(token), "getMe", Me);
-  await saveOwnBot(forUser(getDb(), userId), encryptSecret(token.trim()), me.result.username);
+  await saveOwnBot(forUser(getDb(), userId), kind, encryptSecret(token.trim()), me.result.username);
 }
 
-/** Reads the newest private chat on the user's bot and links it. Throws when nobody has written to the bot yet. */
-export async function detectOwnBotChat(userId: string) {
+/** Reads the newest private chat on the kind's bot and links it. Throws when nobody has written to the bot yet. */
+export async function detectOwnBotChat(userId: string, kind: AgentKind) {
   const s = forUser(getDb(), userId);
-  const link = await getTelegramLink(s);
+  const link = await getTelegramLink(s, kind);
   if (!link?.botToken) throw new Error("Connect your bot first");
 
   const { result } = await call(decryptSecret(link.botToken), "getUpdates", Updates, {
@@ -68,17 +68,15 @@ export async function detectOwnBotChat(userId: string) {
   const latest = [...result].reverse().find((u) => u.message?.chat.type === "private")?.message;
   if (!latest) throw new Error(`No message yet. Open @${link.botUsername ?? "your bot"} in Telegram and send /start.`);
 
-  const linked = await linkOwnBotChat(s, BigInt(latest.chat.id), latest.from?.username);
+  const linked = await linkOwnBotChat(s, kind, BigInt(latest.chat.id), latest.from?.username);
   if (!linked) throw new Error("Connect your bot first");
   // The runner paused the agent while it had no usable chat or token; now it has both. A pause the user chose stays.
-  for (const kind of AGENT_KINDS) {
-    const agent = await getAgent(s, kind);
-    if (agent?.paused && agent.pausedReason && TELEGRAM_PAUSES.includes(agent.pausedReason)) {
-      await updateAgent(s, kind, { paused: false, pausedReason: null });
-    }
+  const agent = await getAgent(s, kind);
+  if (agent?.paused && agent.pausedReason && TELEGRAM_PAUSES.includes(agent.pausedReason)) {
+    await updateAgent(s, kind, { paused: false, pausedReason: null });
   }
 }
 
-export async function disconnectTelegram(userId: string) {
-  await removeTelegramLink(forUser(getDb(), userId));
+export async function disconnectTelegram(userId: string, kind: AgentKind) {
+  await removeTelegramLink(forUser(getDb(), userId), kind);
 }

@@ -263,7 +263,7 @@ export const AGENT_TYPES = [
   {
     kind: "auto-rebalance",
     name: "Auto-rebalance",
-    sub: "Re-centers your range when price moves out; starts in preview",
+    sub: "Moves your position back into range when price leaves it",
   },
 ] as const satisfies readonly { kind: AgentKind; name: string; sub: string }[];
 

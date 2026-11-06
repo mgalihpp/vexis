@@ -14,6 +14,7 @@ import {
   fakeMeteora,
   fakeTelegram,
   fakeZap,
+  link,
   MINUTE,
   quietHistory,
   reading,
@@ -40,7 +41,7 @@ function setup(options: { watches?: ReturnType<typeof watch>[] } = {}) {
 function spikeScenario(volume: number, extra: { watches?: ReturnType<typeof watch>[] } = {}) {
   const s = setup(extra);
   s.db.minutes.set("POOL1", quietHistory("POOL1", 10));
-  s.db.chats.set("user-1", 42n);
+  s.db.chats.set(link("user-1", "volume-watch"), 42n);
   const last = s.db.minutes.get("POOL1")?.at(-1)?.cumulativeVolume ?? 0;
   s.meteora.readings = [reading({ cumulativeVolume: last + volume })];
   return s;
@@ -115,7 +116,7 @@ describe("evaluate and notify", () => {
   test("warm-up: too little history gives no alert", async () => {
     const s = setup();
     s.db.minutes.set("POOL1", quietHistory("POOL1", 3));
-    s.db.chats.set("user-1", 42n);
+    s.db.chats.set(link("user-1", "volume-watch"), 42n);
     s.meteora.readings = [reading({ cumulativeVolume: 10_000 + 3 * 100 + 9000 })];
     await s.run(cycle());
     expect(s.db.alerts).toEqual([]);
@@ -209,19 +210,22 @@ describe("evaluate and notify", () => {
   test("a bot token that no longer decrypts pauses the agent for a re-link, no alert row", async () => {
     const s = spikeScenario(5000);
     const userId = s.db.watches[0]?.userId ?? "";
-    s.db.unreadable.add(userId);
+    s.db.unreadable.add(link(userId, "volume-watch"));
     await s.run(cycle());
     expect(s.db.paused.get("agent-1")).toBe("telegram_relink");
     expect(s.db.alerts).toEqual([]);
     expect(s.telegram.sent).toEqual([]);
   });
 
-  test("an alert goes out through the user's own bot", async () => {
+  test("an alert goes out through the bot the user linked for this agent", async () => {
     const s = spikeScenario(5000);
-    s.db.ownBots.set("user-1", "own-bot-token");
+    s.db.ownBots.set(link("user-1", "volume-watch"), "own-bot-token");
+    s.db.chats.set(link("user-1", "auto-rebalance"), 99n);
+    s.db.ownBots.set(link("user-1", "auto-rebalance"), "rebalance-bot-token");
     await s.run(cycle());
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.botToken).toBe("own-bot-token");
+    expect(s.telegram.sent[0]?.chatId).toBe(42n);
   });
 
   test("a row with a bad config is skipped; other agents still run", async () => {
@@ -252,7 +256,7 @@ describe("evaluate and notify", () => {
         }),
       ],
     });
-    s.db.chats.set("user-2", 7n);
+    s.db.chats.set(link("user-2", "volume-watch"), 7n);
     await s.run(cycle());
     expect(s.db.alerts.map((a) => a.agentId)).toEqual(["loose"]);
     expect(s.telegram.sent.map((m) => m.chatId)).toEqual([7n]);
@@ -262,7 +266,7 @@ describe("evaluate and notify", () => {
     const s = setup({
       watches: [watch(), watch({ agentPoolId: "ap-2", poolAddress: "POOL2" })],
     });
-    s.db.chats.set("user-1", 42n);
+    s.db.chats.set(link("user-1", "volume-watch"), 42n);
     for (const pool of ["POOL1", "POOL2"]) s.db.minutes.set(pool, quietHistory(pool, 10));
     s.meteora.readings = [
       reading({ cumulativeVolume: 10_000 + 1000 + 5000 }),
@@ -284,7 +288,7 @@ function rebalanceSetup(
 ) {
   const config = { strategy: "Curve", slippageBps: 50, halfWidth: null, cooldownSec: 300, dryRun: !options.live };
   const db = fakeDb({ rebalances: options.watches ?? [rebalanceWatch({ config })] });
-  db.state.chats.set("user-1", 42n);
+  db.state.chats.set(link("user-1", "auto-rebalance"), 42n);
   db.state.wallets.set("user-1", testWallet());
   const chain = fakeChain({ POOL1: { activeBinId: active, positions } });
   const telegram = fakeTelegram();
@@ -351,7 +355,8 @@ describe("auto-rebalance preview", () => {
 
   test("no Telegram pauses the agent; a failed chain read is skipped without crashing", async () => {
     const s = rebalanceSetup(130);
-    s.db.chats.delete("user-1");
+    s.db.chats.delete(link("user-1", "auto-rebalance"));
+    s.db.chats.set(link("user-1", "volume-watch"), 42n);
     await s.run();
     expect(s.db.paused.get("rb-agent-1")).toBe("telegram_not_linked");
     expect(s.db.rebalances).toEqual([]);
@@ -463,7 +468,7 @@ describe("auto-rebalance live", () => {
 
     const apart = live(130, { watches: [agent(1, "OWNER1"), agent(2, "OWNER2", "user-2")] });
     apart.chain.pools.POOL2 = apart.chain.pools.POOL1 as NonNullable<(typeof apart.chain.pools)["POOL1"]>;
-    apart.db.chats.set("user-2", 43n);
+    apart.db.chats.set(link("user-2", "auto-rebalance"), 43n);
     apart.db.wallets.set("user-2", testWallet());
     await apart.run();
     expect(apart.zap.calls).toHaveLength(2);

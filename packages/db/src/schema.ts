@@ -195,23 +195,30 @@ export const wallets = pgTable(
 ).enableRLS();
 
 /**
- * A user's Telegram setup. There is no shared bot: the user brings their own (`bot_token`, AES-GCM encrypted,
- * see `secret.ts`). The web app validates it with `getMe`, then reads `chat_id` from the messages waiting on
- * that bot once the user has sent /start. The runner sends alerts with this token. One chat per user and one
- * user per chat, so alerts never reach someone else's chat.
+ * A user's Telegram setup, one per agent kind. There is no shared bot: the user brings their own (`bot_token`,
+ * AES-GCM encrypted, see `secret.ts`). The web app validates it with `getMe`, then reads `chat_id` from the
+ * messages waiting on that bot once the user has sent /start. The runner sends that kind's alerts with this
+ * token. A chat is linked to one user per kind, so alerts never reach someone else's chat.
  */
-export const telegramLinks = pgTable("telegram_links", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  botToken: text("bot_token").notNull(),
-  botUsername: text("bot_username").notNull(),
-  chatId: bigint("chat_id", { mode: "bigint" }).unique(),
-  username: text("username"),
-  linkedAt: timestamp("linked_at", { withTimezone: true }),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-}).enableRLS();
+export const telegramLinks = pgTable(
+  "telegram_links",
+  {
+    userId: userId(),
+    kind: text("kind").$type<AgentKind>().notNull(),
+    botToken: text("bot_token").notNull(),
+    botUsername: text("bot_username").notNull(),
+    chatId: bigint("chat_id", { mode: "bigint" }),
+    username: text("username"),
+    linkedAt: timestamp("linked_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.kind] }),
+    unique("telegram_links_kind_chat_unique").on(t.kind, t.chatId),
+    check("telegram_links_kind_check", sql.raw(`kind in (${AGENT_KINDS.map((k) => `'${k}'`).join(", ")})`)),
+  ],
+).enableRLS();
 
 /**
  * One row per user per agent kind. The runner runs rows where `enabled and not paused`.

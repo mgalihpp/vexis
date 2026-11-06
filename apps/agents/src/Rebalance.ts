@@ -113,7 +113,7 @@ const act = Effect.fn("actOnRebalance")(function* (
   const { webUrl } = yield* AppConfig;
   const live = !config.dryRun;
 
-  const target = yield* db.telegramTarget(watch.userId);
+  const target = yield* db.telegramTarget(watch.userId, "auto-rebalance");
   if (target._tag !== "ready")
     return yield* pause(watch.agentId, target._tag === "missing" ? TELEGRAM_NOT_LINKED : TELEGRAM_RELINK);
 

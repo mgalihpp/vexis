@@ -223,7 +223,7 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
           </Panel>
           <Panel title="Telegram">
             <div className="px-3.25 pb-3.25">
-              <TelegramPanel />
+              <TelegramPanel kind="volume-watch" />
             </div>
           </Panel>
         </div>
@@ -415,7 +415,7 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
 
         {section === "telegram" && (
           <div className="p-4 sm:p-5">
-            <TelegramPanel />
+            <TelegramPanel kind={agent.kind} />
           </div>
         )}
 

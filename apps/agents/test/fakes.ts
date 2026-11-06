@@ -1,5 +1,5 @@
 import { Keypair } from "@solana/web3.js";
-import { REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
+import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
 import { Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
@@ -42,6 +42,9 @@ export type StoredRebalance = NewRebalance & {
   error: string | null;
 };
 
+/** Key for the fake's Telegram state: a link belongs to one user and one agent kind. */
+export const link = (userId: string, kind: AgentKind) => `${userId}/${kind}`;
+
 /** In-memory `Db`: same contract as the Postgres one, state exposed for assertions. */
 export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] } = {}) {
   const state = {
@@ -49,9 +52,10 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
     rebalanceWatches: seed.rebalances ?? [],
     rebalances: [] as StoredRebalance[],
     minutes: new Map<string, NewMinute[]>(),
+    /** Telegram state by `link(userId, kind)`. */
     chats: new Map<string, bigint>(),
     ownBots: new Map<string, string>(),
-    /** Users whose stored bot token no longer decrypts. */
+    /** Links whose stored bot token no longer decrypts. */
     unreadable: new Set<string>(),
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
@@ -122,14 +126,15 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
             .slice(-limit)
             .map((r) => ({ minute: r.minute.getTime(), volume: r.volume })),
         ),
-      telegramTarget: (userId) => {
-        const chatId = state.chats.get(userId);
+      telegramTarget: (userId, kind) => {
+        const key = link(userId, kind);
+        const chatId = state.chats.get(key);
         if (chatId === undefined) return Effect.succeed({ _tag: "missing" } as const);
-        if (state.unreadable.has(userId)) return Effect.succeed({ _tag: "unreadable" } as const);
+        if (state.unreadable.has(key)) return Effect.succeed({ _tag: "unreadable" } as const);
         return Effect.succeed({
           _tag: "ready",
           chatId,
-          botToken: state.ownBots.get(userId) ?? "user-bot-token",
+          botToken: state.ownBots.get(key) ?? "user-bot-token",
         } as const);
       },
       pauseAgent: (agentId, reason) => Effect.sync(() => void state.paused.set(agentId, reason)),

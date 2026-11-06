@@ -365,7 +365,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
         </div>
       )}
       <div className="rounded-2xl bg-muted/40 p-4">
-        <TelegramPanel />
+        <TelegramPanel kind={draft.kind} />
       </div>
     </>
   );

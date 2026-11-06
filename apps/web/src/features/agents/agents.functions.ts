@@ -56,23 +56,25 @@ export const getTelegram = createServerFn({ method: "GET" })
 
 export const connectTelegramBot = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ token: BotToken }))
+  .validator(z.object({ kind: Kind, token: BotToken }))
   .handler(async ({ context, data }) => {
-    await connectOwnBot(context.viewer.id, data.token);
+    await connectOwnBot(context.viewer.id, data.kind, data.token);
     return loadTelegram(context.viewer.id);
   });
 
 export const detectTelegramChat = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .handler(async ({ context }) => {
-    await detectOwnBotChat(context.viewer.id);
+  .validator(z.object({ kind: Kind }))
+  .handler(async ({ context, data }) => {
+    await detectOwnBotChat(context.viewer.id, data.kind);
     return loadTelegram(context.viewer.id);
   });
 
 export const disconnectTelegramLink = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .handler(async ({ context }) => {
-    await disconnectTelegram(context.viewer.id);
+  .validator(z.object({ kind: Kind }))
+  .handler(async ({ context, data }) => {
+    await disconnectTelegram(context.viewer.id, data.kind);
     return loadTelegram(context.viewer.id);
   });
 

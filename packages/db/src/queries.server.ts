@@ -194,36 +194,41 @@ export async function removeRebalanceWallet({ db, userId }: UserScope) {
 
 // --- telegram ---------------------------------------------------------------------------------
 
-export function getTelegramLink({ db, userId }: UserScope) {
+/** Every Telegram link the user has, one per agent kind at most. */
+export function getTelegramLinks({ db, userId }: UserScope) {
+  return db.select().from(telegramLinks).where(eq(telegramLinks.userId, userId));
+}
+
+export function getTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
   return db
     .select()
     .from(telegramLinks)
-    .where(eq(telegramLinks.userId, userId))
+    .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)))
     .then((rows) => rows[0]);
 }
 
-/** Stores the user's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
-export async function saveOwnBot({ db, userId }: UserScope, encryptedToken: string, botUsername: string) {
+/** Stores the kind's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
+export async function saveOwnBot({ db, userId }: UserScope, kind: AgentKind, encryptedToken: string, botUsername: string) {
   const fresh = { botToken: encryptedToken, botUsername, chatId: null, username: null, linkedAt: null };
   await db
     .insert(telegramLinks)
-    .values({ userId, ...fresh })
-    .onConflictDoUpdate({ target: telegramLinks.userId, set: fresh });
+    .values({ userId, kind, ...fresh })
+    .onConflictDoUpdate({ target: [telegramLinks.userId, telegramLinks.kind], set: fresh });
 }
 
-/** Binds the chat found on the user's own bot. False when the user has no bot saved. */
-export async function linkOwnBotChat({ db, userId }: UserScope, chatId: bigint, username?: string) {
+/** Binds the chat found on the kind's bot. False when no bot is saved for that kind. */
+export async function linkOwnBotChat({ db, userId }: UserScope, kind: AgentKind, chatId: bigint, username?: string) {
   const rows = await db
     .update(telegramLinks)
     .set({ chatId, username: username ?? null, linkedAt: new Date() })
-    .where(eq(telegramLinks.userId, userId))
+    .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)))
     .returning({ userId: telegramLinks.userId });
   return rows.length > 0;
 }
 
-/** Forgets the bot and the chat. The runner pauses the user's agents at the next alert. */
-export async function removeTelegramLink({ db, userId }: UserScope) {
-  await db.delete(telegramLinks).where(eq(telegramLinks.userId, userId));
+/** Forgets the kind's bot and chat. The runner pauses that agent at its next alert. */
+export async function removeTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
+  await db.delete(telegramLinks).where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)));
 }
 
 // --- invites (not user-scoped: used before the user exists, or by admins) ---------------------

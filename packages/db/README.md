@@ -35,7 +35,7 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 | `invite_redemptions`                             | user   | `used_by`/`used_at`, one per user.                                                          |
 | `user_settings`                                  | user   | `timezone` (IANA), `currency` (`usd`/`sol`).                                                |
 | `wallets`                                        | user   | Unique per `(user_id, address)`.                                                            |
-| `telegram_links`                                 | user   | The user's own bot (encrypted token) and linked chat; one chat per user.                    |
+| `telegram_links`                                 | user   | One bot (encrypted token) and linked chat per `(user_id, kind)`.                            |
 | `agents`                                         | user   | One per `(user_id, kind)`; `enabled`, `paused`, `config` jsonb (zod-validated).             |
 | `agent_pools`                                    | user   | Pools an agent watches; `last_alert_at` for the cooldown.                                   |
 | `agent_alerts`                                   | user   | `vol_1m`, `baseline`, `ratio`, `delivered`, `error`, `at`.                                  |
