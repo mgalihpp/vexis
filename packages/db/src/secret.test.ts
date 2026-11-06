@@ -32,6 +32,19 @@ describe("secret", () => {
     expect(() => decryptSecret(blob)).toThrow();
   });
 
+  test("a wallet secret only opens with WALLET_ENC_KEY, never with the token key", () => {
+    const saved = process.env.WALLET_ENC_KEY;
+    process.env.WALLET_ENC_KEY = randomBytes(32).toString("base64");
+    try {
+      const blob = encryptSecret(TOKEN, "WALLET_ENC_KEY");
+      expect(decryptSecret(blob, "WALLET_ENC_KEY")).toBe(TOKEN);
+      expect(() => decryptSecret(blob)).toThrow();
+    } finally {
+      if (saved === undefined) delete process.env.WALLET_ENC_KEY;
+      else process.env.WALLET_ENC_KEY = saved;
+    }
+  });
+
   test("a missing or short key is an error", () => {
     delete process.env.TOKEN_ENC_KEY;
     expect(() => encryptSecret(TOKEN)).toThrow("TOKEN_ENC_KEY is not set");

@@ -5,9 +5,11 @@ import type { Db } from "./client.server.ts";
 import {
   agentAlerts,
   agentPools,
+  agentRebalances,
   agents,
   inviteRedemptions,
   invites,
+  rebalanceWallets,
   telegramLinks,
   userSettings,
   wallets,
@@ -156,6 +158,38 @@ export async function getAlert({ db, userId }: UserScope, alertId: string) {
     .from(agentAlerts)
     .where(and(eq(agentAlerts.id, alertId), eq(agentAlerts.userId, userId)));
   return row;
+}
+
+// --- auto-rebalance --------------------------------------------------------------------------
+
+export function listRebalances({ db, userId }: UserScope, options: { limit?: number } = {}) {
+  return db
+    .select()
+    .from(agentRebalances)
+    .where(eq(agentRebalances.userId, userId))
+    .orderBy(desc(agentRebalances.at))
+    .limit(Math.min(options.limit ?? 50, 500));
+}
+
+/** The public key only: the encrypted secret is read by the runner, never by the web app. */
+export function getRebalanceWallet({ db, userId }: UserScope) {
+  return db
+    .select({ publicKey: rebalanceWallets.publicKey })
+    .from(rebalanceWallets)
+    .where(eq(rebalanceWallets.userId, userId))
+    .then((rows) => rows[0]);
+}
+
+export async function saveRebalanceWallet({ db, userId }: UserScope, publicKey: string, encryptedSecret: string) {
+  const row = { publicKey, secretKey: encryptedSecret };
+  await db
+    .insert(rebalanceWallets)
+    .values({ userId, ...row })
+    .onConflictDoUpdate({ target: rebalanceWallets.userId, set: row });
+}
+
+export async function removeRebalanceWallet({ db, userId }: UserScope) {
+  await db.delete(rebalanceWallets).where(eq(rebalanceWallets.userId, userId));
 }
 
 // --- telegram ---------------------------------------------------------------------------------

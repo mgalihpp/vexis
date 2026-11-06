@@ -176,7 +176,7 @@ export function AlertsTable({
   );
 }
 
-function Delivery({ alert: a }: { alert: AlertView }) {
+export function Delivery({ alert: a }: { alert: Pick<AlertView, "delivered" | "error"> }) {
   if (a.delivered) return <span className="rounded bg-profit/15 px-1.5 py-0.5 text-[0.625rem] text-profit">Sent</span>;
   return (
     <span className="rounded bg-loss/15 px-1.5 py-0.5 text-[0.625rem] text-loss" title={a.error ?? undefined}>

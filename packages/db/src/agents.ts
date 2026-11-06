@@ -3,7 +3,7 @@ import { z } from "zod";
 // Agent kinds and their config schemas. `agents.config` is jsonb; every write goes through
 // `parseAgentConfig`, and the runner parses again on read so a bad row is skipped, not run.
 
-export const AGENT_KINDS = ["volume-watch"] as const;
+export const AGENT_KINDS = ["volume-watch", "auto-rebalance"] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
 export const VolumeWatchConfig = z.object({
@@ -20,8 +20,25 @@ export const VolumeWatchConfig = z.object({
 });
 export type VolumeWatchConfig = z.infer<typeof VolumeWatchConfig>;
 
+export const REBALANCE_STRATEGIES = ["Spot", "Curve", "BidAsk"] as const;
+
+export const AutoRebalanceConfig = z.object({
+  /** Liquidity shape of the re-centered position. */
+  strategy: z.enum(REBALANCE_STRATEGIES).default("Curve"),
+  /** Slippage tolerance for the balancing swap, in basis points. */
+  slippageBps: z.number().int().min(0).max(10_000).default(50),
+  /** Bins on each side of the active bin; null keeps the position's current width. */
+  halfWidth: z.number().int().min(1).max(1024).nullable().default(null),
+  /** Per-pool quiet time after a rebalance (or its preview), in seconds. */
+  cooldownSec: z.number().int().min(0).max(86_400).default(300),
+  /** True records and reports the move only; false signs and sends it with the agent wallet. */
+  dryRun: z.boolean().default(true),
+});
+export type AutoRebalanceConfig = z.infer<typeof AutoRebalanceConfig>;
+
 export const AGENT_CONFIG = {
   "volume-watch": VolumeWatchConfig,
+  "auto-rebalance": AutoRebalanceConfig,
 } as const satisfies Record<AgentKind, z.ZodType>;
 
 export type AgentConfig<K extends AgentKind> = z.infer<(typeof AGENT_CONFIG)[K]>;
@@ -45,3 +62,13 @@ export const TELEGRAM_RELINK = "telegram_relink";
 
 /** Pauses the runner sets over Telegram and that linking a chat clears. A pause the user chose is neither. */
 export const TELEGRAM_PAUSES: readonly string[] = [TELEGRAM_NOT_LINKED, TELEGRAM_RELINK];
+
+/**
+ * `agents.paused_reason` the runner sets when the agent wallet's stored secret does not decrypt with this
+ * `WALLET_ENC_KEY`, or does not match its public key. Saving the wallet again clears it.
+ */
+export const WALLET_UNREADABLE = "wallet_unreadable";
+
+/** `agents.paused_reason` the runner sets after `REBALANCE_FAILURE_LIMIT` live rebalances failed in a row. Resuming clears it. */
+export const REBALANCE_FAILING = "rebalance_failing";
+export const REBALANCE_FAILURE_LIMIT = 3;

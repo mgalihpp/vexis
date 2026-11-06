@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tile } from "@/features/portfolio/components/active-figures";
 import { SCROLL_TABLE, type View, ViewToggle } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
-import { type AgentView, agentStatus, compactUsd, formatMinutes, summarizeFleet } from "../agents";
+import { AGENT_NAME, type AgentView, agentStatus, formatMinutes, ruleSummary, summarizeFleet } from "../agents";
 import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
 import { AgentsBar, BarPill, PairLogo, StatCard } from "./agent-layout";
@@ -50,9 +50,7 @@ export function FleetPage() {
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-3.25">Agent</TableHead>
                     <TableHead>Pools</TableHead>
-                    <TableHead className="text-right">Spike</TableHead>
-                    <TableHead className="text-right">Baseline</TableHead>
-                    <TableHead className="text-right">Min volume</TableHead>
+                    <TableHead>Rule</TableHead>
                     <TableHead className="text-right">Alerts 24h</TableHead>
                     <TableHead className="text-right">Last alert</TableHead>
                     <TableHead className="w-20 pr-3.25" />
@@ -84,9 +82,8 @@ function NewAgentButton() {
 
 function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
   const [first, ...rest] = agent.pools;
-  const c = agent.config;
   return (
     <TableRow>
       <TableCell className="pl-3.25">
@@ -98,7 +95,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
         >
           <AgentAvatar status={status} className="size-8" />
           <div>
-            <div className="text-xs font-semibold group-hover:text-brand">Volume spike</div>
+            <div className="text-xs font-semibold group-hover:text-brand">{AGENT_NAME[agent.kind]}</div>
             <StatusDot status={status} />
           </div>
         </Link>
@@ -119,9 +116,11 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
           <span className="text-muted-foreground">No pools</span>
         )}
       </TableCell>
-      <TableCell className="text-right font-medium">≥ {c.mult}×</TableCell>
-      <TableCell className="text-right">{formatMinutes(c.baseline * 60)}</TableCell>
-      <TableCell className="text-right">{compactUsd(c.minUsd)}/min</TableCell>
+      <TableCell className="font-medium">
+        {ruleSummary(agent)
+          .map(([, value]) => value)
+          .join(" · ")}
+      </TableCell>
       <TableCell className="text-right font-semibold">{agent.alerts24h}</TableCell>
       <TableCell className="text-right text-muted-foreground">
         {agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"}
@@ -156,8 +155,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
 
 function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
-  const c = agent.config;
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
   return (
     <article className="rounded-lg border bg-card p-2.5 text-xs tabular-nums">
       <div className="flex items-start justify-between gap-1.5">
@@ -169,7 +167,7 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
         >
           <AgentAvatar status={status} className="size-9" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold group-hover:text-brand">Volume spike</div>
+            <div className="truncate text-sm font-semibold group-hover:text-brand">{AGENT_NAME[agent.kind]}</div>
             <StatusDot status={status} />
           </div>
         </Link>
@@ -212,15 +210,11 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
         )}
       </Tile>
       <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-        <Tile label="Spike">
-          <span className="font-semibold">≥ {c.mult}×</span>
-        </Tile>
-        <Tile label="Baseline" className="text-right">
-          {formatMinutes(c.baseline * 60)}
-        </Tile>
-        <Tile label="Min volume" className="text-right">
-          {compactUsd(c.minUsd)}/min
-        </Tile>
+        {ruleSummary(agent).map(([label, value], i) => (
+          <Tile key={label} label={label} className={i === 0 ? "" : "text-right"}>
+            {i === 0 ? <span className="font-semibold">{value}</span> : value}
+          </Tile>
+        ))}
         <Tile label="Alerts 24h">
           <span className="font-semibold">{agent.alerts24h}</span>
         </Tile>
@@ -228,7 +222,7 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
           {agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"}
         </Tile>
         <Tile label="Cooldown" className="text-right">
-          {formatMinutes(c.cooldownSec)}
+          {formatMinutes(agent.config.cooldownSec)}
         </Tile>
       </div>
     </article>

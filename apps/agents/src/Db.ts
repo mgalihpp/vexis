@@ -1,10 +1,26 @@
-import { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK } from "@vexis/db/agents";
+import type { Keypair } from "@solana/web3.js";
+import {
+  REBALANCE_FAILING,
+  REBALANCE_FAILURE_LIMIT,
+  TELEGRAM_NOT_LINKED,
+  TELEGRAM_RELINK,
+  WALLET_UNREADABLE,
+} from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
-import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
+import {
+  agentAlerts,
+  agentPools,
+  agentRebalances,
+  agents,
+  poolMinutes,
+  rebalanceWallets,
+  telegramLinks,
+} from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "./errors.ts";
+import { walletSigner } from "./wallet.ts";
 
 /** One (agent, pool) pair of a runnable volume-watch agent. `config` is raw jsonb. */
 export type Watch = {
@@ -16,6 +32,38 @@ export type Watch = {
   readonly config: unknown;
   readonly lastAlertAt: Date | null;
 };
+
+/** One (agent, pool) pair of a runnable auto-rebalance agent, with the wallet whose position it manages. */
+export type RebalanceWatch = Watch & { readonly owner: string };
+
+export type NewRebalance = {
+  readonly agentId: string;
+  readonly userId: string;
+  readonly poolAddress: string;
+  readonly positionAddress: string;
+  readonly activeBin: number;
+  readonly lowerBin: number;
+  readonly upperBin: number;
+  readonly newLowerBin: number;
+  readonly newUpperBin: number;
+  /** Sent on-chain (dryRun false), rather than a preview. */
+  readonly live: boolean;
+  readonly at: Date;
+};
+
+/** How a live rebalance ended: the confirmed signature, or why it failed. */
+export type TxOutcome =
+  | { readonly _tag: "sent"; readonly signature: string }
+  | { readonly _tag: "failed"; readonly error: string };
+
+/**
+ * The agent wallet's signer. `unreadable`: the stored secret does not decrypt with this `WALLET_ENC_KEY` or does
+ * not match its public key, so the user has to save the wallet again.
+ */
+export type WalletSigner =
+  | { readonly _tag: "missing" }
+  | { readonly _tag: "unreadable" }
+  | { readonly _tag: "ready"; readonly signer: Keypair };
 
 export type StoredReading = { readonly minute: number; readonly cumulativeVolume: number };
 
@@ -37,7 +85,7 @@ export type NewAlert = {
   readonly at: Date;
 };
 
-export { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK };
+export { REBALANCE_FAILING, REBALANCE_FAILURE_LIMIT, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, WALLET_UNREADABLE };
 
 /**
  * Where a user's alerts go. `unreadable`: a bot is linked but its token does not decrypt with this
@@ -48,6 +96,12 @@ export type TelegramTarget =
   | { readonly _tag: "unreadable" }
   | { readonly _tag: "ready"; readonly chatId: bigint; readonly botToken: string };
 
+/** Rows newest first: how many failed before the first that did not. */
+export const leadingFailures = (rows: ReadonlyArray<{ readonly txError: string | null }>) => {
+  const ok = rows.findIndex((r) => r.txError === null);
+  return ok === -1 ? rows.length : ok;
+};
+
 /** Postgres `double precision` takes Infinity but JSON does not; a zero baseline is stored capped. */
 const MAX_STORED_RATIO = 1_000_000;
 
@@ -57,6 +111,18 @@ export class Db extends Context.Service<
   {
     /** Enabled, unpaused volume-watch agents joined with their pools. */
     runnableWatches(): Effect.Effect<ReadonlyArray<Watch>, DbError>;
+    /** Enabled, unpaused auto-rebalance agents with a saved wallet, joined with their pools. */
+    runnableRebalances(): Effect.Effect<ReadonlyArray<RebalanceWatch>, DbError>;
+    /** Inserts with `delivered = false` and returns the new id. */
+    recordRebalance(row: NewRebalance): Effect.Effect<string, DbError>;
+    /** `error` null marks the row delivered; otherwise stores why the Telegram send failed. */
+    settleRebalance(id: string, error: string | null): Effect.Effect<void, DbError>;
+    /** Stores a live row's signature or transaction error. */
+    settleTransaction(id: string, outcome: TxOutcome): Effect.Effect<void, DbError>;
+    /** Failed live rebalances in a row, newest first, counting at most `REBALANCE_FAILURE_LIMIT`. */
+    failureStreak(agentId: string): Effect.Effect<number, DbError>;
+    /** Decrypts the agent wallet's secret. The only place anything decrypts it; the web app only writes it. */
+    walletSigner(userId: string): Effect.Effect<WalletSigner, DbError>;
     /** Newest stored reading per pool, for the next delta. Pools never seen are absent. */
     latestReadings(pools: ReadonlyArray<string>): Effect.Effect<ReadonlyMap<string, StoredReading>, DbError>;
     /** Existing `(pool, minute)` rows are kept. */
@@ -116,6 +182,86 @@ export class Db extends Context.Service<
               .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
               .where(and(eq(agents.kind, "volume-watch"), eq(agents.enabled, true), eq(agents.paused, false))),
           ),
+
+        runnableRebalances: () =>
+          run("runnableRebalances", () =>
+            db
+              .select({
+                agentId: agents.id,
+                userId: agents.userId,
+                agentPoolId: agentPools.id,
+                poolAddress: agentPools.poolAddress,
+                label: agentPools.label,
+                config: agents.config,
+                lastAlertAt: agentPools.lastAlertAt,
+                owner: rebalanceWallets.publicKey,
+              })
+              .from(agents)
+              .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
+              .innerJoin(rebalanceWallets, eq(rebalanceWallets.userId, agents.userId))
+              .where(and(eq(agents.kind, "auto-rebalance"), eq(agents.enabled, true), eq(agents.paused, false))),
+          ),
+
+        recordRebalance: (row) =>
+          run("recordRebalance", () =>
+            db
+              .insert(agentRebalances)
+              .values({ ...row, delivered: false })
+              .returning({ id: agentRebalances.id }),
+          ).pipe(
+            Effect.flatMap(([r]) =>
+              r
+                ? Effect.succeed(r.id)
+                : Effect.fail(new DbError({ operation: "recordRebalance", cause: new Error("no row returned") })),
+            ),
+          ),
+
+        settleRebalance: (id, error) =>
+          run("settleRebalance", () =>
+            db
+              .update(agentRebalances)
+              .set({ delivered: error === null, error })
+              .where(eq(agentRebalances.id, id)),
+          ).pipe(Effect.asVoid),
+
+        settleTransaction: (id, outcome) =>
+          run("settleTransaction", () =>
+            db
+              .update(agentRebalances)
+              .set(
+                outcome._tag === "sent"
+                  ? { signature: outcome.signature, txError: null }
+                  : { signature: null, txError: outcome.error },
+              )
+              .where(eq(agentRebalances.id, id)),
+          ).pipe(Effect.asVoid),
+
+        failureStreak: (agentId) =>
+          run("failureStreak", () =>
+            db
+              .select({ txError: agentRebalances.txError })
+              .from(agentRebalances)
+              .where(and(eq(agentRebalances.agentId, agentId), eq(agentRebalances.live, true)))
+              .orderBy(desc(agentRebalances.at))
+              .limit(REBALANCE_FAILURE_LIMIT),
+          ).pipe(Effect.map(leadingFailures)),
+
+        walletSigner: (userId) =>
+          run("walletSigner", async (): Promise<WalletSigner> => {
+            const [row] = await db
+              .select({ publicKey: rebalanceWallets.publicKey, secretKey: rebalanceWallets.secretKey })
+              .from(rebalanceWallets)
+              .where(eq(rebalanceWallets.userId, userId));
+            if (!row) return { _tag: "missing" };
+            let secret: string;
+            try {
+              secret = decryptSecret(row.secretKey, "WALLET_ENC_KEY");
+            } catch {
+              return { _tag: "unreadable" };
+            }
+            const signer = walletSigner(secret, row.publicKey);
+            return signer ? { _tag: "ready", signer } : { _tag: "unreadable" };
+          }),
 
         latestReadings: (pools) =>
           pools.length === 0

@@ -1,4 +1,4 @@
-import { TELEGRAM_PAUSES } from "@vexis/db/agents";
+import { AGENT_KINDS, TELEGRAM_PAUSES } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
@@ -71,9 +71,11 @@ export async function detectOwnBotChat(userId: string) {
   const linked = await linkOwnBotChat(s, BigInt(latest.chat.id), latest.from?.username);
   if (!linked) throw new Error("Connect your bot first");
   // The runner paused the agent while it had no usable chat or token; now it has both. A pause the user chose stays.
-  const agent = await getAgent(s, "volume-watch");
-  if (agent?.paused && agent.pausedReason && TELEGRAM_PAUSES.includes(agent.pausedReason)) {
-    await updateAgent(s, "volume-watch", { paused: false, pausedReason: null });
+  for (const kind of AGENT_KINDS) {
+    const agent = await getAgent(s, kind);
+    if (agent?.paused && agent.pausedReason && TELEGRAM_PAUSES.includes(agent.pausedReason)) {
+      await updateAgent(s, kind, { paused: false, pausedReason: null });
+    }
   }
 }
 
