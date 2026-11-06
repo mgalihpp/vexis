@@ -68,16 +68,56 @@ export type RebalanceLine = {
   readonly slippageBps: number;
 };
 
-/** A position that left its range and the range it would move to. Sending lands later; this is a preview. */
+const rangeRows = (line: RebalanceLine, moved: string) => [
+  `Active bin: <b>${line.activeBinId}</b>`,
+  `Range: ${line.from.lowerBinId} to ${line.from.upperBinId}`,
+  `${moved}: <b>${line.to.lowerBinId} to ${line.to.upperBinId}</b>`,
+  `${line.strategy}, slippage ${line.slippageBps} bps`,
+];
+
+export const solscanTx = (signature: string) => `https://solscan.io/tx/${signature}`;
+
+/** A position that left its range and the range it would move to, with the agent in preview (dry run). */
 export function formatRebalancePreview(line: RebalanceLine): string {
   return [
     `🔁 <b>Out of range</b> ${escapeHtml(line.name)}`,
     "",
-    `Active bin: <b>${line.activeBinId}</b>`,
-    `Range: ${line.from.lowerBinId} to ${line.from.upperBinId}`,
-    `Would move to: <b>${line.to.lowerBinId} to ${line.to.upperBinId}</b>`,
-    `${line.strategy}, slippage ${line.slippageBps} bps`,
+    ...rangeRows(line, "Would move to"),
     "",
     "<i>Preview only: no transaction was sent.</i>",
+  ].join("\n");
+}
+
+/** A live rebalance that landed. */
+export function formatRebalanceSent(line: RebalanceLine, signature: string): string {
+  return [
+    `✅ <b>Rebalanced</b> ${escapeHtml(line.name)}`,
+    "",
+    ...rangeRows(line, "Moved to"),
+    "",
+    `<a href="${solscanTx(signature)}">View transaction on Solscan</a>`,
+  ].join("\n");
+}
+
+/** Long enough for an Anchor error with its owners; Telegram caps a message at 4096 characters. */
+const MAX_ERROR = 500;
+
+/** A live rebalance that failed, and what happens next: another try after the cooldown, or a pause. */
+export function formatRebalanceFailed(
+  line: RebalanceLine,
+  error: string,
+  next: { readonly paused: true; readonly failures: number } | { readonly paused: false; readonly cooldownSec: number },
+): string {
+  const short = error.length > MAX_ERROR ? `${error.slice(0, MAX_ERROR)}…` : error;
+  return [
+    `⚠️ <b>Rebalance failed</b> ${escapeHtml(line.name)}`,
+    "",
+    ...rangeRows(line, "Tried to move to"),
+    "",
+    `<code>${escapeHtml(short)}</code>`,
+    "",
+    next.paused
+      ? `<b>Agent paused</b> after ${next.failures} failed rebalances in a row. Check the wallet and the error, then resume it in Vexis.`
+      : `Trying again ${next.cooldownSec < 60 ? "next minute" : `after the ${Math.round(next.cooldownSec / 60)} min cooldown`} if the position is still out of range.`,
   ].join("\n");
 }

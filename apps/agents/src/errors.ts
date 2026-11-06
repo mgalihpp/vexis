@@ -28,3 +28,8 @@ export class ChainError extends Schema.TaggedError<ChainError>()("ChainError", {
   poolAddress: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/** A live rebalance failed: building the zap, or a leg that failed to simulate or land. Never carries a secret. */
+export class ZapError extends Schema.TaggedError<ZapError>()("ZapError", {
+  message: Schema.String,
+}) {}

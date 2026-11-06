@@ -21,12 +21,13 @@ describe("volume-watch config", () => {
 });
 
 describe("auto-rebalance config", () => {
-  test("defaults keep the current width and preview-safe settings", () => {
+  test("defaults keep the current width and start as a preview (dry run)", () => {
     expect(defaultAgentConfig("auto-rebalance")).toEqual({
       strategy: "Curve",
       slippageBps: 50,
       halfWidth: null,
       cooldownSec: 300,
+      dryRun: true,
     });
   });
 
@@ -35,5 +36,6 @@ describe("auto-rebalance config", () => {
     expect(() => parseAgentConfig("auto-rebalance", { halfWidth: 0 })).toThrow();
     expect(() => parseAgentConfig("auto-rebalance", { slippageBps: 10_001 })).toThrow();
     expect(() => parseAgentConfig("auto-rebalance", { strategy: "Wide" })).toThrow();
+    expect(() => parseAgentConfig("auto-rebalance", { dryRun: "false" })).toThrow();
   });
 });

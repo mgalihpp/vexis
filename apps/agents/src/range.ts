@@ -27,12 +27,18 @@ export function pickPosition(positions: ReadonlyArray<OnChainPosition>): Positio
 export const outOfRange = (activeBinId: number, p: Pick<OnChainPosition, "lowerBinId" | "upperBinId">) =>
   activeBinId < p.lowerBinId || activeBinId > p.upperBinId;
 
+/** Bins each side of the active bin after a move: the configured `halfWidth`, or the current width's half. */
+export const halfWidthFor = (
+  config: Pick<AutoRebalanceConfig, "halfWidth">,
+  p: Pick<OnChainPosition, "lowerBinId" | "upperBinId">,
+) => config.halfWidth ?? Math.max(1, Math.floor((p.upperBinId - p.lowerBinId) / 2));
+
 /** The range to move to: `halfWidth` bins each side of the active bin, or the current width re-centered. */
 export function targetRange(
   config: Pick<AutoRebalanceConfig, "halfWidth">,
   activeBinId: number,
   p: Pick<OnChainPosition, "lowerBinId" | "upperBinId">,
 ) {
-  const half = config.halfWidth ?? Math.max(1, Math.floor((p.upperBinId - p.lowerBinId) / 2));
+  const half = halfWidthFor(config, p);
   return { lowerBinId: activeBinId - half, upperBinId: activeBinId + half };
 }

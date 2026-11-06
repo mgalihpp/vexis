@@ -4,15 +4,25 @@
 import {
   type AgentKind,
   AutoRebalanceConfig,
+  REBALANCE_FAILING,
+  REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
   TELEGRAM_NOT_LINKED,
   TELEGRAM_PAUSES,
   TELEGRAM_RELINK,
   VolumeWatchConfig,
+  WALLET_UNREADABLE,
 } from "@vexis/db/agents";
 
 export type { AgentKind, AutoRebalanceConfig, VolumeWatchConfig };
-export { REBALANCE_STRATEGIES, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK };
+export {
+  REBALANCE_FAILING,
+  REBALANCE_FAILURE_LIMIT,
+  REBALANCE_STRATEGIES,
+  TELEGRAM_NOT_LINKED,
+  TELEGRAM_RELINK,
+  WALLET_UNREADABLE,
+};
 
 /** Pools one agent may watch. The runner reads them in batches of 100, so this is a UI limit, not a hard one. */
 export const MAX_POOLS = 20;
@@ -37,7 +47,7 @@ interface AgentBase {
   paused: boolean;
   pausedReason: string | null;
   pools: PoolView[];
-  /** Alerts (or rebalance previews) in the 24 hours before `AgentsData.now`. */
+  /** Alerts (or out-of-range rebalances) in the 24 hours before `AgentsData.now`. */
   alerts24h: number;
   lastAlertAt: number | null;
 }
@@ -94,8 +104,12 @@ export interface RebalanceView {
   upperBin: number;
   newLowerBin: number;
   newUpperBin: number;
-  /** Null for a preview: nothing was sent on-chain. */
+  /** Sent on-chain; false for a preview, where nothing was signed. */
+  live: boolean;
+  /** Set once a live rebalance confirmed. */
   signature: string | null;
+  /** Why a live rebalance failed. A live row with neither is still in flight (or the runner stopped mid-send). */
+  txError: string | null;
   delivered: boolean;
   error: string | null;
   at: number;
@@ -125,14 +139,18 @@ export type AgentStatus = "live" | "paused" | "attention" | "off";
 
 type StatusInput = Pick<AgentView, "enabled" | "paused" | "pausedReason"> & { wallet?: string | null };
 
+/** Runner pauses that the user's setup clears on its own: linking Telegram, or saving the wallet again. */
+const SETUP_PAUSES: readonly string[] = [...TELEGRAM_PAUSES, WALLET_UNREADABLE];
+
 /**
- * `attention` is a pause the runner set because it cannot alert over Telegram (no chat, or a token to re-link),
- * or an auto-rebalance agent with no wallet, which the runner skips until one is saved.
+ * `attention` is a pause the runner set because its setup is broken (no Telegram chat, a bot token to re-link, a
+ * wallet whose key no longer decrypts), or an auto-rebalance agent with no wallet, which the runner skips until one
+ * is saved.
  */
 export function agentStatus(a: StatusInput): AgentStatus {
   if (!a.enabled) return "off";
   if (a.wallet === null) return "attention";
-  if (a.paused) return a.pausedReason && TELEGRAM_PAUSES.includes(a.pausedReason) ? "attention" : "paused";
+  if (a.paused) return a.pausedReason && SETUP_PAUSES.includes(a.pausedReason) ? "attention" : "paused";
   return "live";
 }
 
@@ -144,13 +162,19 @@ export function statusHint(a: StatusInput): string | undefined {
   if (agentStatus(a) === "attention" && a.pausedReason === TELEGRAM_RELINK) {
     return "Paused because the saved bot token can no longer be read. Connect your bot again and the agent resumes.";
   }
+  if (agentStatus(a) === "attention" && a.pausedReason === WALLET_UNREADABLE) {
+    return "Paused because the saved wallet key can no longer be read. Save the wallet again and the agent resumes.";
+  }
+  if (agentStatus(a) === "paused" && a.pausedReason === REBALANCE_FAILING) {
+    return `Paused after ${REBALANCE_FAILURE_LIMIT} failed rebalances in a row. Check the errors in the history, then resume.`;
+  }
   return STATUS_HINT[agentStatus(a)];
 }
 
 export const STATUS_LABEL: Record<AgentStatus, string> = {
   live: "Active",
   paused: "Paused",
-  attention: "Needs Telegram",
+  attention: "Needs attention",
   off: "Off",
 };
 
@@ -239,7 +263,7 @@ export const AGENT_TYPES = [
   {
     kind: "auto-rebalance",
     name: "Auto-rebalance",
-    sub: "Re-centers your range when price moves out (preview only for now)",
+    sub: "Re-centers your range when price moves out; starts in preview",
   },
 ] as const satisfies readonly { kind: AgentKind; name: string; sub: string }[];
 
@@ -287,6 +311,8 @@ export interface RebalanceFields {
   /** Empty keeps the position's current width. */
   halfWidth: string;
   cooldownMin: string;
+  /** True records and reports moves only; false signs and sends them with the agent wallet. */
+  dryRun: boolean;
 }
 
 export const rebalanceFields = (c: AutoRebalanceConfig): RebalanceFields => ({
@@ -294,6 +320,7 @@ export const rebalanceFields = (c: AutoRebalanceConfig): RebalanceFields => ({
   slippageBps: String(c.slippageBps),
   halfWidth: c.halfWidth === null ? "" : String(c.halfWidth),
   cooldownMin: String(c.cooldownSec / 60),
+  dryRun: c.dryRun,
 });
 
 export type RebalanceResult =
@@ -307,6 +334,7 @@ export function parseRebalanceFields(fields: RebalanceFields): RebalanceResult {
     slippageBps: num(fields.slippageBps),
     halfWidth: fields.halfWidth.trim() === "" ? null : num(fields.halfWidth),
     cooldownSec: Math.round(num(fields.cooldownMin) * 60),
+    dryRun: fields.dryRun,
   });
   if (parsed.success) return { ok: true, config: parsed.data };
   const errors: Partial<Record<keyof RebalanceFields, string>> = {};
@@ -318,6 +346,8 @@ export function parseRebalanceFields(fields: RebalanceFields): RebalanceResult {
   return { ok: false, errors };
 }
 
+export const modeLabel = (c: Pick<AutoRebalanceConfig, "dryRun">) => (c.dryRun ? "Preview" : "Live");
+
 /** `Same width` or `±34 bins`. */
 export const describeWidth = (halfWidth: number | null) => (halfWidth === null ? "Same width" : `±${halfWidth} bins`);
 
@@ -327,9 +357,9 @@ export const describeWidth = (halfWidth: number | null) => (halfWidth === null ?
 export function ruleSummary(a: AgentView): [string, string][] {
   if (a.kind === "auto-rebalance") {
     return [
+      ["Mode", modeLabel(a.config)],
       ["Strategy", a.config.strategy],
       ["Width", describeWidth(a.config.halfWidth)],
-      ["Slippage", `${a.config.slippageBps} bps`],
     ];
   }
   return [

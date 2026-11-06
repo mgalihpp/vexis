@@ -306,8 +306,10 @@ export const rebalanceWallets = pgTable("rebalance_wallets", {
 }).enableRLS();
 
 /**
- * Rebalance history, written by the runner: the range the position left, the range it would move to,
- * and the outcome. `signature` is null for a preview. `delivered` / `error` record the Telegram send.
+ * Rebalance history, written by the runner: the range the position left, the range it moves to, and the
+ * outcome. `live` rows were sent on-chain: `signature` once it confirmed, `tx_error` when it failed, neither
+ * while in flight (or if the runner died mid-send). A preview has `live` false and no signature.
+ * `delivered` / `error` record the Telegram send.
  */
 export const agentRebalances = pgTable(
   "agent_rebalances",
@@ -322,7 +324,9 @@ export const agentRebalances = pgTable(
     upperBin: integer("upper_bin").notNull(),
     newLowerBin: integer("new_lower_bin").notNull(),
     newUpperBin: integer("new_upper_bin").notNull(),
+    live: boolean("live").notNull().default(false),
     signature: text("signature"),
+    txError: text("tx_error"),
     delivered: boolean("delivered").notNull().default(false),
     error: text("error"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Effect, Layer } from "effect";
 import type { AppConfig } from "../src/AppConfig.ts";
 import { cycle } from "../src/Cycle.ts";
-import type { Db } from "../src/Db.ts";
+import type { Db, RebalanceWatch } from "../src/Db.ts";
 import { formatMessage, formatUsd, linkButtons, type SpikeLine } from "../src/format.ts";
 import { prune, RETENTION_MS } from "../src/Ingest.ts";
 import type { Meteora } from "../src/Meteora.ts";
@@ -13,6 +13,7 @@ import {
   fakeDb,
   fakeMeteora,
   fakeTelegram,
+  fakeZap,
   MINUTE,
   quietHistory,
   reading,
@@ -20,6 +21,7 @@ import {
   runAt,
   T0,
   testConfig,
+  testWallet,
   watch,
 } from "./fakes.ts";
 
@@ -278,14 +280,18 @@ describe("evaluate and notify", () => {
 function rebalanceSetup(
   active: number,
   positions = [{ address: "POS1", lowerBinId: 100, upperBinId: 120, funded: true }],
+  options: { live?: boolean; watches?: RebalanceWatch[] } = {},
 ) {
-  const db = fakeDb({ rebalances: [rebalanceWatch()] });
+  const config = { strategy: "Curve", slippageBps: 50, halfWidth: null, cooldownSec: 300, dryRun: !options.live };
+  const db = fakeDb({ rebalances: options.watches ?? [rebalanceWatch({ config })] });
   db.state.chats.set("user-1", 42n);
+  db.state.wallets.set("user-1", testWallet());
   const chain = fakeChain({ POOL1: { activeBinId: active, positions } });
   const telegram = fakeTelegram();
-  const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, testConfig);
+  const zap = fakeZap();
+  const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, zap.layer, testConfig);
   const run = (at = T0) => runAt(rebalanceCycle().pipe(Effect.provide(layer)), at);
-  return { db: db.state, chain: chain.state, telegram: telegram.state, run };
+  return { db: db.state, chain: chain.state, telegram: telegram.state, zap: zap.state, config, run };
 }
 
 describe("auto-rebalance preview", () => {
@@ -307,6 +313,17 @@ describe("auto-rebalance preview", () => {
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.text).toContain("Would move to: <b>120 to 140</b>");
     expect(s.telegram.sent[0]?.text).toContain("no transaction was sent");
+    expect(s.db.rebalances[0]).toMatchObject({ live: false, signature: null, txError: null });
+    expect(s.zap.calls).toEqual([]);
+  });
+
+  test("a preview never reads the wallet's secret, so an unreadable one does not pause it", async () => {
+    const s = rebalanceSetup(130);
+    s.db.wallets.set("user-1", { _tag: "unreadable" });
+    await s.run();
+    expect(s.db.paused.size).toBe(0);
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.zap.calls).toEqual([]);
   });
 
   test("cooldown holds the next minute back; a failed send hands the slot back", async () => {
@@ -343,6 +360,124 @@ describe("auto-rebalance preview", () => {
     down.chain.pools = {};
     await down.run();
     expect(down.db.rebalances).toEqual([]);
+  });
+});
+
+describe("auto-rebalance live", () => {
+  const live = (active = 130, options: { watches?: RebalanceWatch[] } = {}) =>
+    rebalanceSetup(active, undefined, { live: true, ...options });
+
+  test("success: sends with the agent wallet, stores the signature and links it on Telegram", async () => {
+    const s = live();
+    const wallet = s.db.wallets.get("user-1");
+    await s.run();
+    expect(s.zap.calls).toEqual([
+      {
+        owner: wallet?._tag === "ready" ? wallet.signer.publicKey.toBase58() : "",
+        request: { poolAddress: "POOL1", positionAddress: "POS1", strategy: "Curve", slippageBps: 50, halfWidth: 10 },
+      },
+    ]);
+    expect(s.db.rebalances).toMatchObject([
+      { live: true, signature: "SIG1", txError: null, newLowerBin: 120, newUpperBin: 140, delivered: true },
+    ]);
+    expect(s.telegram.sent[0]?.text).toContain("<b>Rebalanced</b>");
+    expect(s.telegram.sent[0]?.text).toContain('<a href="https://solscan.io/tx/SIG1">');
+  });
+
+  test("a failed Telegram message after a send keeps the cooldown: the transaction happened", async () => {
+    const s = live();
+    s.telegram.failSend = true;
+    await s.run();
+    expect(s.db.rebalances[0]).toMatchObject({ signature: "SIG1", delivered: false });
+    await s.run(T0 + MINUTE);
+    expect(s.zap.calls).toHaveLength(1);
+  });
+
+  test("failure: stores the error, waits out the cooldown, and pauses after three in a row", async () => {
+    const s = live();
+    s.zap.fail = "[swap] simulation failed: Custom(6001)";
+    await s.run();
+    expect(s.db.rebalances[0]).toMatchObject({ live: true, signature: null, txError: s.zap.fail, delivered: true });
+    expect(s.telegram.sent[0]?.text).toContain("Rebalance failed");
+    expect(s.telegram.sent[0]?.text).toContain("Custom(6001)");
+    expect(s.telegram.sent[0]?.text).toContain("after the 5 min cooldown");
+
+    await s.run(T0 + MINUTE);
+    expect(s.zap.calls).toHaveLength(1);
+
+    await s.run(T0 + 5 * MINUTE);
+    await s.run(T0 + 10 * MINUTE);
+    expect(s.zap.calls).toHaveLength(3);
+    expect(s.db.paused.get("rb-agent-1")).toBe("rebalance_failing");
+    expect(s.telegram.sent.at(-1)?.text).toContain("Agent paused</b> after 3 failed rebalances");
+
+    await s.run(T0 + 60 * MINUTE);
+    expect(s.zap.calls).toHaveLength(3);
+  });
+
+  test("a success between failures resets the streak", async () => {
+    const s = live();
+    s.zap.fail = "boom";
+    await s.run(T0);
+    await s.run(T0 + 5 * MINUTE);
+    s.zap.fail = null;
+    await s.run(T0 + 10 * MINUTE);
+    s.zap.fail = "boom";
+    await s.run(T0 + 15 * MINUTE);
+    await s.run(T0 + 20 * MINUTE);
+    expect(s.db.paused.size).toBe(0);
+  });
+
+  test("the pause stops the agent's other pools in the same tick", async () => {
+    const pool = (n: number) =>
+      rebalanceWatch({
+        agentPoolId: `rb-ap-${n}`,
+        poolAddress: `POOL${n}`,
+        config: { cooldownSec: 300, dryRun: false },
+      });
+    const s = live(130, { watches: [pool(1), pool(2)] });
+    s.chain.pools.POOL2 = s.chain.pools.POOL1 as NonNullable<(typeof s.chain.pools)["POOL1"]>;
+    s.zap.fail = "boom";
+    await s.run(T0);
+    await s.run(T0 + 5 * MINUTE);
+    // Two failures in the first tick, the third pauses: POOL2 is not tried again.
+    expect(s.zap.calls.map((c) => c.request.poolAddress)).toEqual(["POOL1", "POOL2", "POOL1"]);
+    expect(s.db.paused.get("rb-agent-1")).toBe("rebalance_failing");
+  });
+
+  test("one transaction in flight per wallet; different wallets do not wait for each other", async () => {
+    const agent = (n: number, owner: string, userId = "user-1") =>
+      rebalanceWatch({
+        agentId: `rb-agent-${userId}`,
+        userId,
+        agentPoolId: `rb-ap-${n}`,
+        poolAddress: `POOL${n}`,
+        owner,
+        config: { dryRun: false },
+      });
+    const same = live(130, { watches: [agent(1, "OWNER1"), agent(2, "OWNER1")] });
+    same.chain.pools.POOL2 = same.chain.pools.POOL1 as NonNullable<(typeof same.chain.pools)["POOL1"]>;
+    await same.run();
+    expect(same.zap.calls).toHaveLength(2);
+    expect(same.zap.maxInFlight).toBe(1);
+
+    const apart = live(130, { watches: [agent(1, "OWNER1"), agent(2, "OWNER2", "user-2")] });
+    apart.chain.pools.POOL2 = apart.chain.pools.POOL1 as NonNullable<(typeof apart.chain.pools)["POOL1"]>;
+    apart.db.chats.set("user-2", 43n);
+    apart.db.wallets.set("user-2", testWallet());
+    await apart.run();
+    expect(apart.zap.calls).toHaveLength(2);
+    expect(apart.zap.maxInFlight).toBe(2);
+  });
+
+  test("a wallet secret that does not decrypt pauses the agent before anything is claimed or sent", async () => {
+    const s = live();
+    s.db.wallets.set("user-1", { _tag: "unreadable" });
+    await s.run();
+    expect(s.db.paused.get("rb-agent-1")).toBe("wallet_unreadable");
+    expect(s.db.rebalances).toEqual([]);
+    expect(s.zap.calls).toEqual([]);
+    expect(s.db.rebalanceWatches[0]?.lastAlertAt).toBeNull();
   });
 });
 

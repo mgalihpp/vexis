@@ -10,6 +10,7 @@ import {
   MAX_POOLS,
   parseConfigFields,
   parseRebalanceFields,
+  REBALANCE_FAILING,
   ratioText,
   rebalanceFields,
   ruleSummary,
@@ -18,6 +19,7 @@ import {
   TELEGRAM_NOT_LINKED,
   TELEGRAM_RELINK,
   type VolumeAgentView,
+  WALLET_UNREADABLE,
 } from "./agents";
 
 const agent = (over: Partial<VolumeAgentView> = {}): VolumeAgentView => ({
@@ -56,6 +58,15 @@ describe("status", () => {
     expect(agentStatus({ ...rb, wallet: "Pubkey111" })).toBe("live");
     expect(agentStatus({ ...rb, enabled: false, wallet: null })).toBe("off");
   });
+
+  test("a wallet key that no longer decrypts needs attention; repeated failed rebalances are a plain pause", () => {
+    const unreadable = { enabled: true, paused: true, pausedReason: WALLET_UNREADABLE, wallet: "Pubkey111" };
+    expect(agentStatus(unreadable)).toBe("attention");
+    expect(statusHint(unreadable)).toContain("Save the wallet again");
+    const failing = { ...unreadable, pausedReason: REBALANCE_FAILING };
+    expect(agentStatus(failing)).toBe("paused");
+    expect(statusHint(failing)).toContain("3 failed rebalances in a row");
+  });
 });
 
 describe("config form", () => {
@@ -86,11 +97,12 @@ describe("config form", () => {
 
 describe("rebalance form", () => {
   test("blank width keeps the current width; minutes become seconds; errors land on their field", () => {
-    const fields = rebalanceFields({ strategy: "Spot", slippageBps: 100, halfWidth: null, cooldownSec: 900 });
-    expect(fields).toEqual({ strategy: "Spot", slippageBps: "100", halfWidth: "", cooldownMin: "15" });
-    expect(parseRebalanceFields({ ...fields, halfWidth: "34" })).toEqual({
+    const config = { strategy: "Spot", slippageBps: 100, halfWidth: null, cooldownSec: 900, dryRun: true } as const;
+    const fields = rebalanceFields(config);
+    expect(fields).toEqual({ strategy: "Spot", slippageBps: "100", halfWidth: "", cooldownMin: "15", dryRun: true });
+    expect(parseRebalanceFields({ ...fields, halfWidth: "34", dryRun: false })).toEqual({
       ok: true,
-      config: { strategy: "Spot", slippageBps: 100, halfWidth: 34, cooldownSec: 900 },
+      config: { ...config, halfWidth: 34, dryRun: false },
     });
     const bad = parseRebalanceFields({ ...fields, halfWidth: "0", cooldownMin: "" });
     expect(bad.ok ? [] : Object.keys(bad.errors).sort()).toEqual(["cooldownMin", "halfWidth"]);
@@ -102,13 +114,14 @@ describe("rebalance form", () => {
       ...agent(),
       kind: "auto-rebalance" as const,
       wallet: null,
-      config: { strategy: "Curve" as const, slippageBps: 50, halfWidth: null, cooldownSec: 300 },
+      config: { strategy: "Curve" as const, slippageBps: 50, halfWidth: null, cooldownSec: 300, dryRun: true },
     };
     expect(ruleSummary(rb)).toEqual([
+      ["Mode", "Preview"],
       ["Strategy", "Curve"],
       ["Width", "Same width"],
-      ["Slippage", "50 bps"],
     ]);
+    expect(ruleSummary({ ...rb, config: { ...rb.config, dryRun: false } })[0]).toEqual(["Mode", "Live"]);
   });
 });
 

@@ -4,6 +4,16 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { TriangleAlertIcon, WalletIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +24,9 @@ import {
   agentStatus,
   describeWidth,
   formatMinutes,
+  modeLabel,
   parseRebalanceFields,
+  REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
   type RebalanceAgentView,
   type RebalanceFields,
@@ -99,7 +111,7 @@ export function RebalanceConfigForm({
 }: {
   fields: RebalanceFields;
   errors: Partial<Record<keyof RebalanceFields, string>>;
-  onChange: (key: keyof RebalanceFields, value: string) => void;
+  onChange: (key: Exclude<keyof RebalanceFields, "dryRun">, value: string) => void;
 }) {
   return (
     <div className="@container divide-y divide-border">
@@ -148,6 +160,56 @@ export function RebalanceConfigForm({
   );
 }
 
+/**
+ * Preview or live. Turning live on asks first: from then on the agent signs and sends with the saved wallet without
+ * asking again. Turning it off needs no confirmation.
+ */
+function ModeSetting({ dryRun, onChange }: { dryRun: boolean; onChange: (dryRun: boolean) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <SettingRow
+      label="Mode"
+      hint="Preview records and reports each move. Live signs and sends it from the agent wallet."
+    >
+      <Segmented
+        label="Mode"
+        options={[
+          { value: 0, label: "Preview" },
+          { value: 1, label: "Live" },
+        ]}
+        value={dryRun ? 0 : 1}
+        onChange={(v) => (v === 1 ? setConfirming(true) : onChange(true))}
+      />
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send real transactions?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  When a position leaves its range, the agent will withdraw it, swap to balance the two sides and
+                  deposit it again around the active bin, signing with the saved wallet. Each move costs network and
+                  priority fees, and the swap can lose up to the slippage you set.
+                </p>
+                <p>
+                  Start with a small position in a separate hot wallet. After {REBALANCE_FAILURE_LIMIT} failures in a
+                  row the agent pauses itself.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep preview</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => onChange(false)}>
+              Turn live on
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </SettingRow>
+  );
+}
+
 export function RebalanceRuleSection({
   agent,
   onSaved,
@@ -168,12 +230,23 @@ export function RebalanceRuleSection({
   };
   return (
     <>
-      <div className="p-4 sm:p-5">
-        <RebalanceConfigForm
-          fields={fields}
-          errors={result.ok ? {} : result.errors}
-          onChange={(key, value) => update({ ...fields, [key]: value })}
-        />
+      <div className="@container divide-y divide-border p-4 sm:p-5">
+        <div className="pb-4">
+          <ModeSetting dryRun={fields.dryRun} onChange={(dryRun) => update({ ...fields, dryRun })} />
+          {!fields.dryRun && (
+            <p className="mt-3 flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
+              <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
+              <span>Live: out-of-range positions are rebalanced on-chain with the agent wallet, without asking.</span>
+            </p>
+          )}
+        </div>
+        <div className="pt-4">
+          <RebalanceConfigForm
+            fields={fields}
+            errors={result.ok ? {} : result.errors}
+            onChange={(key, value) => update({ ...fields, [key]: value })}
+          />
+        </div>
       </div>
       <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
         <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
@@ -341,7 +414,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
         <StatCard label="Pools" value={agent.pools.length} />
         <StatCard label="Out of range, 24h" value={agent.alerts24h} />
         <StatCard label="Last out of range" value={agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"} />
-        <StatCard label="Mode" value="Preview" />
+        <StatCard label="Mode" value={modeLabel(c)} tone={c.dryRun ? "" : "text-brand"} />
       </div>
       <div className="grid gap-2 xl:grid-cols-[1fr_2fr]">
         <div className="flex flex-col gap-2">
@@ -368,7 +441,9 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
         </div>
         <Panel title="Recent rebalances" action={tabLink("alerts", "View all")} className="overflow-hidden">
           <p className="px-3.25 pb-2 text-xs text-muted-foreground">
-            Preview only: the agent records and reports the move, nothing is signed or sent yet.
+            {c.dryRun
+              ? "Preview: the agent records and reports each move; nothing is signed or sent."
+              : "Live: the agent rebalances on-chain with the saved wallet and links each transaction."}
           </p>
           <div className="overflow-x-auto border-t">
             <RebalanceTable rows={data.rebalances.slice(0, 8)} now={data.now} />
@@ -386,6 +461,32 @@ export function RebalanceHistory() {
       <RebalanceTable rows={data.rebalances} now={data.now} />
     </div>
   );
+}
+
+const TAG = "rounded px-1.5 py-0.5 text-[0.625rem]";
+
+function Transaction({ row }: { row: RebalanceView }) {
+  if (row.signature) {
+    return (
+      <a
+        href={`https://solscan.io/tx/${row.signature}`}
+        target="_blank"
+        rel="noreferrer"
+        className="font-mono text-brand hover:underline"
+      >
+        {shortAddr(row.signature)}
+      </a>
+    );
+  }
+  if (!row.live) return <span className={`${TAG} bg-muted text-muted-foreground`}>Preview</span>;
+  if (row.txError) {
+    return (
+      <span title={row.txError} className={`${TAG} cursor-help bg-loss/10 text-loss`}>
+        Failed
+      </span>
+    );
+  }
+  return <span className={`${TAG} bg-muted text-muted-foreground`}>Sending</span>;
 }
 
 function RebalanceTable({ rows, now }: { rows: RebalanceView[]; now: number }) {
@@ -428,18 +529,7 @@ function RebalanceTable({ rows, now }: { rows: RebalanceView[]; now: number }) {
               {r.newLowerBin} to {r.newUpperBin}
             </TableCell>
             <TableCell className="text-right">
-              {r.signature ? (
-                <a
-                  href={`https://solscan.io/tx/${r.signature}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-mono text-brand hover:underline"
-                >
-                  {shortAddr(r.signature)}
-                </a>
-              ) : (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">Preview</span>
-              )}
+              <Transaction row={r} />
             </TableCell>
             <TableCell className="pr-3.25 text-right">
               <Delivery alert={r} />

@@ -1,6 +1,14 @@
 import { Keypair } from "@solana/web3.js";
+import { WALLET_UNREADABLE } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
-import { forUser, getRebalanceWallet, removeRebalanceWallet, saveRebalanceWallet } from "@vexis/db/queries";
+import {
+  forUser,
+  getAgent,
+  getRebalanceWallet,
+  removeRebalanceWallet,
+  saveRebalanceWallet,
+  updateAgent,
+} from "@vexis/db/queries";
 import { encryptSecret } from "@vexis/db/secret";
 import bs58 from "bs58";
 import { z } from "zod";
@@ -29,7 +37,13 @@ function keypairOf(secret: string) {
 /** Saves (or replaces) the wallet and returns its public key. */
 export async function saveWallet(userId: string, secret: string) {
   const publicKey = keypairOf(secret).publicKey.toBase58();
-  await saveRebalanceWallet(forUser(getDb(), userId), publicKey, encryptSecret(secret, "WALLET_ENC_KEY"));
+  const s = forUser(getDb(), userId);
+  await saveRebalanceWallet(s, publicKey, encryptSecret(secret, "WALLET_ENC_KEY"));
+  // The runner paused the agent because the old key no longer decrypted; this one does. A pause the user chose stays.
+  const agent = await getAgent(s, "auto-rebalance");
+  if (agent?.paused && agent.pausedReason === WALLET_UNREADABLE) {
+    await updateAgent(s, "auto-rebalance", { paused: false, pausedReason: null });
+  }
   return publicKey;
 }
 

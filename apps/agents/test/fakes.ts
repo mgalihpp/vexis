@@ -1,12 +1,24 @@
+import { Keypair } from "@solana/web3.js";
+import { REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
 import { Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
 import { Chain, type PoolState } from "../src/Chain.ts";
-import { Db, type NewAlert, type NewMinute, type NewRebalance, type RebalanceWatch, type Watch } from "../src/Db.ts";
-import { ChainError, MeteoraError, TelegramError } from "../src/errors.ts";
+import {
+  Db,
+  leadingFailures,
+  type NewAlert,
+  type NewMinute,
+  type NewRebalance,
+  type RebalanceWatch,
+  type WalletSigner,
+  type Watch,
+} from "../src/Db.ts";
+import { ChainError, MeteoraError, TelegramError, ZapError } from "../src/errors.ts";
 import type { LinkButton } from "../src/format.ts";
 import { Meteora, type PoolReading } from "../src/Meteora.ts";
 import { Telegram } from "../src/Telegram.ts";
+import { Zap, type ZapRequest } from "../src/Zap.ts";
 
 export const MINUTE = 60_000;
 /** A whole minute, so test readings land on a minute boundary. */
@@ -22,7 +34,13 @@ export const runAt = <A, E>(effect: Effect.Effect<A, E>, at: number = T0) =>
   );
 
 export type StoredAlert = NewAlert & { id: string; delivered: boolean; error: string | null };
-export type StoredRebalance = NewRebalance & { id: string; delivered: boolean; error: string | null };
+export type StoredRebalance = NewRebalance & {
+  id: string;
+  signature: string | null;
+  txError: string | null;
+  delivered: boolean;
+  error: string | null;
+};
 
 /** In-memory `Db`: same contract as the Postgres one, state exposed for assertions. */
 export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] } = {}) {
@@ -38,6 +56,8 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
     pruned: [] as Date[],
+    /** Agent wallets by user; a user absent here has none. */
+    wallets: new Map<string, WalletSigner>(),
   };
   const rowsOf = (pool: string) => state.minutes.get(pool) ?? [];
 
@@ -49,7 +69,7 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
       recordRebalance: (row) =>
         Effect.sync(() => {
           const id = `rebalance-${state.rebalances.length + 1}`;
-          state.rebalances.push({ ...row, id, delivered: false, error: null });
+          state.rebalances.push({ ...row, id, signature: null, txError: null, delivered: false, error: null });
           return id;
         }),
       settleRebalance: (id, error) =>
@@ -58,6 +78,24 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
             if (r.id === id) Object.assign(r, { delivered: error === null, error });
           }
         }),
+      settleTransaction: (id, outcome) =>
+        Effect.sync(() => {
+          for (const r of state.rebalances) {
+            if (r.id !== id) continue;
+            if (outcome._tag === "sent") Object.assign(r, { signature: outcome.signature, txError: null });
+            else Object.assign(r, { signature: null, txError: outcome.error });
+          }
+        }),
+      failureStreak: (agentId) =>
+        Effect.sync(() =>
+          leadingFailures(
+            state.rebalances
+              .filter((r) => r.agentId === agentId && r.live)
+              .reverse()
+              .slice(0, REBALANCE_FAILURE_LIMIT),
+          ),
+        ),
+      walletSigner: (userId) => Effect.succeed(state.wallets.get(userId) ?? { _tag: "missing" }),
       latestReadings: (pools) =>
         Effect.succeed(
           new Map(
@@ -226,3 +264,35 @@ export function rebalanceWatch(overrides: Partial<RebalanceWatch> = {}): Rebalan
     ...overrides,
   };
 }
+
+/**
+ * Zap stand-in: never signs or sends. `fail` makes the next calls fail with that message. `inFlight` and `maxInFlight`
+ * measure overlap: each call yields a few times while counted, so concurrent calls would interleave.
+ */
+export function fakeZap() {
+  const state = {
+    calls: [] as { owner: string; request: ZapRequest }[],
+    fail: null as string | null,
+    inFlight: 0,
+    maxInFlight: 0,
+  };
+  const layer = Layer.succeed(
+    Zap,
+    Zap.of({
+      rebalance: (signer, request) =>
+        Effect.gen(function* () {
+          state.calls.push({ owner: signer.publicKey.toBase58(), request });
+          state.inFlight++;
+          state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+          for (let i = 0; i < 5; i++) yield* Effect.yieldNow;
+          state.inFlight--;
+          if (state.fail !== null) return yield* new ZapError({ message: state.fail });
+          return `SIG${state.calls.length}`;
+        }),
+    }),
+  );
+  return { state, layer };
+}
+
+/** A ready agent wallet with a key made for the test; never a real one. */
+export const testWallet = (): WalletSigner => ({ _tag: "ready", signer: Keypair.generate() });
