@@ -20,7 +20,7 @@ export const getChart = createServerFn({ method: "GET" })
 
 export const findPools = createServerFn({ method: "GET" })
   .middleware([requireViewer])
-  .validator(z.object({ query: z.string().trim().max(40) }))
+  .validator(z.object({ query: z.string().trim().max(44) }))
   .handler(({ data }) => searchPools(data.query));
 
 export const getTrackedPositions = createServerFn({ method: "GET" })
