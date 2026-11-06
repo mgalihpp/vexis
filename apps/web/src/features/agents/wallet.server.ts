@@ -40,7 +40,7 @@ async function checkRpcUrl(url: string) {
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    throw new Error("Could not reach that RPC within 10 seconds");
+    throw new Error("Could not reach that RPC, or it took longer than 10 seconds");
   }
   if (response.status === 401 || response.status === 403)
     throw new Error("That RPC rejected the request; check its API key");

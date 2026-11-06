@@ -55,7 +55,9 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
     rows.map(async (row): Promise<AgentView> => {
       const pools = await listAgentPools(s, row.id);
       const tokens = await Promise.all(pools.map((p) => poolTokens(p.poolAddress)));
-      const mine = (row.kind === "volume-watch" ? alerts : rebalances).filter((e) => e.agentId === row.id);
+      // An in-range fee claim is not an out-of-range event, so it stays out of the counts.
+      const events = row.kind === "volume-watch" ? alerts : rebalances.filter((r) => r.action === "rebalance");
+      const mine = events.filter((e) => e.agentId === row.id);
       const base = {
         id: row.id,
         enabled: row.enabled,
