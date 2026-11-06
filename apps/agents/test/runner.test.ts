@@ -9,6 +9,7 @@ import type { Meteora } from "../src/Meteora.ts";
 import { rebalanceCycle } from "../src/Rebalance.ts";
 import type { Telegram } from "../src/Telegram.ts";
 import {
+  chainPosition,
   fakeChain,
   fakeDb,
   fakeMeteora,
@@ -16,11 +17,13 @@ import {
   fakeZap,
   link,
   MINUTE,
+  poolState,
   quietHistory,
   reading,
   rebalanceWatch,
   runAt,
   T0,
+  TEST_RPC,
   testConfig,
   testWallet,
   watch,
@@ -283,14 +286,21 @@ describe("evaluate and notify", () => {
 /** One auto-rebalance agent on POOL1 whose position spans bins 100..120, with the active bin at `active`. */
 function rebalanceSetup(
   active: number,
-  positions = [{ address: "POS1", lowerBinId: 100, upperBinId: 120, funded: true }],
-  options: { live?: boolean; watches?: RebalanceWatch[] } = {},
+  positions = [chainPosition()],
+  options: { live?: boolean; watches?: RebalanceWatch[]; config?: Record<string, unknown> } = {},
 ) {
-  const config = { strategy: "Curve", slippageBps: 50, halfWidth: null, cooldownSec: 300, dryRun: !options.live };
+  const config = {
+    strategy: "Curve",
+    slippageBps: 50,
+    halfWidth: null,
+    cooldownSec: 300,
+    dryRun: !options.live,
+    ...options.config,
+  };
   const db = fakeDb({ rebalances: options.watches ?? [rebalanceWatch({ config })] });
   db.state.chats.set(link("user-1", "auto-rebalance"), 42n);
   db.state.wallets.set("user-1", testWallet());
-  const chain = fakeChain({ POOL1: { activeBinId: active, positions } });
+  const chain = fakeChain({ POOL1: poolState({ activeBinId: active, positions }) });
   const telegram = fakeTelegram();
   const zap = fakeZap();
   const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, zap.layer, testConfig);
@@ -302,7 +312,7 @@ describe("auto-rebalance preview", () => {
   test("in range: nothing recorded or sent; the read uses the agent's wallet", async () => {
     const s = rebalanceSetup(110);
     await s.run();
-    expect(s.chain.calls).toEqual([{ pool: "POOL1", owner: "OWNER1" }]);
+    expect(s.chain.calls).toEqual([{ rpcUrl: TEST_RPC, pool: "POOL1", owner: "OWNER1" }]);
     expect(s.db.rebalances).toEqual([]);
     expect(s.telegram.sent).toEqual([]);
   });
@@ -317,6 +327,7 @@ describe("auto-rebalance preview", () => {
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.text).toContain("Would move to: <b>120 to 140</b>");
     expect(s.telegram.sent[0]?.text).toContain("no transaction was sent");
+    expect(s.telegram.sent[0]?.text).toContain("Fees: kept in the wallet");
     expect(s.db.rebalances[0]).toMatchObject({ live: false, signature: null, txError: null });
     expect(s.zap.calls).toEqual([]);
   });
@@ -343,10 +354,7 @@ describe("auto-rebalance preview", () => {
   });
 
   test("several funded positions or none: no guess, nothing sent", async () => {
-    const two = rebalanceSetup(130, [
-      { address: "A", lowerBinId: 100, upperBinId: 120, funded: true },
-      { address: "B", lowerBinId: 100, upperBinId: 120, funded: true },
-    ]);
+    const two = rebalanceSetup(130, [chainPosition({ address: "A" }), chainPosition({ address: "B" })]);
     await two.run();
     const none = rebalanceSetup(130, []);
     await none.run();
@@ -366,10 +374,31 @@ describe("auto-rebalance preview", () => {
     await down.run();
     expect(down.db.rebalances).toEqual([]);
   });
+
+  test("a wallet without an RPC URL is skipped unread; one that no longer decrypts pauses for a re-save", async () => {
+    const missing = rebalanceSetup(130, undefined, { watches: [rebalanceWatch({ rpc: { _tag: "missing" } })] });
+    await missing.run();
+    expect(missing.chain.calls).toEqual([]);
+    expect(missing.db.paused.size).toBe(0);
+    expect(missing.telegram.sent).toEqual([]);
+
+    const unreadable = rebalanceSetup(130, undefined, { watches: [rebalanceWatch({ rpc: { _tag: "unreadable" } })] });
+    await unreadable.run();
+    expect(unreadable.chain.calls).toEqual([]);
+    expect(unreadable.db.paused.get("rb-agent-1")).toBe("wallet_unreadable");
+  });
+
+  test("a preview has no SOL gate and mentions the fee mode", async () => {
+    const s = rebalanceSetup(130, undefined, { config: { feeMode: "sweep" } });
+    s.chain.pools.POOL1 = poolState({ activeBinId: 130, nativeLamports: 0n });
+    await s.run();
+    expect(s.db.paused.size).toBe(0);
+    expect(s.telegram.sent[0]?.text).toContain("Fees: swept to SOL");
+  });
 });
 
 describe("auto-rebalance live", () => {
-  const live = (active = 130, options: { watches?: RebalanceWatch[] } = {}) =>
+  const live = (active = 130, options: { watches?: RebalanceWatch[]; config?: Record<string, unknown> } = {}) =>
     rebalanceSetup(active, undefined, { live: true, ...options });
 
   test("success: sends with the agent wallet, stores the signature and links it on Telegram", async () => {
@@ -378,6 +407,7 @@ describe("auto-rebalance live", () => {
     await s.run();
     expect(s.zap.calls).toEqual([
       {
+        rpcUrl: TEST_RPC,
         owner: wallet?._tag === "ready" ? wallet.signer.publicKey.toBase58() : "",
         request: { poolAddress: "POOL1", positionAddress: "POS1", strategy: "Curve", slippageBps: 50, halfWidth: 10 },
       },
@@ -483,6 +513,134 @@ describe("auto-rebalance live", () => {
     expect(s.db.rebalances).toEqual([]);
     expect(s.zap.calls).toEqual([]);
     expect(s.db.rebalanceWatches[0]?.lastAlertAt).toBeNull();
+  });
+
+  test("less SOL than the reserve pauses with one message naming both, before anything is claimed or sent", async () => {
+    const s = live(130, { config: { solReserve: 0.1 } });
+    s.chain.pools.POOL1 = poolState({ activeBinId: 130, nativeLamports: 50_000_000n });
+    await s.run();
+    expect(s.db.paused.get("rb-agent-1")).toBe("low_sol");
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.telegram.sent[0]?.text).toContain("Low SOL");
+    expect(s.telegram.sent[0]?.text).toContain("<b>0.05 SOL</b>, below the 0.1 SOL reserve");
+    expect(s.db.rebalances).toEqual([]);
+    expect(s.zap.calls).toEqual([]);
+    expect(s.db.rebalanceWatches[0]?.lastAlertAt).toBeNull();
+    await s.run(T0 + MINUTE);
+    expect(s.telegram.sent).toHaveLength(1);
+  });
+
+  test("compound after the zap deposits the fees the read saw and keeps the reserve", async () => {
+    const s = live(130, { config: { feeMode: "compound", solReserve: 0.2 } });
+    s.chain.pools.POOL1 = poolState({ activeBinId: 130, positions: [chainPosition({ feeX: 40n, feeY: 7n })] });
+    await s.run();
+    expect(s.zap.compounds).toEqual([
+      expect.objectContaining({ positionAddress: "POS1", feeX: 40n, feeY: 7n, reserveLamports: 200_000_000n }),
+    ]);
+    expect(s.telegram.sent[0]?.text).toContain(
+      'Fees compounded into the position: <a href="https://solscan.io/tx/COMPOUND1">',
+    );
+  });
+
+  test("a failed fee step keeps the rebalance as sent and adds a line to the message", async () => {
+    const s = live(130, { config: { feeMode: "sweep" } });
+    s.chain.pools.POOL1 = poolState({ activeBinId: 130, positions: [chainPosition({ feeX: 40n, feeY: 7n })] });
+    s.zap.failFees = "Jupiter quote failed";
+    await s.run();
+    expect(s.zap.sweeps).toHaveLength(1);
+    expect(s.db.rebalances).toMatchObject([{ action: "rebalance", signature: "SIG1", txError: null, delivered: true }]);
+    expect(s.db.paused.size).toBe(0);
+    const text = s.telegram.sent[0]?.text ?? "";
+    expect(text).toContain("<b>Rebalanced</b>");
+    expect(text).toContain("Sweep to SOL failed; the fees stay in the wallet.");
+    expect(text).toContain("Jupiter quote failed");
+  });
+});
+
+describe("auto-rebalance fee claim in range", () => {
+  // 0.5 lamports per X lamport on a SOL-on-Y pool: 20M X + 5M Y lamports are worth 0.015 SOL.
+  const fees = [chainPosition({ feeX: 20_000_000n, feeY: 5_000_000n })];
+  const claimSetup = (config: Record<string, unknown>, live = true) =>
+    rebalanceSetup(110, fees, { live, config: { feeMode: "compound", feeClaimThresholdSol: 0.01, ...config } });
+
+  test("fees over the threshold: claims, compounds, records a claim row in the current range, reports it", async () => {
+    const s = claimSetup({});
+    await s.run();
+    expect(s.zap.claims).toEqual([{ poolAddress: "POOL1", positionAddress: "POS1" }]);
+    expect(s.zap.compounds).toEqual([expect.objectContaining({ feeX: 20_000_000n, feeY: 5_000_000n })]);
+    expect(s.zap.calls).toEqual([]);
+    expect(s.db.rebalances).toMatchObject([
+      {
+        action: "claim",
+        feeSol: 0.015,
+        live: true,
+        lowerBin: 100,
+        upperBin: 120,
+        newLowerBin: 100,
+        newUpperBin: 120,
+        signature: "CLAIM1",
+        delivered: true,
+      },
+    ]);
+    const text = s.telegram.sent[0]?.text ?? "";
+    expect(text).toContain("<b>Fees claimed</b>");
+    expect(text).toContain("Unclaimed fees: <b>0.015 SOL</b>");
+    expect(text).toContain("COMPOUND1");
+    await s.run(T0 + MINUTE);
+    expect(s.zap.claims).toHaveLength(1);
+  });
+
+  test.each([
+    ["below the threshold", { feeClaimThresholdSol: 0.02 }, true],
+    ["fees kept in the wallet", { feeMode: "keep", feeClaimThresholdSol: 0.01 }, true],
+    ["no threshold", { feeClaimThresholdSol: null }, true],
+    ["preview only logs", {}, false],
+  ] as const)("%s: nothing is claimed or recorded", async (_, config, live) => {
+    const s = claimSetup(config, live);
+    await s.run();
+    expect(s.zap.claims).toEqual([]);
+    expect(s.db.rebalances).toEqual([]);
+    expect(s.telegram.sent).toEqual([]);
+  });
+
+  test("a pool with no SOL side is never valued, so never claimed", async () => {
+    const s = claimSetup({});
+    s.chain.pools.POOL1 = poolState({ mintY: "EPjFWvd5wAvEdJ3uNnzTPdixyBUS2h5vYodx2M4vKn1v", positions: fees });
+    await s.run();
+    expect(s.zap.claims).toEqual([]);
+  });
+
+  test("a failed claim is stored and reported but never pauses the agent", async () => {
+    const s = claimSetup({});
+    s.zap.failClaim = "[claim-fee] simulation failed";
+    await s.run();
+    expect(s.db.rebalances).toMatchObject([
+      { action: "claim", signature: null, txError: "[claim-fee] simulation failed" },
+    ]);
+    expect(s.telegram.sent[0]?.text).toContain("Fee claim failed");
+    expect(s.zap.compounds).toEqual([]);
+    for (const minutes of [5, 10, 15]) await s.run(T0 + minutes * MINUTE);
+    expect(s.zap.claims).toHaveLength(4);
+    expect(s.db.paused.size).toBe(0);
+  });
+
+  test("a claim that finds no fee leaves no row and hands the cooldown back", async () => {
+    const s = claimSetup({});
+    s.zap.noFee = true;
+    await s.run();
+    expect(s.db.rebalances).toEqual([]);
+    expect(s.telegram.sent).toEqual([]);
+    expect(s.db.rebalanceWatches[0]?.lastAlertAt).toBeNull();
+  });
+
+  test("claim failures do not count toward the rebalance failure pause", async () => {
+    const s = claimSetup({});
+    s.zap.failClaim = "boom";
+    for (const minutes of [0, 5, 10]) await s.run(T0 + minutes * MINUTE);
+    s.zap.fail = "boom";
+    s.chain.pools.POOL1 = poolState({ activeBinId: 130, positions: fees });
+    await s.run(T0 + 15 * MINUTE);
+    expect(s.db.paused.size).toBe(0);
   });
 });
 

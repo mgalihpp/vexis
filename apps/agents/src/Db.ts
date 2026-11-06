@@ -1,8 +1,10 @@
 import type { Keypair } from "@solana/web3.js";
 import {
   type AgentKind,
+  LOW_SOL,
   REBALANCE_FAILING,
   REBALANCE_FAILURE_LIMIT,
+  type RebalanceAction,
   TELEGRAM_NOT_LINKED,
   TELEGRAM_RELINK,
   WALLET_UNREADABLE,
@@ -34,10 +36,22 @@ export type Watch = {
   readonly lastAlertAt: Date | null;
 };
 
+/**
+ * The RPC the user gave with the agent wallet. `missing` on wallets saved before it was required; `unreadable` when it
+ * does not decrypt with this `WALLET_ENC_KEY`, so the user has to save the wallet again.
+ */
+export type RpcTarget =
+  | { readonly _tag: "missing" }
+  | { readonly _tag: "unreadable" }
+  | { readonly _tag: "ready"; readonly url: string };
+
 /** One (agent, pool) pair of a runnable auto-rebalance agent, with the wallet whose position it manages. */
-export type RebalanceWatch = Watch & { readonly owner: string };
+export type RebalanceWatch = Watch & { readonly owner: string; readonly rpc: RpcTarget };
 
 export type NewRebalance = {
+  readonly action: RebalanceAction;
+  /** Unclaimed fees valued in SOL when the runner acted; null when the pool has no SOL side. */
+  readonly feeSol: number | null;
   readonly agentId: string;
   readonly userId: string;
   readonly poolAddress: string;
@@ -86,7 +100,7 @@ export type NewAlert = {
   readonly at: Date;
 };
 
-export { REBALANCE_FAILING, REBALANCE_FAILURE_LIMIT, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, WALLET_UNREADABLE };
+export { LOW_SOL, REBALANCE_FAILING, REBALANCE_FAILURE_LIMIT, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, WALLET_UNREADABLE };
 
 /**
  * Where a user's alerts go. `unreadable`: a bot is linked but its token does not decrypt with this
@@ -112,15 +126,17 @@ export class Db extends Context.Service<
   {
     /** Enabled, unpaused volume-watch agents joined with their pools. */
     runnableWatches(): Effect.Effect<ReadonlyArray<Watch>, DbError>;
-    /** Enabled, unpaused auto-rebalance agents with a saved wallet, joined with their pools. */
+    /** Enabled, unpaused auto-rebalance agents with a saved wallet, joined with their pools. Decrypts the RPC URL. */
     runnableRebalances(): Effect.Effect<ReadonlyArray<RebalanceWatch>, DbError>;
     /** Inserts with `delivered = false` and returns the new id. */
     recordRebalance(row: NewRebalance): Effect.Effect<string, DbError>;
+    /** Deletes a row whose action turned out to have nothing to do. */
+    dropRebalance(id: string): Effect.Effect<void, DbError>;
     /** `error` null marks the row delivered; otherwise stores why the Telegram send failed. */
     settleRebalance(id: string, error: string | null): Effect.Effect<void, DbError>;
     /** Stores a live row's signature or transaction error. */
     settleTransaction(id: string, outcome: TxOutcome): Effect.Effect<void, DbError>;
-    /** Failed live rebalances in a row, newest first, counting at most `REBALANCE_FAILURE_LIMIT`. */
+    /** Failed live rebalances in a row, newest first, counting at most `REBALANCE_FAILURE_LIMIT`. Claims do not count. */
     failureStreak(agentId: string): Effect.Effect<number, DbError>;
     /** Decrypts the agent wallet's secret. The only place anything decrypts it; the web app only writes it. */
     walletSigner(userId: string): Effect.Effect<WalletSigner, DbError>;
@@ -185,8 +201,8 @@ export class Db extends Context.Service<
           ),
 
         runnableRebalances: () =>
-          run("runnableRebalances", () =>
-            db
+          run("runnableRebalances", async () => {
+            const rows = await db
               .select({
                 agentId: agents.id,
                 userId: agents.userId,
@@ -196,12 +212,21 @@ export class Db extends Context.Service<
                 config: agents.config,
                 lastAlertAt: agentPools.lastAlertAt,
                 owner: rebalanceWallets.publicKey,
+                rpcUrl: rebalanceWallets.rpcUrl,
               })
               .from(agents)
               .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
               .innerJoin(rebalanceWallets, eq(rebalanceWallets.userId, agents.userId))
-              .where(and(eq(agents.kind, "auto-rebalance"), eq(agents.enabled, true), eq(agents.paused, false))),
-          ),
+              .where(and(eq(agents.kind, "auto-rebalance"), eq(agents.enabled, true), eq(agents.paused, false)));
+            return rows.map(({ rpcUrl, ...row }): RebalanceWatch => {
+              if (rpcUrl === null) return { ...row, rpc: { _tag: "missing" } };
+              try {
+                return { ...row, rpc: { _tag: "ready", url: decryptSecret(rpcUrl, "WALLET_ENC_KEY") } };
+              } catch {
+                return { ...row, rpc: { _tag: "unreadable" } };
+              }
+            });
+          }),
 
         recordRebalance: (row) =>
           run("recordRebalance", () =>
@@ -216,6 +241,9 @@ export class Db extends Context.Service<
                 : Effect.fail(new DbError({ operation: "recordRebalance", cause: new Error("no row returned") })),
             ),
           ),
+
+        dropRebalance: (id) =>
+          run("dropRebalance", () => db.delete(agentRebalances).where(eq(agentRebalances.id, id))).pipe(Effect.asVoid),
 
         settleRebalance: (id, error) =>
           run("settleRebalance", () =>
@@ -242,7 +270,13 @@ export class Db extends Context.Service<
             db
               .select({ txError: agentRebalances.txError })
               .from(agentRebalances)
-              .where(and(eq(agentRebalances.agentId, agentId), eq(agentRebalances.live, true)))
+              .where(
+                and(
+                  eq(agentRebalances.agentId, agentId),
+                  eq(agentRebalances.live, true),
+                  eq(agentRebalances.action, "rebalance"),
+                ),
+              )
               .orderBy(desc(agentRebalances.at))
               .limit(REBALANCE_FAILURE_LIMIT),
           ).pipe(Effect.map(leadingFailures)),
