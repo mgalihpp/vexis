@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { VolumeWatchConfig } from "@vexis/db/agents";
+import { AGENT_KINDS, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
 import { z } from "zod";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { requireViewer } from "@/features/auth/auth.middleware";
@@ -9,14 +9,21 @@ import {
   createAgent,
   loadAgents,
   loadAlerts,
+  loadRebalances,
   loadTelegram,
   removePool,
   saveConfig,
   setAgentState,
 } from "./agents.server";
 import { BotToken, connectOwnBot, detectOwnBotChat, disconnectTelegram } from "./telegram.server";
+import { loadWallet, removeWallet, SecretKeyInput, saveWallet } from "./wallet.server";
 
 const PoolInput = z.object({ address: PoolAddress, label: z.string().trim().min(1).max(80) });
+const Kind = z.enum(AGENT_KINDS);
+const KindConfig = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("volume-watch"), config: VolumeWatchConfig }),
+  z.object({ kind: z.literal("auto-rebalance"), config: AutoRebalanceConfig }),
+]);
 
 export const getAgents = createServerFn({ method: "GET" })
   .middleware([requireViewer])
@@ -25,6 +32,23 @@ export const getAgents = createServerFn({ method: "GET" })
 export const getAlerts = createServerFn({ method: "GET" })
   .middleware([requireViewer])
   .handler(({ context }) => loadAlerts(context.viewer.id));
+
+export const getRebalances = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .handler(({ context }) => loadRebalances(context.viewer.id));
+
+export const getRebalanceWallet = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .handler(({ context }) => loadWallet(context.viewer.id));
+
+export const saveRebalanceWalletFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .validator(z.object({ secretKey: SecretKeyInput }))
+  .handler(async ({ context, data }) => ({ publicKey: await saveWallet(context.viewer.id, data.secretKey) }));
+
+export const removeRebalanceWalletFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .handler(({ context }) => removeWallet(context.viewer.id));
 
 export const getTelegram = createServerFn({ method: "GET" })
   .middleware([requireViewer])
@@ -52,25 +76,25 @@ export const disconnectTelegramLink = createServerFn({ method: "POST" })
     return loadTelegram(context.viewer.id);
   });
 
-export const createVolumeAgent = createServerFn({ method: "POST" })
+export const createAgentFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ pools: z.array(PoolInput).min(1).max(MAX_POOLS), config: VolumeWatchConfig }))
+  .validator(KindConfig.and(z.object({ pools: z.array(PoolInput).min(1).max(MAX_POOLS) })))
   .handler(({ context, data }) => createAgent(context.viewer.id, data));
 
 export const setAgentRunning = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ enabled: z.boolean().optional(), paused: z.boolean().optional() }))
-  .handler(({ context, data }) => setAgentState(context.viewer.id, data));
+  .validator(z.object({ kind: Kind, enabled: z.boolean().optional(), paused: z.boolean().optional() }))
+  .handler(({ context, data: { kind, ...patch } }) => setAgentState(context.viewer.id, kind, patch));
 
 export const saveAgentConfig = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(VolumeWatchConfig)
-  .handler(({ context, data }) => saveConfig(context.viewer.id, data));
+  .validator(KindConfig)
+  .handler(({ context, data }) => saveConfig(context.viewer.id, data.kind, data.config));
 
 export const addAgentPoolFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(PoolInput)
-  .handler(({ context, data }) => addPool(context.viewer.id, data));
+  .validator(PoolInput.extend({ kind: Kind }))
+  .handler(({ context, data: { kind, ...pool } }) => addPool(context.viewer.id, kind, pool));
 
 export const removeAgentPoolFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])

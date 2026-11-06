@@ -9,6 +9,7 @@ import {
   PowerIcon,
   SendIcon,
   SlidersHorizontalIcon,
+  WalletIcon,
   XIcon,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
@@ -26,6 +27,7 @@ import {
 } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
 import {
+  AGENT_NAME,
   type AgentView,
   agentStatus,
   type ConfigFields,
@@ -35,6 +37,7 @@ import {
   parseConfigFields,
   STATUS_LABEL,
   statusHint,
+  type VolumeAgentView,
 } from "../agents";
 import { addAgentPoolFn, removeAgentPoolFn, saveAgentConfig, setAgentRunning } from "../agents.functions";
 import { agentsQuery, alertsQuery } from "../agents.queries";
@@ -58,16 +61,18 @@ import {
   TelegramPanel,
   useAgentMutation,
 } from "./agent-ui";
+import { RebalanceHistory, RebalanceOverview, RebalanceRuleSection, WalletPanel } from "./rebalance-ui";
 
 export const DETAIL_TABS = ["overview", "pools", "alerts", "settings"] as const;
 export type DetailTab = (typeof DETAIL_TABS)[number];
 
-const TAB_LABEL: Record<DetailTab, string> = {
-  overview: "Overview",
-  pools: "Pools",
-  alerts: "Alert History",
-  settings: "Settings",
-};
+const tabLabel = (tab: DetailTab, agent: AgentView) =>
+  ({
+    overview: "Overview",
+    pools: "Pools",
+    alerts: agent.kind === "auto-rebalance" ? "Rebalance History" : "Alert History",
+    settings: "Settings",
+  })[tab];
 
 const tabClass =
   "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 hover:text-muted-foreground";
@@ -104,7 +109,7 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { paused } }));
+  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { kind: agent.kind, paused } }));
   const hint = statusHint(agent);
   const [notice, setNotice] = useState<string | null>(null);
   // Like the portfolio's tables, the alert history fills the viewport and scrolls inside its table.
@@ -130,7 +135,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
           <BarPill icon={<BotIcon className="size-[0.9rem] text-brand" />}>Agents</BarPill>
         </Link>
         <ChevronRightIcon className="size-3.25 shrink-0 text-muted-foreground" />
-        <BarPill>Volume spike</BarPill>
+        <BarPill>{AGENT_NAME[agent.kind]}</BarPill>
       </AgentsBar>
 
       <nav className="flex shrink-0 overflow-x-auto border-b px-2">
@@ -143,7 +148,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
             className={`${tabClass} ${t === tab ? "text-foreground! after:bg-brand" : ""}`}
             aria-current={t === tab ? "page" : undefined}
           >
-            {TAB_LABEL[t]}
+            {tabLabel(t, agent)}
             {t === "pools" && <span className="ml-1 text-muted-foreground">{agent.pools.length}</span>}
           </Link>
         ))}
@@ -166,9 +171,14 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
               </button>
             </div>
           )}
-          {tab === "overview" && <Overview agent={agent} now={now} />}
+          {tab === "overview" &&
+            (agent.kind === "auto-rebalance" ? (
+              <RebalanceOverview agent={agent} now={now} />
+            ) : (
+              <Overview agent={agent} now={now} />
+            ))}
           {tab === "pools" && <PoolsTab agent={agent} now={now} />}
-          {tab === "alerts" && <AlertsTab now={now} />}
+          {tab === "alerts" && (agent.kind === "auto-rebalance" ? <RebalanceHistory /> : <AlertsTab now={now} />)}
           {tab === "settings" && <SettingsTab agent={agent} onSaved={setNotice} />}
         </div>
       </div>
@@ -176,7 +186,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   );
 }
 
-function Overview({ agent, now }: { agent: AgentView; now: number }) {
+function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
   const { data } = useSuspenseQuery(alertsQuery);
   const status = agentStatus(agent);
   const tabLink = (tab: DetailTab, label: string) => (
@@ -237,7 +247,9 @@ function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="pl-3.25">Pool</TableHead>
-              <TableHead className="text-right">Last alert</TableHead>
+              <TableHead className="text-right">
+                {agent.kind === "auto-rebalance" ? "Last out of range" : "Last alert"}
+              </TableHead>
               <TableHead className="w-20 pr-3.25" />
             </TableRow>
           </TableHeader>
@@ -286,7 +298,7 @@ function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
             taken={agent.pools.map((p) => p.address)}
             count={agent.pools.length}
             busy={add.isPending}
-            onPick={(pool) => add.mutate({ data: pool })}
+            onPick={(pool) => add.mutate({ data: { ...pool, kind: agent.kind } })}
           />
           <FormError error={add.error ?? remove.error} />
         </div>
@@ -355,18 +367,20 @@ function AlertsTab({ now }: { now: number }) {
 }
 
 function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: string) => void }) {
-  const [fields, setFields] = useState<ConfigFields>(() => configFields(agent.config));
-  const save = useAgentMutation(saveAgentConfig);
-  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { enabled } }));
-  const result = parseConfigFields(fields, agent.config);
-  const dirty = JSON.stringify(fields) !== JSON.stringify(configFields(agent.config));
+  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { kind: agent.kind, enabled } }));
+  const [dirty, setDirty] = useState(false);
   const [section, setSection] = useState<SettingsSectionId>("rule");
-  const current = SETTINGS_SECTIONS.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];
+  const sections = SETTINGS_SECTIONS.filter((s) => s.id !== "wallet" || agent.kind === "auto-rebalance").map((s) =>
+    s.id === "rule" && agent.kind === "auto-rebalance"
+      ? { ...s, label: "Rebalance rule", description: "How the position is re-centered when it leaves its range." }
+      : s,
+  );
+  const current = sections.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];
 
   return (
     <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6">
       <nav aria-label="Settings" className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:px-0">
-        {SETTINGS_SECTIONS.map((s) => {
+        {sections.map((s) => {
           const on = s.id === section;
           return (
             <button
@@ -392,44 +406,22 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
           <p className="mt-0.5 text-xs text-muted-foreground">{current.description}</p>
         </header>
 
-        {section === "rule" && (
-          <>
-            <div className="p-4 sm:p-5">
-              <ConfigForm
-                fields={fields}
-                errors={result.ok ? {} : result.errors}
-                onChange={(key, value) => setFields((f) => ({ ...f, [key]: value }))}
-              />
-            </div>
-            <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
-              <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
-              <FormError error={save.error} />
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={!dirty || save.isPending}
-                onClick={() => setFields(configFields(agent.config))}
-              >
-                Reset
-              </Button>
-              <Button
-                size="sm"
-                disabled={!result.ok || !dirty || save.isPending}
-                onClick={() =>
-                  result.ok && save.mutate({ data: result.config }, { onSuccess: () => onSaved("Rule saved") })
-                }
-                className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
-              >
-                {save.isPending && <Spinner />}
-                {save.isPending ? "Saving" : "Save rule"}
-              </Button>
-            </footer>
-          </>
-        )}
+        {section === "rule" &&
+          (agent.kind === "auto-rebalance" ? (
+            <RebalanceRuleSection agent={agent} onSaved={onSaved} onDirty={setDirty} />
+          ) : (
+            <VolumeRuleSection agent={agent} onSaved={onSaved} onDirty={setDirty} />
+          ))}
 
         {section === "telegram" && (
           <div className="p-4 sm:p-5">
             <TelegramPanel />
+          </div>
+        )}
+
+        {section === "wallet" && (
+          <div className="p-4 sm:p-5">
+            <WalletPanel />
           </div>
         )}
 
@@ -460,6 +452,68 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
   );
 }
 
+function VolumeRuleSection({
+  agent,
+  onSaved,
+  onDirty,
+}: {
+  agent: VolumeAgentView;
+  onSaved: (message: string) => void;
+  onDirty: (dirty: boolean) => void;
+}) {
+  const [fields, setFields] = useState<ConfigFields>(() => configFields(agent.config));
+  const save = useAgentMutation(saveAgentConfig);
+  const result = parseConfigFields(fields, agent.config);
+  const dirty = JSON.stringify(fields) !== JSON.stringify(configFields(agent.config));
+  const update = (next: ConfigFields) => {
+    setFields(next);
+    onDirty(JSON.stringify(next) !== JSON.stringify(configFields(agent.config)));
+  };
+  return (
+    <>
+      <div className="p-4 sm:p-5">
+        <ConfigForm
+          fields={fields}
+          errors={result.ok ? {} : result.errors}
+          onChange={(key, value) => update({ ...fields, [key]: value })}
+        />
+      </div>
+      <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
+        <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
+        <FormError error={save.error} />
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={!dirty || save.isPending}
+          onClick={() => update(configFields(agent.config))}
+        >
+          Reset
+        </Button>
+        <Button
+          size="sm"
+          disabled={!result.ok || !dirty || save.isPending}
+          onClick={() =>
+            result.ok &&
+            save.mutate(
+              { data: { kind: "volume-watch", config: result.config } },
+              {
+                onSuccess: () => {
+                  onDirty(false);
+                  onSaved("Rule saved");
+                },
+              },
+            )
+          }
+          className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+        >
+          {save.isPending && <Spinner />}
+          {save.isPending ? "Saving" : "Save rule"}
+        </Button>
+      </footer>
+    </>
+  );
+}
+
 const SETTINGS_SECTIONS = [
   {
     id: "rule",
@@ -468,6 +522,12 @@ const SETTINGS_SECTIONS = [
     description: "When a pool's volume counts as a spike worth an alert.",
   },
   { id: "telegram", label: "Telegram", icon: SendIcon, description: "Where alerts are sent." },
+  {
+    id: "wallet",
+    label: "Wallet",
+    icon: WalletIcon,
+    description: "The wallet whose position the agent keeps in range.",
+  },
   { id: "agent", label: "Agent", icon: PowerIcon, description: "Turn the agent on or off." },
 ] as const;
 type SettingsSectionId = (typeof SETTINGS_SECTIONS)[number]["id"];

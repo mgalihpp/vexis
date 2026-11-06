@@ -290,6 +290,49 @@ export const agentAlerts = pgTable(
   ],
 ).enableRLS();
 
+/**
+ * The wallet the user's auto-rebalance agent manages: a hot wallet the user hands us, one per user. The
+ * secret key is AES-256-GCM encrypted with `WALLET_ENC_KEY` (`secret.ts`) and never leaves the server;
+ * the public key is kept in the clear so reads and previews never decrypt it.
+ */
+export const rebalanceWallets = pgTable("rebalance_wallets", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  publicKey: text("public_key").notNull(),
+  secretKey: text("secret_key").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}).enableRLS();
+
+/**
+ * Rebalance history, written by the runner: the range the position left, the range it would move to,
+ * and the outcome. `signature` is null for a preview. `delivered` / `error` record the Telegram send.
+ */
+export const agentRebalances = pgTable(
+  "agent_rebalances",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentId: uuid("agent_id").notNull(),
+    userId: userId(),
+    poolAddress: text("pool_address").notNull(),
+    positionAddress: text("position_address").notNull(),
+    activeBin: integer("active_bin").notNull(),
+    lowerBin: integer("lower_bin").notNull(),
+    upperBin: integer("upper_bin").notNull(),
+    newLowerBin: integer("new_lower_bin").notNull(),
+    newUpperBin: integer("new_upper_bin").notNull(),
+    signature: text("signature"),
+    delivered: boolean("delivered").notNull().default(false),
+    error: text("error"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.agentId, t.userId], foreignColumns: [agents.id, agents.userId] }).onDelete("cascade"),
+    index("agent_rebalances_user_at_idx").on(t.userId, t.at.desc()),
+  ],
+).enableRLS();
+
 // ---------------------------------------------------------------------------------------------
 // Global market data, shared by every user.
 // ---------------------------------------------------------------------------------------------

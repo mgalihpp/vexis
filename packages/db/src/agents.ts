@@ -3,7 +3,7 @@ import { z } from "zod";
 // Agent kinds and their config schemas. `agents.config` is jsonb; every write goes through
 // `parseAgentConfig`, and the runner parses again on read so a bad row is skipped, not run.
 
-export const AGENT_KINDS = ["volume-watch"] as const;
+export const AGENT_KINDS = ["volume-watch", "auto-rebalance"] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
 export const VolumeWatchConfig = z.object({
@@ -20,8 +20,23 @@ export const VolumeWatchConfig = z.object({
 });
 export type VolumeWatchConfig = z.infer<typeof VolumeWatchConfig>;
 
+export const REBALANCE_STRATEGIES = ["Spot", "Curve", "BidAsk"] as const;
+
+export const AutoRebalanceConfig = z.object({
+  /** Liquidity shape of the re-centered position. */
+  strategy: z.enum(REBALANCE_STRATEGIES).default("Curve"),
+  /** Slippage tolerance for the balancing swap, in basis points. */
+  slippageBps: z.number().int().min(0).max(10_000).default(50),
+  /** Bins on each side of the active bin; null keeps the position's current width. */
+  halfWidth: z.number().int().min(1).max(1024).nullable().default(null),
+  /** Per-pool quiet time after a rebalance (or its preview), in seconds. */
+  cooldownSec: z.number().int().min(0).max(86_400).default(300),
+});
+export type AutoRebalanceConfig = z.infer<typeof AutoRebalanceConfig>;
+
 export const AGENT_CONFIG = {
   "volume-watch": VolumeWatchConfig,
+  "auto-rebalance": AutoRebalanceConfig,
 } as const satisfies Record<AgentKind, z.ZodType>;
 
 export type AgentConfig<K extends AgentKind> = z.infer<(typeof AGENT_CONFIG)[K]>;

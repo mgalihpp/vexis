@@ -64,7 +64,8 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `BETTER_AUTH_SECRET`   | web         | none                                 | Long random string used to sign sessions                  |
 | `BETTER_AUTH_URL`      | web         | none                                 | Public origin; requests from another origin are rejected  |
 | `TOKEN_ENC_KEY`        | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
-| `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for on-chain bin and fee reads                        |
+| `WALLET_ENC_KEY`       | web         | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
+| `SOLANA_RPC_URL`       | web, runner | public mainnet endpoint              | RPC for on-chain bin, fee and position reads              |
 | `JUPITER_API_KEY`      | web         | none, uses `lite-api.jup.ag`         | Switches price and balance calls to `api.jup.ag`          |
 | `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
@@ -127,13 +128,15 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 
 The web app does not send Telegram messages; `apps/agents` does. It runs one tick a minute: read the runnable agents, fetch every distinct pool once (batched), store that minute's volume, evaluate each agent against its own config, then claim the cooldown and send. Alerts go out with each user's own bot token, so the runner never polls Telegram.
 
+Auto-rebalance agents run on the same minute. For each watched pool the runner reads the agent wallet's position on-chain (`SOLANA_RPC_URL`); when its one funded position has left its range, it records the range it would move to and sends a Telegram preview. For now it only previews: nothing is signed or sent on-chain.
+
 On a VPS it runs next to the web process under pm2:
 
 ```bash
 pm2 start "bun apps/agents/src/main.ts" --name vexis-agents
 ```
 
-It needs `DATABASE_URL` and `TOKEN_ENC_KEY`, the same values the web app uses.
+It needs `DATABASE_URL` and `TOKEN_ENC_KEY`, the same values the web app uses, and a paid RPC in `SOLANA_RPC_URL` once anyone runs an auto-rebalance agent: the public endpoint rate limits the per-minute position reads.
 
 ## Deploy
 

@@ -44,7 +44,10 @@ export type LinkButton = { readonly text: string; readonly url: string };
  * Buttons under the message, one per pool. Telegram refuses button URLs it cannot reach, so a local
  * `VEXIS_WEB_URL` (dev) gives none and the alert goes out as text only.
  */
-export function linkButtons(lines: ReadonlyArray<SpikeLine>, webUrl: string): LinkButton[] {
+export function linkButtons(
+  lines: ReadonlyArray<Pick<SpikeLine, "name" | "poolAddress">>,
+  webUrl: string,
+): LinkButton[] {
   const base = webUrl.replace(/\/+$/, "");
   if (!/^https?:\/\//.test(base) || /^https?:\/\/(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|\[::1\])/.test(base)) {
     return [];
@@ -53,4 +56,28 @@ export function linkButtons(lines: ReadonlyArray<SpikeLine>, webUrl: string): Li
     text: lines.length === 1 ? "View pool on Vexis" : `View ${line.name}`,
     url: `${base}/analytics?pool=${line.poolAddress}`,
   }));
+}
+
+export type RebalanceLine = {
+  readonly name: string;
+  readonly poolAddress: string;
+  readonly activeBinId: number;
+  readonly from: { readonly lowerBinId: number; readonly upperBinId: number };
+  readonly to: { readonly lowerBinId: number; readonly upperBinId: number };
+  readonly strategy: string;
+  readonly slippageBps: number;
+};
+
+/** A position that left its range and the range it would move to. Sending lands later; this is a preview. */
+export function formatRebalancePreview(line: RebalanceLine): string {
+  return [
+    `🔁 <b>Out of range</b> ${escapeHtml(line.name)}`,
+    "",
+    `Active bin: <b>${line.activeBinId}</b>`,
+    `Range: ${line.from.lowerBinId} to ${line.from.upperBinId}`,
+    `Would move to: <b>${line.to.lowerBinId} to ${line.to.upperBinId}</b>`,
+    `${line.strategy}, slippage ${line.slippageBps} bps`,
+    "",
+    "<i>Preview only: no transaction was sent.</i>",
+  ].join("\n");
 }

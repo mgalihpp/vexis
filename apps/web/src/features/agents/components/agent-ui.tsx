@@ -313,9 +313,9 @@ export function PoolPicker({
 const BASELINE_PRESETS = [15, 30, 60, 180];
 const MIN_USD_PRESETS = [1000, 5000, 10000, 25000, 100000];
 const COOLDOWN_PRESETS = [1, 5, 15, 60];
-const CUSTOM = -1;
+export const CUSTOM = -1;
 
-const minutesLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60}h` : `${m}m`);
+export const minutesLabel = (m: number) => (m >= 60 && m % 60 === 0 ? `${m / 60}h` : `${m}m`);
 const usdLabel = (v: number) => (v >= 1000 ? `$${+(v / 1000).toFixed(1)}K` : `$${v}`);
 
 const NUMBER_INPUT =
@@ -337,7 +337,7 @@ type CustomField = {
  * Segmented control sized to its options, so a row never stretches them across the page. The chosen option is
  * raised; Custom becomes a number field in place once it is chosen.
  */
-function Segmented({
+export function Segmented({
   label,
   options,
   value,
@@ -408,7 +408,7 @@ const SLIDER =
   "focus-visible:[&::-webkit-slider-thumb]:ring-4 focus-visible:[&::-webkit-slider-thumb]:ring-brand/30";
 
 /** One setting: what it is and what it does on the left, the control on the right (stacked when narrow). */
-function SettingRow({
+export function SettingRow({
   label,
   hint,
   error,

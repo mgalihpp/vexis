@@ -1,6 +1,14 @@
 import { TELEGRAM_NOT_LINKED, TELEGRAM_RELINK } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
-import { agentAlerts, agentPools, agents, poolMinutes, telegramLinks } from "@vexis/db/schema";
+import {
+  agentAlerts,
+  agentPools,
+  agentRebalances,
+  agents,
+  poolMinutes,
+  rebalanceWallets,
+  telegramLinks,
+} from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
@@ -15,6 +23,22 @@ export type Watch = {
   readonly label: string | null;
   readonly config: unknown;
   readonly lastAlertAt: Date | null;
+};
+
+/** One (agent, pool) pair of a runnable auto-rebalance agent, with the wallet whose position it manages. */
+export type RebalanceWatch = Watch & { readonly owner: string };
+
+export type NewRebalance = {
+  readonly agentId: string;
+  readonly userId: string;
+  readonly poolAddress: string;
+  readonly positionAddress: string;
+  readonly activeBin: number;
+  readonly lowerBin: number;
+  readonly upperBin: number;
+  readonly newLowerBin: number;
+  readonly newUpperBin: number;
+  readonly at: Date;
 };
 
 export type StoredReading = { readonly minute: number; readonly cumulativeVolume: number };
@@ -57,6 +81,12 @@ export class Db extends Context.Service<
   {
     /** Enabled, unpaused volume-watch agents joined with their pools. */
     runnableWatches(): Effect.Effect<ReadonlyArray<Watch>, DbError>;
+    /** Enabled, unpaused auto-rebalance agents with a saved wallet, joined with their pools. */
+    runnableRebalances(): Effect.Effect<ReadonlyArray<RebalanceWatch>, DbError>;
+    /** Inserts with `delivered = false` and returns the new id. */
+    recordRebalance(row: NewRebalance): Effect.Effect<string, DbError>;
+    /** `error` null marks the row delivered; otherwise stores why the Telegram send failed. */
+    settleRebalance(id: string, error: string | null): Effect.Effect<void, DbError>;
     /** Newest stored reading per pool, for the next delta. Pools never seen are absent. */
     latestReadings(pools: ReadonlyArray<string>): Effect.Effect<ReadonlyMap<string, StoredReading>, DbError>;
     /** Existing `(pool, minute)` rows are kept. */
@@ -116,6 +146,47 @@ export class Db extends Context.Service<
               .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
               .where(and(eq(agents.kind, "volume-watch"), eq(agents.enabled, true), eq(agents.paused, false))),
           ),
+
+        runnableRebalances: () =>
+          run("runnableRebalances", () =>
+            db
+              .select({
+                agentId: agents.id,
+                userId: agents.userId,
+                agentPoolId: agentPools.id,
+                poolAddress: agentPools.poolAddress,
+                label: agentPools.label,
+                config: agents.config,
+                lastAlertAt: agentPools.lastAlertAt,
+                owner: rebalanceWallets.publicKey,
+              })
+              .from(agents)
+              .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
+              .innerJoin(rebalanceWallets, eq(rebalanceWallets.userId, agents.userId))
+              .where(and(eq(agents.kind, "auto-rebalance"), eq(agents.enabled, true), eq(agents.paused, false))),
+          ),
+
+        recordRebalance: (row) =>
+          run("recordRebalance", () =>
+            db
+              .insert(agentRebalances)
+              .values({ ...row, delivered: false })
+              .returning({ id: agentRebalances.id }),
+          ).pipe(
+            Effect.flatMap(([r]) =>
+              r
+                ? Effect.succeed(r.id)
+                : Effect.fail(new DbError({ operation: "recordRebalance", cause: new Error("no row returned") })),
+            ),
+          ),
+
+        settleRebalance: (id, error) =>
+          run("settleRebalance", () =>
+            db
+              .update(agentRebalances)
+              .set({ delivered: error === null, error })
+              .where(eq(agentRebalances.id, id)),
+          ).pipe(Effect.asVoid),
 
         latestReadings: (pools) =>
           pools.length === 0

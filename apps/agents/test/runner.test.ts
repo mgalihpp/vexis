@@ -6,14 +6,17 @@ import type { Db } from "../src/Db.ts";
 import { formatMessage, formatUsd, linkButtons, type SpikeLine } from "../src/format.ts";
 import { prune, RETENTION_MS } from "../src/Ingest.ts";
 import type { Meteora } from "../src/Meteora.ts";
+import { rebalanceCycle } from "../src/Rebalance.ts";
 import type { Telegram } from "../src/Telegram.ts";
 import {
+  fakeChain,
   fakeDb,
   fakeMeteora,
   fakeTelegram,
   MINUTE,
   quietHistory,
   reading,
+  rebalanceWatch,
   runAt,
   T0,
   testConfig,
@@ -268,6 +271,78 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toHaveLength(1);
     expect(s.telegram.sent[0]?.text).toContain("DOGE-SOL");
     expect(s.telegram.sent[0]?.text).toContain("SOL-USDC");
+  });
+});
+
+/** One auto-rebalance agent on POOL1 whose position spans bins 100..120, with the active bin at `active`. */
+function rebalanceSetup(
+  active: number,
+  positions = [{ address: "POS1", lowerBinId: 100, upperBinId: 120, funded: true }],
+) {
+  const db = fakeDb({ rebalances: [rebalanceWatch()] });
+  db.state.chats.set("user-1", 42n);
+  const chain = fakeChain({ POOL1: { activeBinId: active, positions } });
+  const telegram = fakeTelegram();
+  const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, testConfig);
+  const run = (at = T0) => runAt(rebalanceCycle().pipe(Effect.provide(layer)), at);
+  return { db: db.state, chain: chain.state, telegram: telegram.state, run };
+}
+
+describe("auto-rebalance preview", () => {
+  test("in range: nothing recorded or sent; the read uses the agent's wallet", async () => {
+    const s = rebalanceSetup(110);
+    await s.run();
+    expect(s.chain.calls).toEqual([{ pool: "POOL1", owner: "OWNER1" }]);
+    expect(s.db.rebalances).toEqual([]);
+    expect(s.telegram.sent).toEqual([]);
+  });
+
+  test("out of range: records the move, sends one preview, marks it delivered", async () => {
+    const s = rebalanceSetup(130);
+    await s.run();
+    expect(s.db.rebalances).toMatchObject([
+      { positionAddress: "POS1", activeBin: 130, lowerBin: 100, upperBin: 120, newLowerBin: 120, newUpperBin: 140 },
+    ]);
+    expect(s.db.rebalances[0]?.delivered).toBe(true);
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.telegram.sent[0]?.text).toContain("Would move to: <b>120 to 140</b>");
+    expect(s.telegram.sent[0]?.text).toContain("no transaction was sent");
+  });
+
+  test("cooldown holds the next minute back; a failed send hands the slot back", async () => {
+    const s = rebalanceSetup(130);
+    s.telegram.failSend = true;
+    await s.run();
+    expect(s.db.rebalances[0]).toMatchObject({ delivered: false, error: expect.stringContaining("chat not found") });
+    s.telegram.failSend = false;
+    await s.run(T0 + MINUTE);
+    expect(s.telegram.sent).toHaveLength(1);
+    await s.run(T0 + 2 * MINUTE);
+    expect(s.telegram.sent).toHaveLength(1);
+  });
+
+  test("several funded positions or none: no guess, nothing sent", async () => {
+    const two = rebalanceSetup(130, [
+      { address: "A", lowerBinId: 100, upperBinId: 120, funded: true },
+      { address: "B", lowerBinId: 100, upperBinId: 120, funded: true },
+    ]);
+    await two.run();
+    const none = rebalanceSetup(130, []);
+    await none.run();
+    expect([...two.db.rebalances, ...none.db.rebalances]).toEqual([]);
+  });
+
+  test("no Telegram pauses the agent; a failed chain read is skipped without crashing", async () => {
+    const s = rebalanceSetup(130);
+    s.db.chats.delete("user-1");
+    await s.run();
+    expect(s.db.paused.get("rb-agent-1")).toBe("telegram_not_linked");
+    expect(s.db.rebalances).toEqual([]);
+
+    const down = rebalanceSetup(130);
+    down.chain.pools = {};
+    await down.run();
+    expect(down.db.rebalances).toEqual([]);
   });
 });
 
