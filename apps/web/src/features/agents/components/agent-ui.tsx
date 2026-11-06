@@ -365,7 +365,7 @@ export function Segmented({
   custom?: CustomField;
 }) {
   return (
-    <fieldset className="m-0 flex w-fit max-w-full min-w-0 flex-wrap gap-0.5 rounded-lg border-0 bg-muted p-0.5">
+    <fieldset className="relative m-0 flex w-fit max-w-full min-w-0 flex-wrap gap-0.5 rounded-lg border-0 bg-muted p-0.5">
       <legend className="sr-only">{label}</legend>
       {options.map((o) => {
         const on = o.value === value;
