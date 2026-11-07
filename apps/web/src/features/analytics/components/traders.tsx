@@ -1,13 +1,21 @@
 import { useQuery } from "@tanstack/react-query";
-import { BotIcon, BrainIcon, ExternalLinkIcon, FishSymbolIcon, type LucideIcon, MegaphoneIcon } from "lucide-react";
+import {
+  BotIcon,
+  BrainIcon,
+  ExternalLinkIcon,
+  FilterIcon,
+  FishSymbolIcon,
+  type LucideIcon,
+  MegaphoneIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Notice } from "@/features/portfolio/components/notice";
 import { useStamp } from "@/features/timezone/timezone";
 import { age } from "../analytics";
@@ -126,43 +134,87 @@ function Money({ usd: u, sol: s, signed = false }: { usd: number | null; sol: nu
   );
 }
 
-const FILTERS: { value: TradeFilter["kind"]; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "kol", label: "KOL" },
-  { value: "whale", label: "Whale" },
-  { value: "smart", label: "Smart" },
-];
+const DEFAULT_FILTER: TradeFilter = { kinds: new Set(), hideBots: true };
+const KIND_OPTIONS: GroupKind[] = ["kol", "whale", "smart"];
 
-function RecentTrades({ data }: { data: Ok }) {
+function FilterCheck({
+  id,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className="flex cursor-pointer items-center gap-1.5 rounded px-0.75 py-1.25 text-xs hover:bg-muted"
+    >
+      <Checkbox id={id} checked={checked} onCheckedChange={(on) => onChange(on === true)} />
+      {label}
+    </label>
+  );
+}
+
+/** Same look as the tracked wallets filter: an icon that turns brand while it differs from the default. */
+function TradeFilterMenu({ filter, onChange }: { filter: TradeFilter; onChange: (next: TradeFilter) => void }) {
+  const active = filter.kinds.size > 0 || !filter.hideBots;
+  return (
+    <Popover>
+      <PopoverTrigger
+        aria-label="Filter trades"
+        className={`relative p-1.25 hover:text-foreground ${active ? "text-brand" : "text-foreground/80"}`}
+      >
+        <FilterIcon className="size-3.25" />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-51.25 p-1.5">
+        <div className="flex items-center justify-between px-0.75 pb-0.5 text-xs font-semibold">
+          Filters
+          {active && (
+            <button
+              type="button"
+              className="text-[0.625rem] font-normal text-brand"
+              onClick={() => onChange(DEFAULT_FILTER)}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className="px-0.75 pt-1 pb-0.5 text-[0.6875rem] text-muted-foreground">Wallet</div>
+        {KIND_OPTIONS.map((k) => (
+          <FilterCheck
+            key={k}
+            id={`trades-${k}`}
+            label={GROUP_LABEL[k]}
+            checked={filter.kinds.has(k)}
+            onChange={(on) => {
+              const kinds = new Set(filter.kinds);
+              if (on) kinds.add(k);
+              else kinds.delete(k);
+              onChange({ ...filter, kinds });
+            }}
+          />
+        ))}
+        <div className="px-0.75 pt-1 pb-0.5 text-[0.6875rem] text-muted-foreground">Bots</div>
+        <FilterCheck
+          id="trades-hide-bots"
+          label="Hide bots"
+          checked={filter.hideBots}
+          onChange={(hideBots) => onChange({ ...filter, hideBots })}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function RecentTrades({ data, filter }: { data: Ok; filter: TradeFilter }) {
   const stamp = useStamp();
-  const [filter, setFilter] = useState<TradeFilter>({ kind: "all", hideBots: true });
   const rows = data.trades.filter((t) => tradeFilter(t.tags, filter));
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup
-          type="single"
-          size="sm"
-          variant="outline"
-          spacing={0}
-          value={filter.kind}
-          onValueChange={(v) => v && setFilter((f) => ({ ...f, kind: v as TradeFilter["kind"] }))}
-        >
-          {FILTERS.map((f) => (
-            <ToggleGroupItem key={f.value} value={f.value}>
-              {f.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <Toggle
-          size="sm"
-          variant="outline"
-          pressed={filter.hideBots}
-          onPressedChange={(hideBots) => setFilter((f) => ({ ...f, hideBots }))}
-        >
-          Hide bots
-        </Toggle>
-      </div>
       {rows.length === 0 ? (
         <p className="py-6 text-center text-muted-foreground">No trades match.</p>
       ) : (
@@ -247,7 +299,7 @@ function TopTraders({
   onGroup: (g: GroupKind | null) => void;
 }) {
   const stamp = useStamp();
-  const rows = group ? top.filter((t) => tradeFilter(t.tags, { kind: group, hideBots: true })) : top;
+  const rows = group ? top.filter((t) => tradeFilter(t.tags, { kinds: new Set([group]), hideBots: true })) : top;
   return (
     <div className="flex flex-col gap-2">
       {group && (
@@ -447,6 +499,7 @@ function Loading() {
 function Loaded({ data }: { data: Ok }) {
   const [tab, setTab] = useState("recent");
   const [group, setGroup] = useState<GroupKind | null>(null);
+  const [filter, setFilter] = useState(DEFAULT_FILTER);
   const showTop = data.top !== null || data.topError;
   return (
     <>
@@ -469,12 +522,15 @@ function Loaded({ data }: { data: Ok }) {
         </div>
       )}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="recent">Recent trades</TabsTrigger>
-          {showTop && <TabsTrigger value="top">Top traders</TabsTrigger>}
-        </TabsList>
+        <div className="flex items-center justify-between gap-2">
+          <TabsList>
+            <TabsTrigger value="recent">Recent trades</TabsTrigger>
+            {showTop && <TabsTrigger value="top">Top traders</TabsTrigger>}
+          </TabsList>
+          {tab === "recent" && <TradeFilterMenu filter={filter} onChange={setFilter} />}
+        </div>
         <TabsContent value="recent">
-          <RecentTrades data={data} />
+          <RecentTrades data={data} filter={filter} />
         </TabsContent>
         {showTop && (
           <TabsContent value="top">

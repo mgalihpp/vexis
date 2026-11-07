@@ -132,11 +132,12 @@ const TAG_RULES: readonly ((i: TagInput) => TraderTag | null)[] = [
 
 export const traderTags = (input: TagInput): TraderTag[] => TAG_RULES.flatMap((rule) => rule(input) ?? []);
 
-export type TradeFilter = { kind: "all" | GroupKind; hideBots: boolean };
+/** No kinds means every wallet; several kinds match a wallet carrying any of them. */
+export type TradeFilter = { kinds: ReadonlySet<GroupKind>; hideBots: boolean };
 
 export function tradeFilter(tags: readonly TraderTag[], filter: TradeFilter): boolean {
   if (filter.hideBots && tags.some((t) => t.kind === "bot")) return false;
-  return filter.kind === "all" || tags.some((t) => t.kind === filter.kind);
+  return filter.kinds.size === 0 || tags.some((t) => t.kind !== "bot" && filter.kinds.has(t.kind));
 }
 
 const ZERO_SHARE = 1e-9;
@@ -160,7 +161,7 @@ export function holdStatus(input: {
 export function groupFlows(traders: readonly TopTrader[], solUsd: number | null): GroupFlow[] {
   const toSol = (usd: number | null) => (usd == null || solUsd == null || solUsd <= 0 ? null : usd / solUsd);
   return GROUP_KINDS.map((kind) => {
-    const members = traders.filter((t) => tradeFilter(t.tags, { kind, hideBots: true }));
+    const members = traders.filter((t) => tradeFilter(t.tags, { kinds: new Set([kind]), hideBots: true }));
     const buyUsd = sumKnown(members.map((t) => t.bought.usd));
     const sellUsd = sumKnown(members.map((t) => t.sold.usd));
     const netUsd = buyUsd == null || sellUsd == null ? null : buyUsd - sellUsd;

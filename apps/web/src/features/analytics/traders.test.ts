@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  type GroupKind,
   groupFlows,
   holdStatus,
   parseTraders,
@@ -56,12 +57,15 @@ describe("traderTags", () => {
   });
 });
 
-test("tradeFilter picks a group and hides bots", () => {
+test("tradeFilter matches any picked group and hides bots", () => {
   const whaleBot: TraderTag[] = [{ kind: "whale" }, { kind: "bot" }];
-  expect(tradeFilter(whaleBot, { kind: "whale", hideBots: false })).toBe(true);
-  expect(tradeFilter(whaleBot, { kind: "whale", hideBots: true })).toBe(false);
-  expect(tradeFilter(whaleBot, { kind: "kol", hideBots: false })).toBe(false);
-  expect(tradeFilter([], { kind: "all", hideBots: true })).toBe(true);
+  const f = (kinds: GroupKind[], hideBots: boolean) => ({ kinds: new Set(kinds), hideBots });
+  expect(tradeFilter(whaleBot, f(["whale"], false))).toBe(true);
+  expect(tradeFilter(whaleBot, f(["whale"], true))).toBe(false);
+  expect(tradeFilter(whaleBot, f(["kol"], false))).toBe(false);
+  expect(tradeFilter(whaleBot, f(["kol", "whale"], false))).toBe(true);
+  expect(tradeFilter([], f([], true))).toBe(true);
+  expect(tradeFilter([], f(["smart"], false))).toBe(false);
 });
 
 test("pickTraderMint takes the non-quote side and offers top traders only for it", () => {
