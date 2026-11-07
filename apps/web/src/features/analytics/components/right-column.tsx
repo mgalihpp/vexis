@@ -41,6 +41,8 @@ export function VolumeSparkline({ points: allPoints }: { points: VolumePoint[] }
   const line = points.map((p, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${ys(p.volume).toFixed(1)}`).join(" ");
   const labels = [0, 1, 2, 3].map((i) => points[Math.round((i / 3) * (points.length - 1))]);
   const point = hover === null ? undefined : points[hover];
+  const hoverX = hover === null ? 0 : xs(hover);
+  const tipLeft = `calc(${(hoverX / w) * 100}% ${hoverX > w / 2 ? "- 9rem - 10px" : "+ 10px"})`;
   return (
     <Panel className="gap-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -93,10 +95,7 @@ export function VolumeSparkline({ points: allPoints }: { points: VolumePoint[] }
           {point && hover !== null && (
             <div
               className="pointer-events-none absolute top-0 z-10 w-36 rounded-lg border bg-popover/95 p-2.5 text-[11px] shadow-xl backdrop-blur"
-              style={{
-                left: `${(xs(hover) / w) * 100}%`,
-                transform: hover > points.length / 2 ? "translateX(calc(-100% - 10px))" : "translateX(10px)",
-              }}
+              style={{ left: `clamp(0px, ${tipLeft}, calc(100% - 9rem))` }}
             >
               <div className="font-semibold">{dateFmt.format(local(point.t))}</div>
               <div className="num text-muted-foreground">
