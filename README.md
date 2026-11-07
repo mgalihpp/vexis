@@ -31,7 +31,7 @@ Alerts come in two flavors. The browser watches your favorite wallets and pools 
 
 **Portfolio.** Paste a Solana wallet address. The Overview tab has net P&L, win rate, profit factor, day win % and average win/loss, plus a chart and a month calendar. Active, Closed, Balances and Transactions have their own tabs. Every amount is shown in SOL and USD, and the date range and pair filter live in the URL, so you can send someone a link to the exact view you are looking at.
 
-**Analytics.** Price chart, volume, TVL, fees, LP and trader counts, plus the bin distribution around the active bin, for any pool.
+**Analytics.** Price chart, volume, TVL, fees, LP and trader counts, plus the bin distribution around the active bin, for any pool. A Traders section shows recent swaps and the token's biggest traders, labelled KOL, whale, smart money or bot.
 
 **Alerts.** Two separate things. In the browser, notifications for your favorite wallets and pools: opened, closed, out of range, volume spike. In Telegram, a saved `volume-watch` agent per user: the runner stores one minute of volume per pool, compares it to the median of the previous 30 minutes, and sends a message when the newest minute is both above your USD threshold and above your multiplier (both configurable). Cooldowns stop it from spamming you.
 
@@ -57,20 +57,21 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 
 ## Configuration
 
-| Variable               | Used by     | Default                              | What it does                                              |
-| ---------------------- | ----------- | ------------------------------------ | --------------------------------------------------------- |
-| `DATABASE_URL`         | web, runner | none                                 | Supabase Postgres, transaction pooler on port 6543        |
-| `DATABASE_MIGRATE_URL` | drizzle-kit | falls back to `DATABASE_URL`         | Session pooler on port 5432, for migrations               |
-| `BETTER_AUTH_SECRET`   | web         | none                                 | Long random string used to sign sessions                  |
-| `BETTER_AUTH_URL`      | web         | none                                 | Public origin; requests from another origin are rejected  |
-| `TOKEN_ENC_KEY`        | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
-| `WALLET_ENC_KEY`       | web, runner | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
-| `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for the analytics page's on-chain bin and fee reads   |
-| `JUPITER_API_KEY`      | web, runner | none, uses `lite-api.jup.ag`         | Switches Jupiter calls (prices, balances, zap swaps)      |
-| `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
-| `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
-| `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
-| `NITRO_PRESET`         | build       | `bun`                                | Build target, for example `node-server`                   |
+| Variable                 | Used by     | Default                              | What it does                                              |
+| ------------------------ | ----------- | ------------------------------------ | --------------------------------------------------------- |
+| `DATABASE_URL`           | web, runner | none                                 | Supabase Postgres, transaction pooler on port 6543        |
+| `DATABASE_MIGRATE_URL`   | drizzle-kit | falls back to `DATABASE_URL`         | Session pooler on port 5432, for migrations               |
+| `BETTER_AUTH_SECRET`     | web         | none                                 | Long random string used to sign sessions                  |
+| `BETTER_AUTH_URL`        | web         | none                                 | Public origin; requests from another origin are rejected  |
+| `TOKEN_ENC_KEY`          | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
+| `WALLET_ENC_KEY`         | web, runner | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
+| `SOLANA_RPC_URL`         | web         | public mainnet endpoint              | RPC for the analytics page's on-chain bin and fee reads   |
+| `JUPITER_API_KEY`        | web, runner | none, uses `lite-api.jup.ag`         | Switches Jupiter calls (prices, balances, zap swaps)      |
+| `SOLANA_TRACKER_API_KEY` | web         | none, recent trades only             | Solana Tracker key for whale, smart money and KOL lists   |
+| `METEORA_DATAPI_URL`     | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
+| `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
+| `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
+| `NITRO_PRESET`           | build       | `bun`                                | Build target, for example `node-server`                   |
 
 There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 

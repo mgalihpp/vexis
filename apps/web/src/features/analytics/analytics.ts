@@ -95,10 +95,12 @@ export function ticks(min: number, max: number, count: number): number[] {
   return Array.from({ length: count }, (_, i) => max - ((max - min) * i) / (count - 1));
 }
 
-/** `2d 4h`, `3mo 12d`, `1y 2mo`: pool and token ages. */
+/** `12m`, `5h`, `3mo 12d`, `1y 2mo`: pool, token and trade ages. */
 export function age(fromMs: number, now: number): string {
-  const days = Math.max(0, Math.floor((now - fromMs) / 86_400_000));
-  if (days < 1) return `${Math.floor((now - fromMs) / 3_600_000)}h`;
+  const elapsed = Math.max(0, now - fromMs);
+  const days = Math.floor(elapsed / 86_400_000);
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)}m`;
+  if (days < 1) return `${Math.floor(elapsed / 3_600_000)}h`;
   if (days < 30) return `${days}d`;
   if (days < 365) return `${Math.floor(days / 30)}mo ${days % 30}d`;
   return `${Math.floor(days / 365)}y ${Math.floor((days % 365) / 30)}mo`;

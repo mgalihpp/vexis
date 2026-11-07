@@ -21,28 +21,14 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { compact, NA, Panel } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
 
 const NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
-const short = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
-const amount = (v: number | null) => (v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 4 }));
 const price = (v: number | null) => (v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
-const usd = (v: number | null, signed = false) =>
-  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}$${compact(Math.abs(v))}`;
-const sol3 = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 1000);
-const sol = (v: number | null) => {
-  if (v == null) return NA;
-  // Sign from the rounded value, so a dust amount reads `0 SOL` instead of `+0 SOL`.
-  const r = Math.round(v * 1000) / 1000;
-  return `${r < 0 ? "-" : r > 0 ? "+" : ""}${Math.abs(r).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
-};
-const solAmount = (v: number | null) =>
-  v == null ? NA : `${(Math.round(v * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
-const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 interface Totals {
@@ -497,7 +483,27 @@ function WalletFilterMenu({
   );
 }
 
-export function TrackedWallets({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
+export function TrackedWallets(props: { pool: string; base: Token; quote: Token }) {
+  return (
+    <CollapsiblePanel
+      storageKey="vexis-tracked-open"
+      name="tracked wallets"
+      className="@container"
+      title={
+        <span className="flex items-center gap-1.5">
+          Tracked wallets
+          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
+            <InfoIcon className="size-3.5 text-muted-foreground" />
+          </InfoTip>
+        </span>
+      }
+    >
+      <TrackedBody {...props} />
+    </CollapsiblePanel>
+  );
+}
+
+function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
   // Paging state belongs to one pool, so switching pools starts again on the first page.
   const [paging, setPaging] = useState<{ pool: string; page: number; size: TrackedPageSize }>({
     pool,
@@ -522,17 +528,7 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
   const pages = ok ? data.pages : 1;
 
   return (
-    <Panel
-      className="@container"
-      title={
-        <span className="flex items-center gap-1.5">
-          Tracked wallets
-          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
-            <InfoIcon className="size-3.5 text-muted-foreground" />
-          </InfoTip>
-        </span>
-      }
-    >
+    <>
       {!data && <div className="h-24 animate-pulse rounded-lg bg-background/60" />}
       {data && !data.ok && <p className="text-xs text-loss">{data.message}</p>}
       {ok && wallets.length === 0 && <p className="text-xs text-muted-foreground">No open positions.</p>}
@@ -591,6 +587,6 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
           )}
         </>
       )}
-    </Panel>
+    </>
   );
 }

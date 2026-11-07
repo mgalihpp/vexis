@@ -436,12 +436,13 @@ export async function searchPools(query: string): Promise<PoolSearchHit[]> {
 export interface PoolTokens {
   x: { symbol: string; icon: string | null };
   y: { symbol: string; icon: string | null };
+  mints: { x: string; y: string };
 }
 
 // A pool's pair never changes, so each address is looked up once per server process.
 const poolTokenCache = new Map<string, Promise<PoolTokens | null>>();
 
-/** The two token symbols and icons of a pool, or null when Meteora or Jupiter can't be reached. */
+/** The two token symbols, icons and mints of a pool, or null when Meteora or Jupiter can't be reached. */
 export function poolTokens(address: string): Promise<PoolTokens | null> {
   const hit = poolTokenCache.get(address);
   if (hit) return hit;
@@ -451,7 +452,7 @@ export function poolTokens(address: string): Promise<PoolTokens | null> {
       // loadTokenInfo returns an empty map when Jupiter fails, so a missing mint is not cached for good.
       if (!meta.has(p.token_x.address) || !meta.has(p.token_y.address)) poolTokenCache.delete(address);
       const side = (t: RawPool["token_x"]) => ({ symbol: t.symbol, icon: meta.get(t.address)?.icon ?? null });
-      return { x: side(p.token_x), y: side(p.token_y) };
+      return { x: side(p.token_x), y: side(p.token_y), mints: { x: p.token_x.address, y: p.token_y.address } };
     })
     .catch(() => {
       poolTokenCache.delete(address);
