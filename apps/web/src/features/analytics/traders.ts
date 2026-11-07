@@ -95,13 +95,19 @@ export type TradersResult =
       /** Wallets the two trader lists returned, before KOL-only wallets are added. */
       listed: number;
       kolError: boolean;
+      /** When the trader lists were fetched; they are kept a day. */
+      listsAt: number | null;
+      /** Why the trader lists are missing or old: no API key, or today's request budget is spent. */
+      limit: "no_key" | "quota" | null;
       fetchedAt: number;
     }
-  | { ok: false; reason: "no_key" | "unavailable"; message: string };
+  | { ok: false; reason: "unavailable"; message: string };
+
+const WSOL = "So11111111111111111111111111111111111111112";
 
 // wSOL, USDC, USDT. Trader PnL for a quote token says nothing about the pool.
 export const QUOTE_MINTS: ReadonlySet<string> = new Set([
-  "So11111111111111111111111111111111111111112",
+  WSOL,
   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
   "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 ]);
@@ -414,22 +420,117 @@ export function toTopTraders(listed: TraderStats[], kolTrades: PoolTrade[], solU
     .sort((a, b) => (b.bought.usd ?? -Infinity) - (a.bought.usd ?? -Infinity));
 }
 
-/** Recent trades tagged; holding and lifetime PnL come from the trader table, joined by wallet. */
-export function tagTrades(trades: PoolTrade[], top: readonly TopTrader[] | null): TradeRow[] {
+/** What a wallet is regardless of token: KOL, bot, lifetime PnL. Whale is per token, so it is not kept. */
+export interface KnownWallet {
+  kol: KolIdentity | null;
+  bot: boolean;
+  lifetimePnlUsd: number | null;
+}
+
+const notable = (w: KnownWallet) => w.kol != null || w.bot || (w.lifetimePnlUsd ?? 0) >= SMART_LIFETIME_USD;
+
+/**
+ * `known` updated with the wallets one token's lists name. A wallet the lists show is no longer notable (its lifetime
+ * PnL fell under the smart money line) is dropped; wallets the lists do not mention are kept as they were.
+ */
+export function knownWallets(
+  known: Readonly<Record<string, KnownWallet>>,
+  traders: readonly TraderStats[],
+  kolTrades: readonly PoolTrade[],
+): Record<string, KnownWallet> {
+  const next = { ...known };
+  const fresh = new Set<string>();
+  const see = (wallet: string, identity: TraderIdentity, lifetimePnlUsd: number | null) => {
+    const prev = fresh.has(wallet) ? next[wallet] : undefined;
+    fresh.add(wallet);
+    const w = {
+      kol: identity.kol ?? prev?.kol ?? null,
+      bot: identity.bot || !!prev?.bot,
+      lifetimePnlUsd: lifetimePnlUsd ?? prev?.lifetimePnlUsd ?? null,
+    };
+    if (notable(w)) next[wallet] = w;
+    else delete next[wallet];
+  };
+  for (const t of traders) see(t.wallet, t.identity, t.lifetimePnlUsd);
+  for (const t of kolTrades) see(t.wallet, t.identity, next[t.wallet]?.lifetimePnlUsd ?? null);
+  return next;
+}
+
+/**
+ * Recent trades tagged. Holding comes from this token's trader table; KOL, bot and lifetime PnL from that table or,
+ * for a wallet it does not list, from wallets seen in any other token's lists.
+ */
+export function tagTrades(
+  trades: PoolTrade[],
+  top: readonly TopTrader[] | null,
+  known: Readonly<Record<string, KnownWallet>>,
+): TradeRow[] {
   const byWallet = new Map((top ?? []).map((t) => [t.wallet, t]));
   return trades.map((t) => {
     const trader = byWallet.get(t.wallet);
+    const k = known[t.wallet];
     return {
       ...t,
       tags: traderTags({
         identity: {
-          kol: t.identity.kol ?? trader?.identity.kol ?? null,
-          bot: t.identity.bot || !!trader?.identity.bot,
+          kol: t.identity.kol ?? trader?.identity.kol ?? k?.kol ?? null,
+          bot: t.identity.bot || !!trader?.identity.bot || !!k?.bot,
         },
         tradeUsd: t.usd,
         holdingUsd: trader?.holding.usd ?? null,
-        lifetimePnlUsd: trader?.lifetimePnlUsd ?? null,
+        lifetimePnlUsd: trader?.lifetimePnlUsd ?? k?.lifetimePnlUsd ?? null,
       }),
     };
   });
+}
+
+// GeckoTerminal boundary. Amounts arrive as decimal strings.
+
+const decimal = z
+  .string()
+  .nullish()
+  .transform((v) => {
+    const n = v == null ? Number.NaN : Number(v);
+    return Number.isFinite(n) ? n : null;
+  });
+
+const GeckoTradeSchema = z.object({
+  attributes: z.object({
+    tx_hash: z.string(),
+    tx_from_address: z.string(),
+    block_timestamp: z.string(),
+    from_token_address: z.string(),
+    to_token_address: z.string(),
+    from_token_amount: decimal,
+    to_token_amount: decimal,
+    volume_in_usd: decimal,
+  }),
+});
+
+const NO_IDENTITY: TraderIdentity = { kol: null, bot: false };
+
+/**
+ * A pool's swaps, newest first, with buy and sell relative to `mint` (GeckoTerminal's own `kind` follows the pool's
+ * base token, which can be the quote). SOL is the SOL leg when there is one, else USD at `solUsd`.
+ */
+export function parseGeckoTrades(json: unknown, mint: string, solUsd: number | null): PoolTrade[] {
+  return z
+    .object({ data: z.array(z.unknown()) })
+    .parse(json)
+    .data.flatMap((raw): PoolTrade[] => {
+      const r = GeckoTradeSchema.safeParse(raw);
+      if (!r.success) return [];
+      const a = r.data.attributes;
+      const side = a.to_token_address === mint ? "buy" : a.from_token_address === mint ? "sell" : null;
+      const time = Date.parse(a.block_timestamp);
+      if (!side || !Number.isFinite(time)) return [];
+      const [own, other, otherMint] =
+        side === "buy"
+          ? [a.to_token_amount, a.from_token_amount, a.from_token_address]
+          : [a.from_token_amount, a.to_token_amount, a.to_token_address];
+      const usd = a.volume_in_usd;
+      const sol = otherMint === WSOL ? other : usd != null && solUsd != null && solUsd > 0 ? usd / solUsd : null;
+      return [{ tx: a.tx_hash, side, wallet: a.tx_from_address, time, amount: own, usd, sol, identity: NO_IDENTITY }];
+    })
+    .sort((a, b) => b.time - a.time);
 }

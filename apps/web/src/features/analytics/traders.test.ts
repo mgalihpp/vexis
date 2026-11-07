@@ -3,6 +3,9 @@ import {
   type GroupKind,
   groupFlows,
   holdStatus,
+  type KnownWallet,
+  knownWallets,
+  parseGeckoTrades,
   parseTraders,
   parseTrades,
   pickTraderMint,
@@ -228,7 +231,7 @@ describe("toTopTraders", () => {
   });
 });
 
-test("tagTrades joins holding and lifetime PnL from the trader table by wallet", () => {
+test("tagTrades joins this token's trader table, then wallets known from other tokens", () => {
   const top = toTopTraders(
     parseTraders({ traders: [traderRow({ wallet: "Rich", position: { balance: 1, value: 60_000 } })] }),
     [],
@@ -237,10 +240,86 @@ test("tagTrades joins holding and lifetime PnL from the trader table by wallet",
   const trades = parseTrades([
     { tx: "a", type: "buy", wallet: "Rich", time: 2, volume: 10 },
     { tx: "b", type: "buy", wallet: "Nobody", time: 1, volume: 10 },
+    { tx: "c", type: "buy", wallet: "Elsewhere", time: 0, volume: 10 },
   ]);
-  const [rich, nobody] = tagTrades(trades, top);
+  const known: Record<string, KnownWallet> = {
+    Elsewhere: { kol: { name: "K", twitter: null }, bot: true, lifetimePnlUsd: 150_000 },
+  };
+  const [rich, nobody, elsewhere] = tagTrades(trades, top, known);
   expect(kinds(rich?.tags ?? [])).toEqual(["whale", "smart"]);
   expect(nobody?.tags).toEqual([]);
+  expect(kinds(elsewhere?.tags ?? [])).toEqual(["kol", "smart", "bot"]);
+});
+
+test("knownWallets keeps KOL, bot and smart money wallets and drops ones that stopped qualifying", () => {
+  const listed = parseTraders({
+    traders: [
+      traderRow({ wallet: "Smart", pnl: { wallet: { total: 120_000 } } }),
+      traderRow({ wallet: "Plain", pnl: { wallet: { total: 5 } } }),
+      traderRow({ wallet: "Fallen", pnl: { wallet: { total: 10 } } }),
+    ],
+  });
+  const kols = parseTrades([{ tx: "1", type: "buy", wallet: "Kol", time: T, identity: { name: "A" } }], true);
+  const prev: Record<string, KnownWallet> = {
+    Fallen: { kol: null, bot: false, lifetimePnlUsd: 300_000 },
+    Untouched: { kol: null, bot: true, lifetimePnlUsd: null },
+  };
+  const next = knownWallets(prev, listed, kols);
+  expect(Object.keys(next).sort()).toEqual(["Kol", "Smart", "Untouched"]);
+  expect(next.Smart?.lifetimePnlUsd).toBe(120_000);
+  expect(next.Kol?.kol?.name).toBe("A");
+});
+
+describe("parseGeckoTrades", () => {
+  const row = (over: Record<string, unknown>) => ({
+    attributes: {
+      tx_hash: "tx",
+      tx_from_address: "W",
+      block_timestamp: "2026-11-07T10:00:00Z",
+      from_token_address: SOL,
+      to_token_address: MEME,
+      from_token_amount: "2",
+      to_token_amount: "1000",
+      volume_in_usd: "300",
+      ...over,
+    },
+  });
+
+  test("reads buy and sell against the mint, SOL from the SOL leg, else USD at the SOL price", () => {
+    const [sell, buy, usdc] = parseGeckoTrades(
+      {
+        data: [
+          row({ tx_hash: "buy" }),
+          row({
+            tx_hash: "sell",
+            block_timestamp: "2026-11-07T10:01:00Z",
+            from_token_address: MEME,
+            to_token_address: SOL,
+            from_token_amount: "500",
+            to_token_amount: "1",
+          }),
+          row({ tx_hash: "usdc", block_timestamp: "2026-11-07T09:00:00Z", from_token_address: USDC }),
+        ],
+      },
+      MEME,
+      150,
+    );
+    expect(sell).toMatchObject({ tx: "sell", side: "sell", amount: 500, sol: 1, usd: 300 });
+    expect(buy).toMatchObject({ tx: "buy", side: "buy", wallet: "W", amount: 1000, sol: 2 });
+    expect(buy?.time).toBe(Date.parse("2026-11-07T10:00:00Z"));
+    expect(usdc?.sol).toBe(2);
+  });
+
+  test("drops rows that do not touch the mint or do not parse, and throws on a non-list", () => {
+    const rows = parseGeckoTrades(
+      { data: [row({ to_token_address: USDT }), row({ tx_hash: 5 }), row({ volume_in_usd: "nope" })] },
+      MEME,
+      null,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ usd: null, sol: 2 });
+    expect(() => parseGeckoTrades({ errors: [] }, MEME, 100)).toThrow();
+  });
 });
 
 describe("groupFlows", () => {

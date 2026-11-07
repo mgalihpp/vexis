@@ -479,10 +479,21 @@ function GroupCard({ g, active, onClick }: { g: GroupFlow; active: boolean; onCl
   );
 }
 
+const QUOTA = "Today's Solana Tracker request budget is used up";
+
 function coverage(data: Ok) {
   const base = `From the ${data.listed} biggest buyers and most profitable traders of ${data.symbol}`;
   const kols = data.kolError ? ". Recent KOL trades could not be loaded" : ", plus recent KOL trades";
-  return `${base}${kols}.`;
+  const updated = data.listsAt == null ? "" : `, updated ${age(data.listsAt, data.fetchedAt)} ago`;
+  const quota = data.limit === "quota" ? ` ${QUOTA}, so they refresh tomorrow.` : "";
+  return `${base}${kols}${updated}.${quota}`;
+}
+
+/** Why there are no group cards, when the reason is not a failure. */
+function missingLists(data: Ok) {
+  if (data.limit === "no_key") return "Whale, smart money and KOL lists need a Solana Tracker API key on this server.";
+  if (data.limit === "quota") return `${QUOTA}. Whale, smart money and KOL lists for ${data.symbol} load tomorrow.`;
+  return null;
 }
 
 function Loading() {
@@ -521,6 +532,7 @@ function Loaded({ data }: { data: Ok }) {
           <Notice>{coverage(data)}</Notice>
         </div>
       )}
+      {!data.groups && missingLists(data) && <Notice>{missingLists(data)}</Notice>}
       <Tabs value={tab} onValueChange={setTab}>
         <div className="flex items-center justify-between gap-2">
           <TabsList>
@@ -546,7 +558,7 @@ function Loaded({ data }: { data: Ok }) {
   );
 }
 
-/** Loaded on the client only, since every request counts against the Solana Tracker quota. */
+/** Loaded on the client only, since the trader lists count against the Solana Tracker quota. */
 export function Traders({ pool }: { pool: string }) {
   return (
     <CollapsiblePanel storageKey="vexis-traders-open" name="traders" title="Traders" className="@container">
@@ -561,9 +573,7 @@ function TradersBody({ pool }: { pool: string }) {
     <>
       {!data && !isError && <Loading />}
       {!data && isError && <p className="text-xs text-loss">{UNAVAILABLE}</p>}
-      {data && !data.ok && (
-        <p className={`text-xs ${data.reason === "no_key" ? "text-muted-foreground" : "text-loss"}`}>{data.message}</p>
-      )}
+      {data && !data.ok && <p className="text-xs text-loss">{data.message}</p>}
       {data?.ok && <Loaded data={data} />}
     </>
   );
