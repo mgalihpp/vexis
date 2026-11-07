@@ -21,7 +21,7 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { amount, NA, Panel, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
@@ -483,7 +483,27 @@ function WalletFilterMenu({
   );
 }
 
-export function TrackedWallets({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
+export function TrackedWallets(props: { pool: string; base: Token; quote: Token }) {
+  return (
+    <CollapsiblePanel
+      storageKey="vexis-tracked-open"
+      name="tracked wallets"
+      className="@container"
+      title={
+        <span className="flex items-center gap-1.5">
+          Tracked wallets
+          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
+            <InfoIcon className="size-3.5 text-muted-foreground" />
+          </InfoTip>
+        </span>
+      }
+    >
+      <TrackedBody {...props} />
+    </CollapsiblePanel>
+  );
+}
+
+function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
   // Paging state belongs to one pool, so switching pools starts again on the first page.
   const [paging, setPaging] = useState<{ pool: string; page: number; size: TrackedPageSize }>({
     pool,
@@ -508,17 +528,7 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
   const pages = ok ? data.pages : 1;
 
   return (
-    <Panel
-      className="@container"
-      title={
-        <span className="flex items-center gap-1.5">
-          Tracked wallets
-          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
-            <InfoIcon className="size-3.5 text-muted-foreground" />
-          </InfoTip>
-        </span>
-      }
-    >
+    <>
       {!data && <div className="h-24 animate-pulse rounded-lg bg-background/60" />}
       {data && !data.ok && <p className="text-xs text-loss">{data.message}</p>}
       {ok && wallets.length === 0 && <p className="text-xs text-muted-foreground">No open positions.</p>}
@@ -577,6 +587,6 @@ export function TrackedWallets({ pool, base, quote }: { pool: string; base: Toke
           )}
         </>
       )}
-    </Panel>
+    </>
   );
 }

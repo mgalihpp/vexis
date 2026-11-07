@@ -25,7 +25,7 @@ import {
   WHALE_HOLD_USD,
   WHALE_TRADE_USD,
 } from "../traders";
-import { amount, compact, NA, Panel, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -492,15 +492,23 @@ function Loaded({ data }: { data: Ok }) {
 
 /** Loaded on the client only, since every request counts against the Solana Tracker quota. */
 export function Traders({ pool }: { pool: string }) {
+  return (
+    <CollapsiblePanel storageKey="vexis-traders-open" name="traders" title="Traders" className="@container">
+      <TradersBody pool={pool} />
+    </CollapsiblePanel>
+  );
+}
+
+function TradersBody({ pool }: { pool: string }) {
   const { data, isError } = useQuery(tradersQuery(pool));
   return (
-    <Panel title="Traders" className="@container">
+    <>
       {!data && !isError && <Loading />}
       {!data && isError && <p className="text-xs text-loss">{UNAVAILABLE}</p>}
       {data && !data.ok && (
         <p className={`text-xs ${data.reason === "no_key" ? "text-muted-foreground" : "text-loss"}`}>{data.message}</p>
       )}
       {data?.ok && <Loaded data={data} />}
-    </Panel>
+    </>
   );
 }

@@ -1,13 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronDownIcon, ChevronRightIcon } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { ChevronRightIcon } from "lucide-react";
+import { type ReactNode, useRef, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { type Currency, ratio, STAT_WINDOWS, TIMEFRAMES, type TimeframeId } from "../analytics";
 import type { PoolView, SiblingPool } from "../analytics.types";
 import { CandleChart, type ChartBar } from "./candle-chart";
-import { Label, NA, Panel } from "./ui";
+import { CollapseToggle, Label, NA, Panel, usePanelOpen } from "./ui";
 
 interface StatItem {
   label: string;
@@ -115,29 +115,8 @@ export function ChartPanel({
 }) {
   const [height, setHeight] = useState(CHART_HEIGHT.start);
   const drag = useRef<{ y: number; height: number } | null>(null);
-  const [open, setOpen] = useState(true);
-  // The server always renders the chart open; the saved choice applies before the first paint after hydration.
-  useLayoutEffect(() => {
-    try {
-      if (localStorage.getItem(CHART_OPEN_KEY) === "0") setOpen(false);
-    } catch {}
-  }, []);
-  const toggle = (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-label={open ? "Collapse chart" : "Expand chart"}
-      onClick={() => {
-        setOpen(!open);
-        try {
-          localStorage.setItem(CHART_OPEN_KEY, open ? "0" : "1");
-        } catch {}
-      }}
-      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-    >
-      <ChevronDownIcon className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
-    </button>
-  );
+  const [open, onToggle] = usePanelOpen(CHART_OPEN_KEY);
+  const toggle = <CollapseToggle open={open} onToggle={onToggle} name="chart" />;
   if (!open) {
     // Collapsed, the panel keeps only its title; the height set by dragging comes back on expand.
     return (

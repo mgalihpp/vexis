@@ -1,5 +1,62 @@
-import type { ReactNode } from "react";
+import { ChevronDownIcon } from "lucide-react";
+import { type ReactNode, useLayoutEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+
+/**
+ * Whether a panel is expanded, remembered per browser under `key`. The server always renders it open; the saved
+ * choice applies before the first paint after hydration.
+ */
+export function usePanelOpen(key: string) {
+  const [open, setOpen] = useState(true);
+  useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(key) === "0") setOpen(false);
+    } catch {}
+  }, [key]);
+  const toggle = () => {
+    setOpen(!open);
+    try {
+      localStorage.setItem(key, open ? "0" : "1");
+    } catch {}
+  };
+  return [open, toggle] as const;
+}
+
+export function CollapseToggle({ open, onToggle, name }: { open: boolean; onToggle: () => void; name: string }) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? `Collapse ${name}` : `Expand ${name}`}
+      onClick={onToggle}
+      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      <ChevronDownIcon className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} />
+    </button>
+  );
+}
+
+/** A Panel with a collapse toggle. Collapsed, `children` is not rendered, so its queries do not run. */
+export function CollapsiblePanel({
+  storageKey,
+  name,
+  title,
+  className = "",
+  children,
+}: {
+  storageKey: string;
+  name: string;
+  title: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [open, toggle] = usePanelOpen(storageKey);
+  return (
+    <Panel className={className} title={title} aside={<CollapseToggle open={open} onToggle={toggle} name={name} />}>
+      {open && children}
+    </Panel>
+  );
+}
 
 export const NA = "-";
 
