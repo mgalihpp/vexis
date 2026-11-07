@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { Connection, type GetProgramAccountsFilter, PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { get } from "../portfolio/meteora.server";
+import { type Cache, cached } from "./cache.server";
 import {
   inRangeStatus,
   type PoolTotals,
@@ -135,26 +136,8 @@ async function fetchOwnerDetail(pool: string, owner: string, background = false)
   }
 }
 
-const scanCache = new Map<string, { at: number; value: Promise<Scan> }>();
-const detailCache = new Map<string, { at: number; value: Promise<PnlRow[] | null> }>();
-
-function cached<T>(
-  map: Map<string, { at: number; value: Promise<T> }>,
-  key: string,
-  ttl: number,
-  load: () => Promise<T>,
-) {
-  const hit = map.get(key);
-  if (hit && Date.now() - hit.at < ttl) return hit.value;
-  const value = load();
-  const entry = { at: Date.now(), value };
-  map.set(key, entry);
-  // A failed load is not kept, so the next request retries it.
-  value.catch(() => {
-    if (map.get(key) === entry) map.delete(key);
-  });
-  return value;
-}
+const scanCache: Cache<Scan> = new Map();
+const detailCache: Cache<PnlRow[] | null> = new Map();
 
 const scanFor = (pool: string) =>
   cached(scanCache, pool, SCAN_CACHE_MS, async () => ({ at: Date.now(), groups: await scanOwners(pool) }));

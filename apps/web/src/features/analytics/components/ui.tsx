@@ -8,6 +8,22 @@ const compactFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximum
 /** `2.86M`, `110.21K`. Used for axes and token amounts where a currency sign would be wrong. */
 export const compact = (v: number) => compactFmt.format(v);
 
+export const short = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
+export const amount = (v: number | null) =>
+  v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+export const usd = (v: number | null, signed = false) =>
+  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}$${compact(Math.abs(v))}`;
+export const sol3 = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 1000);
+export const sol = (v: number | null) => {
+  if (v == null) return NA;
+  // Sign from the rounded value, so a dust amount reads `0 SOL` instead of `+0 SOL`.
+  const r = Math.round(v * 1000) / 1000;
+  return `${r < 0 ? "-" : r > 0 ? "+" : ""}${Math.abs(r).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
+};
+export const solAmount = (v: number | null) =>
+  v == null ? NA : `${(Math.round(v * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
+export const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
+
 export const signedPct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
 
 export function Panel({

@@ -21,28 +21,14 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { compact, NA, Panel } from "./ui";
+import { amount, NA, Panel, short, sol, sol3, solAmount, tone, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
 
 const NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
-const short = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
-const amount = (v: number | null) => (v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 4 }));
 const price = (v: number | null) => (v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
-const usd = (v: number | null, signed = false) =>
-  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}$${compact(Math.abs(v))}`;
-const sol3 = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 1000);
-const sol = (v: number | null) => {
-  if (v == null) return NA;
-  // Sign from the rounded value, so a dust amount reads `0 SOL` instead of `+0 SOL`.
-  const r = Math.round(v * 1000) / 1000;
-  return `${r < 0 ? "-" : r > 0 ? "+" : ""}${Math.abs(r).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
-};
-const solAmount = (v: number | null) =>
-  v == null ? NA : `${(Math.round(v * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
-const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 interface Totals {
