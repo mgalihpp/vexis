@@ -165,7 +165,7 @@ const recentTrades = (mint: string, pool: string, solUsd: number | null) =>
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`GeckoTerminal trades ${res.status}`);
-    return { at: Date.now(), trades: parseGeckoTrades(await res.json(), mint, solUsd).slice(0, 100) };
+    return { at: Date.now(), trades: parseGeckoTrades(await res.json(), mint, solUsd) };
   });
 
 export async function loadTraders(pool: string): Promise<TradersResult> {

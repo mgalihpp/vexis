@@ -10,6 +10,48 @@ const isDigit = (char: string) => char >= "0" && char <= "9";
 const prefersReducedMotion = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// One observer and one frame loop for every number: a refetch changes dozens at once, and a loop or a forced layout
+// per number made scrolling stutter. A number off screen just takes its new text.
+const onScreen = new WeakMap<Element, boolean>();
+let observer: IntersectionObserver | undefined;
+
+function watch(node: Element) {
+  if (typeof IntersectionObserver !== "function") return () => {};
+  observer ??= new IntersectionObserver((entries) => {
+    for (const entry of entries) onScreen.set(entry.target, entry.isIntersecting);
+  });
+  observer.observe(node);
+  return () => {
+    observer?.unobserve(node);
+    onScreen.delete(node);
+  };
+}
+
+/** Each step returns true once it is done. */
+const steps = new Set<(now: number) => boolean>();
+let frame = 0;
+
+function tick(now: number) {
+  for (const step of steps) if (step(now)) steps.delete(step);
+  frame = steps.size > 0 ? requestAnimationFrame(tick) : 0;
+}
+
+function animate(step: (now: number) => boolean) {
+  steps.add(step);
+  if (!frame) frame = requestAnimationFrame(tick);
+  return () => {
+    steps.delete(step);
+  };
+}
+
+const EASE = "cubic-bezier(0.2, 0.7, 0.3, 1)";
+const DELTA_KEYFRAMES: Keyframe[] = [
+  { offset: 0, opacity: 0, transform: "translateY(0.35em)", easing: EASE },
+  { offset: 0.18, opacity: 1, transform: "translateY(0)", easing: EASE },
+  { offset: 0.7, opacity: 1, easing: EASE },
+  { offset: 1, opacity: 0, transform: "translateY(-0.8em)" },
+];
+
 interface RollCell {
   strip: HTMLSpanElement;
   to: number;
@@ -74,20 +116,26 @@ export function AnimatedNumber({
   const sr = useRef<HTMLSpanElement>(null);
   const chip = useRef<HTMLSpanElement>(null);
   const shown = useRef(value);
-  const raf = useRef(0);
+  const stop = useRef<() => void>(undefined);
   const fmt = useRef(format);
   fmt.current = format;
   const text = format(value);
 
   useEffect(() => {
     const node = el.current;
+    return node ? watch(node) : undefined;
+  }, []);
+
+  useEffect(() => {
+    const node = el.current;
     if (!node) return;
     const f = fmt.current;
-    const mode = motion === "off" || prefersReducedMotion() ? "off" : motion;
+    const visible = onScreen.get(node) ?? true;
+    const mode = motion === "off" || !visible || prefersReducedMotion() ? "off" : motion;
     const from = shown.current;
     const to = value;
 
-    cancelAnimationFrame(raf.current);
+    stop.current?.();
     node.classList.remove("num-roll");
     // Roll keeps every digit of every wheel in the DOM, so it reads the plain text instead.
     node.removeAttribute("aria-hidden");
@@ -113,9 +161,8 @@ export function AnimatedNumber({
       if (badge && delta !== 0) {
         badge.textContent = `${delta > 0 ? "+" : "-"}${f(Math.abs(delta))}`;
         badge.className = `num-delta ${delta > 0 ? "text-profit" : "text-loss"}`;
-        badge.removeAttribute("data-show");
-        void badge.offsetWidth;
-        badge.setAttribute("data-show", "");
+        for (const running of badge.getAnimations()) running.cancel();
+        badge.animate(DELTA_KEYFRAMES, 1050);
       }
       return;
     }
@@ -136,21 +183,14 @@ export function AnimatedNumber({
     }
 
     const start = performance.now();
-    const step = (now: number) => {
+    stop.current = animate((now) => {
       const p = Math.min(1, (now - start) / TWEEN_MS);
       const eased = 1 - (1 - p) ** 3;
-      const current = from + (to - from) * eased;
-      shown.current = current;
-      node.textContent = f(current);
-      if (p < 1) {
-        raf.current = requestAnimationFrame(step);
-      } else {
-        shown.current = to;
-        node.textContent = f(to);
-      }
-    };
-    raf.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf.current);
+      shown.current = p < 1 ? from + (to - from) * eased : to;
+      node.textContent = f(shown.current);
+      return p >= 1;
+    });
+    return stop.current;
   }, [value, text, motion]);
 
   return (
