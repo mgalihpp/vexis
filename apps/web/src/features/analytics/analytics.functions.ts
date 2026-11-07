@@ -4,6 +4,7 @@ import { requireViewer } from "@/features/auth/auth.middleware";
 import { TIMEFRAMES, type TimeframeId } from "./analytics";
 import { loadAnalytics, loadChart, loadOlder, searchPools } from "./analytics.server";
 import { trackedPositions } from "./tracked.server";
+import { loadTraders } from "./traders.server";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
 export const PoolAddress = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Not a Solana address");
@@ -38,3 +39,8 @@ export const getOlderBars = createServerFn({ method: "GET" })
   .middleware([requireViewer])
   .validator(z.object({ pool: PoolAddress, tf: z.enum(TF_IDS), before: z.number().int().positive() }))
   .handler(({ data }) => loadOlder(data));
+
+export const getTraders = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .validator(z.object({ pool: PoolAddress }))
+  .handler(({ data }) => loadTraders(data.pool));

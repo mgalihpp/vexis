@@ -31,7 +31,7 @@ Alerts come in two flavors. The browser watches your favorite wallets and pools 
 
 **Portfolio.** Paste a Solana wallet address. The Overview tab has net P&L, win rate, profit factor, day win % and average win/loss, plus a chart and a month calendar. Active, Closed, Balances and Transactions have their own tabs. Every amount is shown in SOL and USD, and the date range and pair filter live in the URL, so you can send someone a link to the exact view you are looking at.
 
-**Analytics.** Price chart, volume, TVL, fees, LP and trader counts, plus the bin distribution around the active bin, for any pool.
+**Analytics.** Price chart, volume, TVL, fees, LP and trader counts, plus the bin distribution around the active bin, for any pool. A Traders section shows recent swaps and the token's biggest traders, labelled KOL, whale, smart money or bot.
 
 **Alerts.** Two separate things. In the browser, notifications for your favorite wallets and pools: opened, closed, out of range, volume spike. In Telegram, a saved `volume-watch` agent per user: the runner stores one minute of volume per pool, compares it to the median of the previous 30 minutes, and sends a message when the newest minute is both above your USD threshold and above your multiplier (both configurable). Cooldowns stop it from spamming you.
 
@@ -67,6 +67,7 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `WALLET_ENC_KEY`       | web, runner | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
 | `SOLANA_RPC_URL`       | web         | public mainnet endpoint              | RPC for the analytics page's on-chain bin and fee reads   |
 | `JUPITER_API_KEY`      | web, runner | none, uses `lite-api.jup.ag`         | Switches Jupiter calls (prices, balances, zap swaps)      |
+| `SOLANA_TRACKER_API_KEY` | web       | none, Traders section says so        | Solana Tracker key for the analytics page's Traders section |
 | `METEORA_DATAPI_URL`   | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`      | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
 | `VEXIS_WEB_URL`        | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
