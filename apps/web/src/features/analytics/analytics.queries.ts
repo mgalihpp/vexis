@@ -21,7 +21,7 @@ export const trackedQuery = (input: { pool: string; page?: number; pageSize?: 10
   });
 };
 
-const TRADERS_MS = 2 * 60_000;
+const TRADERS_MS = 5 * 60_000;
 
 /** Solana Tracker has a monthly quota, so this polls at the server's trades cache pace instead of LIVE_MS. */
 export const tradersQuery = (pool: string) =>

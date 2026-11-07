@@ -17,11 +17,11 @@ import {
 const API = "https://data.solanatracker.io";
 const TIMEOUT_MS = 15_000;
 
-// The free plan allows 2,500 requests a month. One pool viewed nonstop costs about 30 trade, 12 KOL and 4 trader
-// requests an hour (two sorts every 30 min); the trader lists and KOL trades are per mint, shared by its pools.
-const TRADES_MS = 2 * 60_000;
-const KOL_MS = 5 * 60_000;
-const TOP_MS = 30 * 60_000;
+// The free plan allows 2,500 requests a month. One pool viewed nonstop costs about 12 trade, 4 KOL and 2 trader
+// requests an hour (two sorts an hour); the trader lists and KOL trades are per mint, shared by its pools.
+const TRADES_MS = 5 * 60_000;
+const KOL_MS = 15 * 60_000;
+const TOP_MS = 60 * 60_000;
 
 // The plan also allows 3 requests a second, so requests leave at least this far apart.
 const SPACING_MS = 350;
