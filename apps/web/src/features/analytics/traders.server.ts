@@ -71,7 +71,10 @@ const settle = <T>(p: Promise<T> | null) =>
   p
     ? p.then(
         (value) => ({ value }),
-        () => ({ value: null }),
+        (err: unknown) => {
+          console.warn("[traders]", err instanceof Error ? err.message : err);
+          return { value: null };
+        },
       )
     : Promise.resolve(null);
 

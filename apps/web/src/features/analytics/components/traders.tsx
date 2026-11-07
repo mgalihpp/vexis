@@ -347,8 +347,9 @@ function GroupCard({ g, active, onClick }: { g: GroupFlow; active: boolean; onCl
 }
 
 function coverage(data: Ok) {
-  const kols = data.kolError ? "KOL trades could not be loaded" : "plus recent KOL trades";
-  return `From the ${data.listed} biggest buyers and most profitable traders of ${data.symbol}, ${kols}. SOL at the current price.`;
+  const base = `From the ${data.listed} biggest buyers and most profitable traders of ${data.symbol}`;
+  const kols = data.kolError ? ". Recent KOL trades could not be loaded" : ", plus recent KOL trades";
+  return `${base}${kols}. SOL at the current price.`;
 }
 
 function Loading() {
