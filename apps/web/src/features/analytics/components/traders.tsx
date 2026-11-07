@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLinkIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { BotIcon, BrainIcon, ExternalLinkIcon, FishSymbolIcon, type LucideIcon, MegaphoneIcon } from "lucide-react";
+import { useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Notice } from "@/features/portfolio/components/notice";
 import { useStamp } from "@/features/timezone/timezone";
 import { age } from "../analytics";
 import { tradersQuery } from "../analytics.queries";
@@ -21,8 +22,10 @@ import {
   type TradersResult,
   type TraderTag,
   tradeFilter,
+  WHALE_HOLD_USD,
+  WHALE_TRADE_USD,
 } from "../traders";
-import { amount, NA, Panel, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, compact, NA, Panel, short, sol, sol3, solAmount, tone, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -38,31 +41,58 @@ const STATUS: Record<HoldStatus, { label: string; variant: "profit" | "brand" | 
   rebought: { label: "Bought back", variant: "info" },
 };
 
-function TagBadge({ tag }: { tag: TraderTag }) {
+const TAG_ICON: Record<TraderTag["kind"], { icon: LucideIcon; label: string; className: string }> = {
+  kol: { icon: MegaphoneIcon, label: "KOL", className: "text-brand" },
+  whale: { icon: FishSymbolIcon, label: "Whale", className: "text-blue-600 dark:text-blue-400" },
+  smart: { icon: BrainIcon, label: "Smart money", className: "text-profit" },
+  bot: { icon: BotIcon, label: "Bot", className: "text-muted-foreground" },
+};
+
+function tagTip(tag: TraderTag) {
   switch (tag.kind) {
     case "kol":
-      return tag.twitter ? (
-        <Badge variant="brand" asChild>
-          <a href={`https://x.com/${tag.twitter}`} target="_blank" rel="noreferrer" title={`@${tag.twitter} on X`}>
-            {tag.name}
-          </a>
-        </Badge>
-      ) : (
-        <Badge variant="brand">{tag.name}</Badge>
-      );
+      return `KOL: ${tag.name}${tag.twitter ? ` (@${tag.twitter})` : ""}`;
     case "whale":
-      return <Badge variant="info">Whale</Badge>;
-    case "smart": {
-      const tip = `Lifetime PnL ${usd(tag.lifetimePnlUsd, true)} across all tokens`;
-      return (
-        <InfoTip aria-label={tip} content={tip}>
-          <Badge variant="profit">Smart</Badge>
-        </InfoTip>
-      );
-    }
+      return `Whale: bought ${usd(WHALE_TRADE_USD)}+ or holds ${usd(WHALE_HOLD_USD)}+`;
+    case "smart":
+      return `Smart money: lifetime PnL ${usd(tag.lifetimePnlUsd, true)} across all tokens`;
     case "bot":
-      return <Badge variant="secondary">Bot</Badge>;
+      return "Bot or arbitrage wallet";
   }
+}
+
+function TagIcon({ tag }: { tag: TraderTag }) {
+  const { icon: Icon, label, className } = TAG_ICON[tag.kind];
+  const tip = tagTip(tag);
+  return (
+    <InfoTip aria-label={tip} content={tip} className="inline-flex">
+      <Icon className={`size-3.5 ${className}`} aria-label={label} />
+    </InfoTip>
+  );
+}
+
+function Tags({ tags }: { tags: readonly TraderTag[] }) {
+  const kol = tags.find((t) => t.kind === "kol");
+  return (
+    <span className="flex items-center gap-1.5">
+      {tags.map((t) => (
+        <TagIcon key={t.kind} tag={t} />
+      ))}
+      {kol?.kind === "kol" &&
+        (kol.twitter ? (
+          <a
+            href={`https://x.com/${kol.twitter}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[0.6875rem] text-muted-foreground hover:text-brand"
+          >
+            {kol.name}
+          </a>
+        ) : (
+          <span className="text-[0.6875rem] text-muted-foreground">{kol.name}</span>
+        ))}
+    </span>
+  );
 }
 
 function Wallet({ address, tags }: { address: string; tags: readonly TraderTag[] }) {
@@ -80,13 +110,7 @@ function Wallet({ address, tags }: { address: string; tags: readonly TraderTag[]
           {short(address)}
           <ExternalLinkIcon className="size-3 text-muted-foreground" />
         </a>
-        {tags.length > 0 && (
-          <span className="flex gap-1">
-            {tags.map((t) => (
-              <TagBadge key={t.kind} tag={t} />
-            ))}
-          </span>
-        )}
+        {tags.length > 0 && <Tags tags={tags} />}
       </span>
     </span>
   );
@@ -293,53 +317,110 @@ function TopTraders({
           </TableBody>
         </Table>
       )}
-      <p className="text-muted-foreground">SOL at the current price.</p>
     </div>
   );
 }
 
-function Line({ label, children }: { label: string; children: ReactNode }) {
+const CAPTION = "text-[0.625rem] font-medium tracking-[0.025em] text-muted-foreground uppercase";
+
+function Side({
+  label,
+  wallets,
+  usdValue,
+  solValue,
+}: {
+  label: string;
+  wallets: number;
+  usdValue: number | null;
+  solValue: number | null;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right tabular-nums">{children}</span>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className={CAPTION}>
+        {label} · {wallets}
+      </span>
+      <span className="font-semibold tabular-nums">{usd(usdValue)}</span>
+      <span className="text-muted-foreground tabular-nums">{solCompact(solValue)}</span>
+    </div>
+  );
+}
+
+const solCompact = (v: number | null, signed = false) =>
+  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}${compact(Math.abs(v))} SOL`;
+
+const SPLIT: { key: "holding" | "partial" | "sold" | "rebought" | "unknown"; label: string; className: string }[] = [
+  { key: "holding", label: "Holding", className: "bg-profit" },
+  { key: "partial", label: "Partial", className: "bg-brand" },
+  { key: "rebought", label: "Bought back", className: "bg-blue-500" },
+  { key: "sold", label: "Sold out", className: "bg-loss" },
+  { key: "unknown", label: "Unknown", className: "bg-muted-foreground/40" },
+];
+
+function StatusSplit({ g }: { g: GroupFlow }) {
+  const parts = SPLIT.filter((s) => s.key !== "unknown" || g.unknown > 0);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
+        {parts.map((s) => (
+          <span key={s.key} className={s.className} style={{ width: `${(g[s.key] / g.wallets) * 100}%` }} />
+        ))}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        {parts.map((s) => (
+          <span key={s.key} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <span className={`size-1.5 rounded-full ${s.className}`} />
+              {s.label}
+            </span>
+            <span className="tabular-nums">{g[s.key]}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
 function GroupCard({ g, active, onClick }: { g: GroupFlow; active: boolean; onClick: () => void }) {
-  const split = [
-    `Holding ${g.holding}`,
-    `Partial ${g.partial}`,
-    `Sold out ${g.sold}`,
-    `Bought back ${g.rebought}`,
-    ...(g.unknown > 0 ? [`Unknown ${g.unknown}`] : []),
-  ].join(" · ");
+  const { icon: Icon, className } = TAG_ICON[g.kind];
+  const flow = (g.buyUsd ?? 0) + (g.sellUsd ?? 0);
+  const buyShare = flow > 0 ? ((g.buyUsd ?? 0) / flow) * 100 : null;
   return (
     <button
       type="button"
       aria-pressed={active}
       disabled={g.wallets === 0}
       onClick={onClick}
-      className={`flex flex-col gap-1.5 rounded-md border p-2.5 text-left text-xs hover:bg-muted/40 disabled:pointer-events-none ${active ? "border-brand" : "bg-background/90"}`}
+      className={`flex flex-col gap-3 rounded-md border p-3 text-left text-xs hover:bg-muted/40 disabled:pointer-events-none ${active ? "border-brand" : "bg-background/90"}`}
     >
-      <span className="flex items-baseline justify-between gap-2">
-        <span className="font-semibold">{GROUP_LABEL[g.kind]}</span>
+      <span className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 font-semibold">
+          <Icon className={`size-4 ${className}`} />
+          {GROUP_LABEL[g.kind]}
+        </span>
         <span className="text-muted-foreground">{g.wallets > 0 ? `${g.wallets} wallets` : "None found"}</span>
       </span>
       {g.wallets > 0 && (
         <>
-          <Line label={`Bought (${g.buyers})`}>
-            {usd(g.buyUsd)} <span className="text-muted-foreground">{solAmount(g.buySol)}</span>
-          </Line>
-          <Line label={`Sold (${g.sellers})`}>
-            {usd(g.sellUsd)} <span className="text-muted-foreground">{solAmount(g.sellSol)}</span>
-          </Line>
-          <Line label="Net flow">
-            <span className={`font-semibold ${tone(g.netUsd)}`}>{usd(g.netUsd, true)}</span>{" "}
-            <span className={tone(sol3(g.netSol))}>{sol(g.netSol)}</span>
-          </Line>
-          <span className="text-muted-foreground">{split}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <Side label="Bought" wallets={g.buyers} usdValue={g.buyUsd} solValue={g.buySol} />
+            <Side label="Sold" wallets={g.sellers} usdValue={g.sellUsd} solValue={g.sellSol} />
+          </div>
+          {buyShare != null && (
+            <div className="flex h-1.5 overflow-hidden rounded-full bg-loss/70">
+              <span className="bg-profit" style={{ width: `${buyShare}%` }} />
+            </div>
+          )}
+          <div className="flex flex-col gap-0.5 border-t pt-2">
+            <span className={CAPTION}>Net flow</span>
+            <span className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
+              <span className={`text-sm font-semibold ${tone(g.netUsd)}`}>{usd(g.netUsd, true)}</span>
+              <span className={tone(sol3(g.netSol))}>{solCompact(g.netSol, true)}</span>
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5 border-t pt-2">
+            <span className={CAPTION}>Still holding?</span>
+            <StatusSplit g={g} />
+          </div>
         </>
       )}
     </button>
@@ -349,7 +430,7 @@ function GroupCard({ g, active, onClick }: { g: GroupFlow; active: boolean; onCl
 function coverage(data: Ok) {
   const base = `From the ${data.listed} biggest buyers and most profitable traders of ${data.symbol}`;
   const kols = data.kolError ? ". Recent KOL trades could not be loaded" : ", plus recent KOL trades";
-  return `${base}${kols}. SOL at the current price.`;
+  return `${base}${kols}.`;
 }
 
 function Loading() {
@@ -384,7 +465,7 @@ function Loaded({ data }: { data: Ok }) {
               />
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">{coverage(data)}</p>
+          <Notice>{coverage(data)}</Notice>
         </div>
       )}
       <Tabs value={tab} onValueChange={setTab}>
