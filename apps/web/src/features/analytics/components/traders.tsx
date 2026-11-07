@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Notice } from "@/features/portfolio/components/notice";
+import { Pagination } from "@/features/portfolio/components/table-controls";
 import { useStamp } from "@/features/timezone/timezone";
 import { age } from "../analytics";
 import { tradersQuery } from "../analytics.queries";
@@ -135,6 +136,8 @@ function Money({ usd: u, sol: s, signed = false }: { usd: number | null; sol: nu
 }
 
 const DEFAULT_FILTER: TradeFilter = { kinds: new Set(), hideBots: true };
+const TRADE_PAGE_SIZE = 25;
+const TRADE_PAGE_SIZES = [TRADE_PAGE_SIZE, 50, 100];
 const KIND_OPTIONS: GroupKind[] = ["kol", "whale", "smart"];
 
 function FilterCheck({
@@ -210,9 +213,26 @@ function TradeFilterMenu({ filter, onChange }: { filter: TradeFilter; onChange: 
   );
 }
 
-function RecentTrades({ data, filter }: { data: Ok; filter: TradeFilter }) {
+function RecentTrades({
+  data,
+  filter,
+  page,
+  pageSize,
+  onPage,
+  onPageSize,
+}: {
+  data: Ok;
+  filter: TradeFilter;
+  page: number;
+  pageSize: number;
+  onPage: (page: number) => void;
+  onPageSize: (size: number) => void;
+}) {
   const stamp = useStamp();
   const rows = data.trades.filter((t) => tradeFilter(t.tags, filter));
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(page, pages - 1);
+  const shown = rows.slice(current * pageSize, (current + 1) * pageSize);
   return (
     <div className="flex flex-col gap-2">
       {rows.length === 0 ? (
@@ -230,7 +250,7 @@ function RecentTrades({ data, filter }: { data: Ok; filter: TradeFilter }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((t) => (
+            {shown.map((t) => (
               <TradeLine
                 key={`${t.tx}:${t.wallet}:${t.side}`}
                 t={t}
@@ -241,6 +261,22 @@ function RecentTrades({ data, filter }: { data: Ok; filter: TradeFilter }) {
             ))}
           </TableBody>
         </Table>
+      )}
+      {rows.length > TRADE_PAGE_SIZE && (
+        <div className="[&>div]:static [&>div]:bg-transparent">
+          <Pagination
+            total={rows.length}
+            page={current}
+            pages={pages}
+            pageSize={pageSize}
+            sizes={TRADE_PAGE_SIZES}
+            onPage={onPage}
+            onPageSize={(size) => {
+              onPageSize(size);
+              onPage(0);
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -511,6 +547,8 @@ function Loaded({ data }: { data: Ok }) {
   const [tab, setTab] = useState("recent");
   const [group, setGroup] = useState<GroupKind | null>(null);
   const [filter, setFilter] = useState(DEFAULT_FILTER);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(TRADE_PAGE_SIZE);
   const showTop = data.top !== null || data.topError;
   return (
     <>
@@ -539,10 +577,25 @@ function Loaded({ data }: { data: Ok }) {
             <TabsTrigger value="recent">Recent trades</TabsTrigger>
             {showTop && <TabsTrigger value="top">Top traders</TabsTrigger>}
           </TabsList>
-          {tab === "recent" && <TradeFilterMenu filter={filter} onChange={setFilter} />}
+          {tab === "recent" && (
+            <TradeFilterMenu
+              filter={filter}
+              onChange={(next) => {
+                setFilter(next);
+                setPage(0);
+              }}
+            />
+          )}
         </div>
         <TabsContent value="recent">
-          <RecentTrades data={data} filter={filter} />
+          <RecentTrades
+            data={data}
+            filter={filter}
+            page={page}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </TabsContent>
         {showTop && (
           <TabsContent value="top">
