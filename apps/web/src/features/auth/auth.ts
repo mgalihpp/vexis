@@ -39,7 +39,7 @@ export const AUTH_ERROR_MESSAGE: Record<AuthError | "network", string> = {
 /** Pages a signed-out visitor may open. Everything else redirects to /login. */
 export function isPublicPath(pathname: string) {
   return (
-    pathname === "/landing" ||
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/terms" ||
     pathname === "/privacy" ||
@@ -49,6 +49,6 @@ export function isPublicPath(pathname: string) {
 
 /** Only same-site paths, so a crafted ?redirect= can't send someone to another origin after login. */
 export function safeRedirect(target: string | undefined) {
-  if (!target?.startsWith("/") || target.startsWith("//") || isPublicPath(target)) return "/";
+  if (!target?.startsWith("/") || target.startsWith("//") || isPublicPath(target)) return "/portfolio";
   return target;
 }

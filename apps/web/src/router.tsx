@@ -131,8 +131,8 @@ export function getRouter() {
     defaultNotFoundComponent: () => (
       <div className="panel p-4.75">
         <p className="font-medium">Nothing here.</p>
-        <Link to="/" className="mt-1.5 inline-block text-xs text-brand hover:underline">
-          Back to the fleet
+        <Link to="/portfolio" className="mt-1.5 inline-block text-xs text-brand hover:underline">
+          Back to your portfolio
         </Link>
       </div>
     ),

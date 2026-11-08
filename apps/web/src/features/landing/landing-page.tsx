@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouteContext } from "@tanstack/react-router";
 import {
   Calendar,
   Check,
@@ -84,29 +84,60 @@ function Arrows({ back = false, className }: { back?: boolean; className?: strin
   );
 }
 
+type CtaTarget = { href: `#${string}` } | { to: "/portfolio" } | { to: "/login"; join: true };
+
 function Cta({
-  href,
   children,
   white = false,
   wide = false,
   className,
-}: {
-  href: string;
+  ...target
+}: CtaTarget & {
   children: ReactNode;
   white?: boolean;
   wide?: boolean;
   className?: string;
 }) {
+  const look = cn(white ? "primary-button-white" : "primary-button", wide && "full-width-button", "w-inline-block");
+  const body = (
+    <>
+      <div className="text-primary-button">{children}</div>
+      <Arrows />
+    </>
+  );
   return (
     <div className={cn(white ? "borders-w-primary-button" : "borders-primary-button", className)}>
-      <a
-        className={cn(white ? "primary-button-white" : "primary-button", wide && "full-width-button", "w-inline-block")}
-        href={href}
-      >
-        <div className="text-primary-button">{children}</div>
-        <Arrows />
-      </a>
+      {"href" in target ? (
+        <a className={look} href={target.href}>
+          {body}
+        </a>
+      ) : target.to === "/login" ? (
+        <Link className={look} to="/login" search={{ mode: "join" }}>
+          {body}
+        </Link>
+      ) : (
+        <Link className={look} to="/portfolio">
+          {body}
+        </Link>
+      )}
     </div>
+  );
+}
+
+function useSignedIn() {
+  return useRouteContext({ from: "__root__", select: (c) => c.viewer != null });
+}
+
+/** The header's main button: signed-in visitors go straight to the app. */
+function HeaderCta({ className }: { className?: string }) {
+  return useSignedIn() ? (
+    <Cta to="/portfolio" white className={className}>
+      Open app
+    </Cta>
+  ) : (
+    <Cta href="#access" white className={className}>
+      Request an invite
+    </Cta>
   );
 }
 
@@ -140,6 +171,7 @@ const NAV_LINKS = [
 ] as const;
 
 function Nav() {
+  const signedIn = useSignedIn();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -204,19 +236,22 @@ function Nav() {
                   ))}
                 </div>
                 <div className="button-header tablet-button">
-                  <Cta href="#access" white>
-                    Request an invite
-                  </Cta>
+                  {!signedIn && (
+                    <Link className="vx-signin vx-signin-menu" to="/login" onClick={close}>
+                      Sign in
+                    </Link>
+                  )}
+                  <HeaderCta />
                 </div>
               </div>
             </nav>
             <div className="button-header">
-              <Link className="vx-signin" to="/login">
-                Sign in
-              </Link>
-              <Cta href="#access" white className="header-desctop">
-                Request an invite
-              </Cta>
+              {!signedIn && (
+                <Link className="vx-signin" to="/login">
+                  Sign in
+                </Link>
+              )}
+              <HeaderCta className="header-desctop" />
             </div>
             <button
               type="button"
@@ -594,8 +629,8 @@ function Access() {
                 ))}
               </div>
               <div className="button-price-wrapper">
-                <Cta href="#access" wide>
-                  Request an invite
+                <Cta to="/login" join wide>
+                  I have an invite
                 </Cta>
               </div>
             </div>
@@ -631,7 +666,9 @@ const FOOTER_LINKS = [
       ["/login", "Sign in"],
     ],
   },
-];
+] as const;
+
+const isHash = (href: string): href is `#${string}` => href.startsWith("#");
 
 function Footer() {
   return (
@@ -650,11 +687,17 @@ function Footer() {
               {FOOTER_LINKS.map((group) => (
                 <div key={group.title} className="footer-links-wrapper">
                   <h6 className="h6-footer-title">{group.title}</h6>
-                  {group.links.map(([href, label]) => (
-                    <a key={href} className="footer-link" href={href}>
-                      {label}
-                    </a>
-                  ))}
+                  {group.links.map(([href, label]) =>
+                    isHash(href) ? (
+                      <a key={href} className="footer-link" href={href}>
+                        {label}
+                      </a>
+                    ) : (
+                      <Link key={href} className="footer-link" to={href}>
+                        {label}
+                      </Link>
+                    ),
+                  )}
                 </div>
               ))}
             </div>

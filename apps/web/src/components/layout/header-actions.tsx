@@ -76,7 +76,7 @@ function SignOutButton() {
       await signOut();
       // Another user may sign in on this browser next, so nothing cached for this one may stay.
       queryClient.clear();
-      await router.navigate({ to: "/login" });
+      await router.navigate({ to: "/" });
     } finally {
       setPending(false);
     }
