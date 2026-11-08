@@ -25,14 +25,14 @@ export function HeroChart() {
     <svg className="vx-hero-chart" viewBox="0 0 690 360" preserveAspectRatio="none" aria-hidden="true" data-reveal="">
       <defs>
         <linearGradient id="vxhf" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#baf448" stopOpacity=".2" />
+          <stop offset="0" stopColor="#baf448" stopOpacity=".12" />
           <stop offset=".75" stopColor="#baf448" stopOpacity=".02" />
           <stop offset="1" stopColor="#baf448" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="vxhs" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="#baf448" stopOpacity="0" />
           <stop offset=".2" stopColor="#baf448" stopOpacity=".18" />
-          <stop offset=".85" stopColor="#baf448" stopOpacity=".3" />
+          <stop offset=".85" stopColor="#baf448" stopOpacity=".2" />
           <stop offset="1" stopColor="#baf448" stopOpacity=".05" />
         </linearGradient>
       </defs>

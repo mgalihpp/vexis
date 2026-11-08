@@ -400,22 +400,24 @@ svg.button-arrow.white-icon-hover { stroke: #fff; }
 .logo-big-banner.vx-big-logo { bottom: -15px; z-index: 0; }
 .content-banner-home-3-wrapper { position: relative; z-index: 1; }
 .vx-hero-chart { position: absolute; inset: 0; width: 100%; height: 100%; -webkit-mask: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent), linear-gradient(#000 60%, transparent); -webkit-mask-composite: source-in; mask: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent) intersect, linear-gradient(#000 60%, transparent); }
-.logo-big-banner.vx-big-logo { min-width: 0; width: 440px; filter: none; }
+.logo-big-banner.vx-big-logo { min-width: 0; width: 370px; filter: none; }
 .vx-big-logo svg { display: block; width: 100%; height: auto; }
 @media (max-width: 767px) {
-  .logo-big-banner.vx-big-logo { width: 340px; height: auto; bottom: -10px; }
+  .logo-big-banner.vx-big-logo { width: 300px; height: auto; bottom: -10px; }
   .images-banner-home-3.vx-hero { height: 300px; }
 }
 @media (max-width: 767px) {
   .section.home-3-banner { padding-top: 120px; }
 }
 @media (max-width: 479px) {
-  .logo-big-banner.vx-big-logo { width: 270px; height: auto; bottom: -5px; }
+  .logo-big-banner.vx-big-logo { width: 240px; height: auto; bottom: -5px; }
   .images-banner-home-3.vx-hero { height: 240px; }
 }
 .logos-banner.vx-sources { justify-content: center; gap: 56px; }
-.vx-source { display: inline-flex; align-items: center; gap: 10px; color: var(--paragraph-gray); font-size: 17px; letter-spacing: -.2px; }
-.vx-source img { width: 26px; height: 26px; border-radius: 50%; filter: grayscale(1) brightness(1.4); opacity: .75; }
+.vx-source { display: inline-flex; align-items: center; gap: 10px; color: var(--primary-light); font-size: 17px; letter-spacing: -.2px; transition: color .3s; }
+.vx-source img { width: 26px; height: 26px; border-radius: 50%; filter: grayscale(1) brightness(1.4); opacity: .75; transition: filter .3s, opacity .3s; }
+.vx-source:hover { color: var(--primary); }
+.vx-source:hover img { filter: none; opacity: 1; }
 .vx-sources-label { text-align: center; color: #6f6f6f; font-size: 13px; margin-bottom: 18px; letter-spacing: .02em; }
 .content-home-1-wrapper.vx-dotted, .right-cards-wrapper.vx-dotted { background-repeat: repeat; isolation: isolate; background-color: var(--light-dark); background-image: radial-gradient(circle, rgb(255 255 255 / .13) 1px, transparent 1.5px); background-size: 12px 12px; background-position: 0 0; }
 .vx-dotted::before, .vx-dotted::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background-size: 240px 240px; -webkit-mask: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%); mask: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%); animation: vx-dots 6s ease-in-out infinite; }
@@ -532,12 +534,16 @@ button:hover .arrow-back .dark-icon-button { transform: translate3d(-15px, 0, 0)
 .vx-menu-icon { width: 22px; height: 22px; color: #efefef; }
 
 /* Shader backdrops: light drawn on black, screened over the section */
-.vx-shaded { position: relative; overflow: hidden; isolation: isolate; }
+/* isolation makes the section the shader's blend backdrop, so the section needs its own colour or black shows through. */
+.vx-shaded { position: relative; overflow: hidden; isolation: isolate; background-color: var(--primary-dark); }
+.footer.vx-shaded { background-color: #000; }
 .vx-shaded > .w-container { position: relative; z-index: 1; }
 /* Glows such as the safety loop may bleed past the edge; never let them scroll the page */
 .vx-page { overflow-x: clip; }
 .vx-shader { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; }
-.vx-shader-footer { opacity: .9; -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+/* A fixed-height strip above the footer content (padding-top 80px, 120px from 1280px), so the streaks never reach the text however tall the footer stacks. */
+.vx-shader-footer { bottom: auto; height: 76px; opacity: .9; -webkit-mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent), linear-gradient(transparent, #000 25%, #000 75%, transparent); -webkit-mask-composite: source-in; mask: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent) intersect, linear-gradient(transparent, #000 25%, #000 75%, transparent); }
+@media screen and (min-width: 1280px) { .vx-shader-footer { height: 112px; } }
 /* The second mask layer clears an ellipse behind the hero copy so the aurora frames the text instead of crossing it. */
 .vx-shader-hero { top: 30%; height: 70%; opacity: .55; -webkit-mask: linear-gradient(transparent, #000 35%, #000 70%, transparent), radial-gradient(ellipse 36% 48% at 50% 46%, transparent 55%, #000 100%); -webkit-mask-composite: source-in; mask: linear-gradient(transparent, #000 35%, #000 70%, transparent), radial-gradient(ellipse 36% 48% at 50% 46%, transparent 55%, #000 100%); mask-composite: intersect; }
 .vx-shader-access { top: 25%; height: 75%; opacity: .55; -webkit-mask: linear-gradient(transparent, #000 40%); mask: linear-gradient(transparent, #000 40%); }
