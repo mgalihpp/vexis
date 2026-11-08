@@ -112,13 +112,13 @@ Build target is a flag, not code: `NITRO_PRESET=node-server bun run build`. Prod
 
 ## How it works
 
-**Two products share the app.** The header links Portfolio and Analytics. `/` redirects to `/portfolio`.
+**Two products share the app.** The header links Portfolio and Analytics. `/` is the public landing page (`features/landing`); its header offers Sign in, or Open app for a signed-in visitor. Sign-out returns to `/`.
 
 **Auth is invite-only** (`features/auth`, Better Auth on the `packages/db` tables, email + password):
 
 - `auth.server.ts` builds the instance (Drizzle adapter, `usePlural`, signed cookie cache 5 min, `tanstackStartCookies` last). Sign-up needs a usable invite in the `x-vexis-invite` header: a `before` hook checks it (and its bound email) on `/sign-up/email`, and the user-create `after` hook redeems it, deleting the new user if the last use went elsewhere. So `/api/auth/sign-up/email` is gated the same as the `join` server function.
 - `auth.functions.ts` has `getViewer`, `signIn`, `join`, `signOut`; sign-in and join return `AuthResult` error codes instead of throwing, and `login-screen.tsx` maps them to the banner or a field.
-- The root `beforeLoad` reads `viewerQuery` (cached 5 min) and redirects to `/login?redirect=…` unless `isPublicPath` (`/landing`, `/login`, `/terms`, `/privacy`, `/api/auth/*`). Public pages render without the app shell. Route guards only steer the UI: every data server function has `.middleware([requireViewer])`; only `getPrices` (root loader, also on `/login`) is open. Sign-out clears the whole query cache.
+- The root `beforeLoad` reads `viewerQuery` (cached 5 min) and redirects to `/login?redirect=…` unless `isPublicPath` (`/`, `/login`, `/terms`, `/privacy`, `/api/auth/*`). Public pages render without the app shell. Route guards only steer the UI: every data server function has `.middleware([requireViewer])`; only `getPrices` (root loader, also on `/login`) is open. Sign-out clears the whole query cache.
 - Env: `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (public origin; requests from another origin are rejected), `DATABASE_URL`. `vite.config.ts` loads the repo-root `.env` for dev; production needs them in the process environment.
 
 **Data loading is TanStack Query with SSR** (`@tanstack/react-router-ssr-query`). `getRouter` creates one `QueryClient` per router, so one per SSR request. Each feature keeps `queryOptions` in `<feature>.queries.ts`; a route loader awaits `context.queryClient.ensureQueryData(...)` (or calls `prefetchQuery` without awaiting, to stream secondary data) and the component reads the same options with `useSuspenseQuery`. Don't read `useLoaderData` for server data. A failed refetch keeps the old data on screen. Only network failures (`TypeError`, no response) are retried, three times in the browser and never on the server, because the VPS's provider NAT drops some new connections; the router's error panel reconnects on its own when a page has no data at all.

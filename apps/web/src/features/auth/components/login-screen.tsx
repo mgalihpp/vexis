@@ -72,10 +72,10 @@ export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite
       </div>
 
       <header className="relative flex h-[88px] items-end justify-between px-6 pb-4 md:items-center md:px-[160px] md:pb-0">
-        <span className="flex items-center gap-2.5 font-brand text-lg font-bold tracking-[0.12em] uppercase">
+        <Link to="/" className="flex items-center gap-2.5 font-brand text-lg font-bold tracking-[0.12em] uppercase">
           <Logo height={22} />
           Vexis
-        </span>
+        </Link>
         <p className="flex items-center gap-1 text-xs text-muted-foreground">
           {copy.switchText}
           <Link
