@@ -13,19 +13,19 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { isNetworkError } from "@/lib/query";
 import { cn } from "@/lib/utils";
 import { INVITE_REQUEST_ERROR_MESSAGE, type InviteRequestError } from "./invite-request";
 import { requestInvite } from "./invite-request.functions";
 import {
   AlertPhone,
+  AnalyticsWindow,
   BigMark,
-  BinsGlimpse,
   BrandMark,
   Circuit,
   HeroChart,
-  ProfitDays,
+  PnlCard,
   SafetyCards,
 } from "./landing-art";
 import { Shader } from "./landing-shader";
@@ -50,10 +50,21 @@ function useReveal() {
   return root;
 }
 
+// The router jumps on any hash change, cutting a smooth scroll short, so in-page links scroll here and leave the URL alone.
+function scrollToAnchor(e: MouseEvent<HTMLDivElement>) {
+  const link = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
+  const target = link && document.getElementById(link.hash.slice(1));
+  if (!target) return;
+  e.preventDefault();
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: still ? "auto" : "smooth" });
+}
+
 export function LandingPage() {
   const root = useReveal();
   return (
-    <div ref={root} className="vx-page">
+    // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: delegates clicks on the anchors inside, which stay keyboard reachable
+    <div ref={root} className="vx-page" onClick={scrollToAnchor}>
       <Nav />
       <Hero />
       <Sources />
@@ -362,7 +373,7 @@ function Benefits() {
             </div>
             <div className="content-home-1-wrapper home-3-value vx-dotted" data-reveal="">
               <h4>Your profit, day by day</h4>
-              <ProfitDays />
+              <PnlCard />
               <p className="small-paragraph">
                 Every day closes in green or red, in SOL and USD, so your best days stand out at a glance.
               </p>
@@ -371,7 +382,7 @@ function Benefits() {
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
             <div className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted" data-reveal="">
-              <BinsGlimpse />
+              <AnalyticsWindow />
             </div>
             <div className="content-benefits-wrapper small-content">
               <h3 data-reveal="">Stay ahead with live pool data and liquidity insights.</h3>
