@@ -145,6 +145,18 @@ export const invites = pgTable(
   ],
 ).enableRLS();
 
+/**
+ * An email that asked for an invite on the landing page. `invited_at` is set once an admin
+ * mails it an invite (`db:invite --email … --send`).
+ */
+export const inviteRequests = pgTable("invite_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  createdAt: createdAt(),
+  invitedAt: timestamp("invited_at", { withTimezone: true }),
+  inviteId: uuid("invite_id").references(() => invites.id, { onDelete: "set null" }),
+}).enableRLS();
+
 /** One row per sign-up through an invite (`used_by` / `used_at`). A user redeems one invite. */
 export const inviteRedemptions = pgTable(
   "invite_redemptions",

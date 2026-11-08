@@ -71,6 +71,9 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `METEORA_DATAPI_URL`     | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
 | `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
+| `RESEND_API_KEY`         | web, script | none                                 | Resend key for invite mail (`db:invite --send`, notices)  |
+| `MAIL_FROM`              | web, script | `Vexis <invite@stunobagent.my.id>`   | Sender of invite mail                                     |
+| `INVITE_NOTIFY_EMAIL`    | web         | none, no notice                      | Gets a one-line mail for each new invite request          |
 | `NITRO_PRESET`           | build       | `bun`                                | Build target, for example `node-server`                   |
 
 There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
@@ -91,7 +94,7 @@ There is no shared Telegram bot. Each user links their own BotFather bot per age
 | `bun run db:migrate`   | Apply migrations                           |
 | `bun run db:studio`    | Open Drizzle Studio                        |
 | `bun run db:isolation` | Check that scoped queries keep users apart |
-| `bun run db:invite`    | Create an invite and print its join link   |
+| `bun run db:invite`    | Create an invite; `--send`, `--requests`   |
 
 CI runs lint, typecheck, test and build on every PR, so the same four locally is a good sanity check.
 

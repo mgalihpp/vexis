@@ -23,6 +23,7 @@ Never edit a migration that has been applied; change `schema.ts` and generate a 
 - `@vexis/db/agents`: agent kinds and their zod config schemas (`VolumeWatchConfig`, `AutoRebalanceConfig`). Client-safe.
 - `@vexis/db/client`: `createDb(url)`, `getDb()` (process-wide, from `DATABASE_URL`), `closeDb()`. Server-only.
 - `@vexis/db/queries`: user-scoped helpers. Server-only.
+- `@vexis/db/mail`: `sendMail({ to, subject, text, html? })` through Resend (`RESEND_API_KEY`, `MAIL_FROM`). Server-only.
 
 The web app imports `client` and `queries` only from its own `*.server.ts` files.
 
@@ -33,6 +34,7 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 | `users`, `sessions`, `accounts`, `verifications` | auth   | Better Auth's core column names, text ids. `users.role` is `admin` or `member`.             |
 | `invites`                                        | admin  | SHA-256 `token_hash`, optional `email`, `max_uses`/`use_count`, `expires_at`, `revoked_at`. |
 | `invite_redemptions`                             | user   | `used_by`/`used_at`, one per user.                                                          |
+| `invite_requests`                                | public | Unique lowercased `email` from the landing form; `invited_at`/`invite_id` once mailed.      |
 | `user_settings`                                  | user   | `timezone` (IANA), `currency` (`usd`/`sol`).                                                |
 | `wallets`                                        | user   | Unique per `(user_id, address)`.                                                            |
 | `telegram_links`                                 | user   | One bot (encrypted token) and linked chat per `(user_id, kind)`.                            |

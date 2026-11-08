@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { type AgentKind, defaultAgentConfig, parseAgentConfig } from "./agents.ts";
 import type { Db } from "./client.server.ts";
 import {
@@ -8,6 +8,7 @@ import {
   agentRebalances,
   agents,
   inviteRedemptions,
+  inviteRequests,
   invites,
   rebalanceWallets,
   telegramLinks,
@@ -379,4 +380,29 @@ export async function redeemInvite(db: Executor, token: string, user: { id: stri
 
 export async function revokeInvite(db: Db, inviteId: string) {
   await db.update(invites).set({ revokedAt: new Date() }).where(eq(invites.id, inviteId));
+}
+
+/** Returns true when the email had not asked before. */
+export async function requestInvite(db: Db, email: string) {
+  const rows = await db
+    .insert(inviteRequests)
+    .values({ email: email.toLowerCase() })
+    .onConflictDoNothing({ target: inviteRequests.email })
+    .returning({ id: inviteRequests.id });
+  return rows.length > 0;
+}
+
+export async function pendingInviteRequests(db: Db) {
+  return db
+    .select({ email: inviteRequests.email, createdAt: inviteRequests.createdAt })
+    .from(inviteRequests)
+    .where(isNull(inviteRequests.invitedAt))
+    .orderBy(asc(inviteRequests.createdAt));
+}
+
+export async function markInviteRequestSent(db: Db, email: string, inviteId: string) {
+  await db
+    .update(inviteRequests)
+    .set({ invitedAt: new Date(), inviteId })
+    .where(eq(inviteRequests.email, email.toLowerCase()));
 }

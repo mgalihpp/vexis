@@ -13,8 +13,11 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { isNetworkError } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { INVITE_REQUEST_ERROR_MESSAGE, type InviteRequestError } from "./invite-request";
+import { requestInvite } from "./invite-request.functions";
 import {
   AlertPhone,
   BigMark,
@@ -135,7 +138,7 @@ function HeaderCta({ className }: { className?: string }) {
       Open app
     </Cta>
   ) : (
-    <Cta href="#access" white className={className}>
+    <Cta href="#request" white className={className}>
       Request an invite
     </Cta>
   );
@@ -300,7 +303,7 @@ function Hero() {
             </p>
           </div>
           <div className="section-button-wrapper" data-reveal="">
-            <Cta href="#access">Request an invite</Cta>
+            <InviteForm />
           </div>
         </div>
       </div>
@@ -458,7 +461,7 @@ function Edge() {
             liquidity simpler to manage and easier to grow.
           </p>
           <div className="section-button-wrapper" data-reveal="">
-            <Cta href="#access">Request an invite</Cta>
+            <InviteForm />
           </div>
         </div>
       </div>
@@ -596,6 +599,69 @@ const PLANS = [
   },
 ];
 
+type InviteFormState = "idle" | "pending" | "sent" | InviteRequestError | "network";
+
+function InviteForm() {
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
+  const [state, setState] = useState<InviteFormState>("idle");
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setState("pending");
+    try {
+      const res = await requestInvite({ data: { email, website } });
+      setState(res.ok ? "sent" : res.error);
+    } catch (error) {
+      setState(isNetworkError(error) ? "network" : "server");
+    }
+  }
+
+  const error = state === "rate-limited" || state === "server" || state === "network" ? state : null;
+  return (
+    <div className="vx-invite" id="request">
+      {state === "sent" ? (
+        <p className="vx-invite-note" role="status">
+          Thanks. We’ll email your invite when a spot opens.
+        </p>
+      ) : (
+        <form className="vx-invite-form" onSubmit={submit}>
+          <input
+            className="vx-invite-input"
+            type="email"
+            required
+            placeholder="you@example.com"
+            aria-label="Email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input
+            className="vx-honeypot"
+            name="website"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+          />
+          <div className="borders-primary-button">
+            <button type="submit" className="primary-button vx-invite-submit" disabled={state === "pending"}>
+              <div className="text-primary-button">{state === "pending" ? "Sending…" : "Request an invite"}</div>
+              <Arrows />
+            </button>
+          </div>
+        </form>
+      )}
+      {error && (
+        <p className="vx-invite-error" role="alert">
+          {INVITE_REQUEST_ERROR_MESSAGE[error]}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Access() {
   return (
     <section className="section vx-shaded vx-access" id="access">
@@ -706,7 +772,7 @@ function Footer() {
             <div className="subtitle-text">Ready when you are</div>
             <h2>Bring your first wallet and see your liquidity the way it really is.</h2>
             <div className="button-footer-wrapper">
-              <Cta href="#access">Request an invite</Cta>
+              <Cta href="#request">Request an invite</Cta>
             </div>
           </div>
         </div>

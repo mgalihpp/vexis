@@ -47,9 +47,10 @@ vec3 aurora(vec2 uv, float aspect) {
 
 vec3 streaks(vec2 uv) {
   vec3 col = vec3(0.0);
-  for (int i = 0; i < 14; i++) {
+  // Streaks stay in a lane along the top edge, above the footer's text.
+  for (int i = 0; i < 9; i++) {
     float fi = float(i);
-    float y = 0.06 + 0.88 * hash(fi * 3.17);
+    float y = 0.88 + 0.1 * hash(fi * 3.17);
     float speed = 0.03 + 0.05 * hash(fi * 7.1);
     float cx = fract(hash(fi * 1.9) + t * speed) * 1.8 - 0.4;
     float len = 0.12 + 0.3 * hash(fi * 5.3);

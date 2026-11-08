@@ -7,7 +7,8 @@
     "./agents": "./src/agents.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",
-    "./secret": "./src/secret.ts"
+    "./secret": "./src/secret.ts",
+    "./mail": "./src/mail.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
