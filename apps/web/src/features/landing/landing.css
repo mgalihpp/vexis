@@ -440,7 +440,7 @@
   .vx-pnl-days i { flex: 1; border-radius: 1px; background: var(--vx-profit); opacity: .75; }
   .vx-pnl-days i.loss { background: var(--vx-loss); }
   .vx-pnl-days i.off { background: #3a3a3a; }
-  .vx-window { position: absolute; top: 34px; left: 30px; right: -60px; bottom: -10px; overflow: hidden; border-radius: 12px 12px 0 0; background: #09090b; box-shadow: 0 0 0 1px #3a3a3a, 0 30px 50px -20px rgb(0 0 0 / .9); text-align: left; -webkit-mask: linear-gradient(#000 72%, transparent); mask: linear-gradient(#000 72%, transparent); }
+  .vx-window { position: absolute; top: 34px; left: 30px; right: -60px; bottom: -10px; overflow: hidden; border-radius: 12px 12px 0 0; background: #09090b; box-shadow: 0 0 0 1px #3a3a3a, 0 30px 50px -20px rgb(0 0 0 / .9); text-align: left; -webkit-mask: linear-gradient(#000 92%, transparent); mask: linear-gradient(#000 92%, transparent); }
   /* Drawn at the app's own size, then scaled down, so it reads as the real page in miniature. */
   .vx-app { width: 640px; transform: scale(.7); transform-origin: 0 0; color: #fafafa; font-size: 12px; line-height: 1.35; }
   .vx-app-nav { display: flex; align-items: center; gap: 22px; height: 44px; padding: 0 14px; border-bottom: 1px solid rgb(255 255 255 / .1); color: #a1a1aa; font-size: 13px; }
@@ -454,7 +454,8 @@
   .vx-app-pair b { display: block; font-size: 16px; font-weight: 600; }
   .vx-app-pair small, .vx-app-stats small { display: block; color: #a1a1aa; font-size: 11px; }
   .vx-app-tokens { display: flex; }
-  .vx-app-tokens img { width: 26px; height: 26px; border-radius: 50%; background: #0b0b0b; box-shadow: 0 0 0 2px #18181b; }
+  .vx-app-tokens img { position: relative; width: 26px; height: 26px; border-radius: 50%; background: #0b0b0b; box-shadow: 0 0 0 2px #18181b; }
+  .vx-app-tokens img:first-child { z-index: 1; }
   .vx-app-tokens img + img { margin-left: -8px; }
   .vx-app-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
   .vx-app-col:last-child .vx-app-stats { margin-top: 0; }
@@ -464,15 +465,18 @@
   .vx-app-legend { display: flex; gap: 12px; margin-top: 8px; color: #a1a1aa; font-size: 11px; }
   .vx-app-legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--vx-brand); }
   .vx-app-legend .y::before { background: var(--vx-sol); }
-  .vx-app-bins { display: flex; align-items: flex-end; gap: 2px; height: 100px; margin-top: 74px; }
+  .vx-app-bins { display: flex; align-items: flex-end; gap: 2px; height: 100px; margin-top: 62px; }
   .vx-app-bins i { position: relative; flex: 1; border-radius: 3px 3px 0 0; background: var(--vx-brand); }
   .vx-app-bins i.y { background: var(--vx-sol); }
   .vx-app-bins i.a { background: linear-gradient(var(--vx-brand) 45%, var(--vx-sol) 45%); }
-  .vx-app-bins i.a::before { content: ""; position: absolute; left: 50%; bottom: 0; height: calc(100% / .75 + 74px); border-left: 2px solid #fafafa; transform: translateX(-1px); }
-  .vx-app-pool { position: absolute; bottom: calc(100% / .75 + 30px); left: 50%; transform: translateX(-50%); display: grid; justify-items: center; padding: 4px 10px; border-radius: 6px; background: #18181b; box-shadow: 0 0 0 1px rgb(255 255 255 / .1), 0 4px 10px rgb(0 0 0 / .4); white-space: nowrap; font-size: 11px; }
+  .vx-app-bins i.a::before { content: ""; position: absolute; left: 50%; bottom: 0; height: calc(100% / .75 + 28px); border-left: 2px solid #fafafa; transform: translateX(-1px); }
+  .vx-app-pool { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); display: grid; justify-items: center; padding: 4px 10px; border-radius: 6px; background: #18181b; box-shadow: 0 0 0 1px rgb(255 255 255 / .1), 0 4px 10px rgb(0 0 0 / .4); white-space: nowrap; font-size: 11px; }
   .vx-app-pool small { color: #a1a1aa; font-size: 11px; }
   .vx-app-pool b { font: 600 11px/1.3 var(--vx-mono); }
   .vx-app-axis { display: flex; justify-content: space-between; margin-top: 8px; color: #a1a1aa; font-size: 10px; }
+  .vx-app-split { display: flex; height: 10px; margin-top: 6px; border-radius: 99px; background: var(--vx-sol); overflow: hidden; }
+  .vx-app-split i { width: 62%; background: var(--vx-brand); }
+  .vx-app-split + .vx-app-legend { margin-top: 6px; }
   .vx-app-candles { display: block; width: 100%; height: 150px; margin-top: 12px; }
   .vx-app-candles line { stroke-width: 1; vector-effect: non-scaling-stroke; }
   .vx-app-candles .up { fill: var(--vx-profit); stroke: var(--vx-profit); }
@@ -517,7 +521,7 @@
     .vx-pcard-num { font-size: 13px; }
     .vx-pcard-mode b { font-size: 19px; }
   }
-  .content-home-1-wrapper.home-3-central-block.vx-bins-card { padding: 26px 26px 22px; justify-content: flex-end; }
+  .content-home-1-wrapper.home-3-central-block.vx-bins-card { padding: 26px 26px 22px; justify-content: flex-end; min-height: 340px; }
   .content-home-1-wrapper.last-item-home-3.vx-tg-card { min-height: 400px; }
   .content-home-1-wrapper.last-item-home-3.vx-tg-card .small-paragraph { position: relative; }
   .numbers-home-wrapper.vx-insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px 40px; align-items: start; padding-bottom: 40px; }
@@ -579,17 +583,23 @@
   
   /* Invite request form in the hero */
   .vx-invite { position: relative; z-index: 1; width: 100%; max-width: 460px; margin: 0 auto; text-align: center; }
-  .vx-invite-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
-  .vx-invite-input { flex: 1 1 200px; min-width: 0; height: 47px; padding: 0 20px; border: 1px solid var(--borders); border-radius: var(--button-r-66); background-color: rgb(29 29 29 / .72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: var(--primary-light); font: 300 15px/1 Geist, sans-serif; letter-spacing: -.2px; outline: none; transition: border-color .3s; }
+  /* The hero and Edge copy are centred flex columns, so their button wrapper needs to stretch for the form to fill the row. */
+  .vx-hero-copy > .section-button-wrapper, .big-title-wrapp > .section-button-wrapper { align-self: stretch; }
+  /* One capsule holds the field and the button, so the form reads as a single control. */
+  .vx-invite-form { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--borders); border-radius: var(--button-r-66); background-color: rgb(29 29 29 / .72); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: border-color .3s; }
+  .vx-invite-form:focus-within { border-color: var(--primary); }
+  .vx-invite-form > .borders-primary-button { flex: none; }
+  .vx-invite-input { flex: 1 1 auto; min-width: 0; height: 47px; padding: 0 18px; border: 0; border-radius: var(--button-r-66); background-color: transparent; color: var(--primary-light); font: 300 15px/1 Geist, sans-serif; letter-spacing: -.2px; outline: none; }
   .vx-invite-input::placeholder { color: #6f6f6f; }
-  .vx-invite-input:focus { border-color: var(--primary); }
   .vx-invite-submit:disabled { opacity: .7; cursor: progress; }
   .vx-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
   .vx-invite-note { color: var(--primary-light); margin: 0; }
   .vx-invite-error { color: var(--vx-loss); font-size: 14px; margin: 10px 0 0; }
   @media screen and (max-width: 479px) {
-    .vx-invite-form > .borders-primary-button { width: 100%; }
-    .vx-invite-submit { width: 100%; justify-content: center; }
+    .vx-invite-form { flex-direction: column; align-items: stretch; border-radius: 30px; }
+    .vx-invite-input { height: 47px; border-radius: 26px; }
+    .vx-invite-form > .borders-primary-button { width: 100%; border-radius: 26px; }
+    .vx-invite-submit { width: 100%; justify-content: center; border-radius: 26px; }
   }
   
   /* In-page links land below the fixed navbar; the invite form keeps the headline above it in view. */

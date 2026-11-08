@@ -263,6 +263,16 @@ export function AnalyticsWindow() {
                 })}
               </svg>
             </div>
+            <div className="vx-app-panel">
+              <b className="vx-app-title">TVL Distribution</b>
+              <div className="vx-app-split">
+                <i />
+              </div>
+              <div className="vx-app-legend">
+                <span>62.4%</span>
+                <span className="y">37.6%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
