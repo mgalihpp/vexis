@@ -38,7 +38,13 @@ export const AUTH_ERROR_MESSAGE: Record<AuthError | "network", string> = {
 
 /** Pages a signed-out visitor may open. Everything else redirects to /login. */
 export function isPublicPath(pathname: string) {
-  return pathname === "/login" || pathname === "/terms" || pathname === "/privacy" || pathname.startsWith("/api/auth/");
+  return (
+    pathname === "/landing" ||
+    pathname === "/login" ||
+    pathname === "/terms" ||
+    pathname === "/privacy" ||
+    pathname.startsWith("/api/auth/")
+  );
 }
 
 /** Only same-site paths, so a crafted ?redirect= can't send someone to another origin after login. */
