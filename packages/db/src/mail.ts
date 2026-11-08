@@ -3,7 +3,6 @@ export type Mail = {
   subject: string;
   text: string;
   html?: string;
-  attachments?: { filename: string; content: string; content_id: string }[];
 };
 
 export async function sendMail(mail: Mail) {

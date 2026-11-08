@@ -1,8 +1,6 @@
 // Email bodies. Table layout and inline styles only: mail clients drop stylesheets,
 // flexbox and webfonts, so every rule here is the one Gmail and Outlook agree on.
 
-import { readFileSync } from "node:fs";
-
 const SANS = `'Inter','Inter Variable',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
 const BRAND_FONT = `'Chakra Petch',${SANS}`;
 const MONO = `'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace`;
@@ -22,7 +20,8 @@ const NOTICE_BG = "#282e20";
 const NOTICE_BORDER = "#495a29";
 const NOTICE_TEXT = "#d0d1ce";
 
-const mark = readFileSync(new URL("../assets/vexis-mark.png", import.meta.url)).toString("base64");
+// Mail clients block data: URIs and many hide inline CID parts, so the mark is the live favicon.
+const LOGO_URL = "https://stunobagent.my.id/favicon.png";
 
 const day = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
@@ -71,8 +70,8 @@ Vexis
           <td style="padding:30px 32px 0 32px;">
             <table role="presentation" cellpadding="0" cellspacing="0" border="0">
               <tr>
-                <td width="26" style="width:26px;"><img src="cid:vexis-mark" width="26" height="24" alt="Vexis" style="display:block;width:26px;height:24px;border:0;outline:none;text-decoration:none;"></td>
-                <td style="padding-left:9px;font-family:${BRAND_FONT};font-size:15px;font-weight:700;line-height:24px;letter-spacing:.16em;color:${TEXT};">VEXIS</td>
+                <td width="32" style="width:32px;"><img src="${LOGO_URL}" width="32" height="32" alt="Vexis" style="display:block;width:32px;height:32px;border:0;border-radius:8px;outline:none;text-decoration:none;"></td>
+                <td style="padding-left:10px;font-family:${BRAND_FONT};font-size:15px;font-weight:700;line-height:32px;letter-spacing:.16em;color:${TEXT};">VEXIS</td>
               </tr>
             </table>
           </td>
@@ -145,6 +144,5 @@ Vexis
     subject: "Your Vexis invite is ready",
     text,
     html,
-    attachments: [{ filename: "vexis-mark.png", content: mark, content_id: "vexis-mark" }],
   };
 }
