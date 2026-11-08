@@ -14,7 +14,8 @@
       "!apps/web/src/components/ui",
       "!apps/web/src/hooks/use-mobile.ts",
       "!apps/web/src/hooks/use-highlighted-code.ts",
-      "!apps/web/src/lib/highlighter.tsx"
+      "!apps/web/src/lib/highlighter.tsx",
+      "!apps/web/src/features/landing/landing.css"
     ]
   },
   "formatter": {
