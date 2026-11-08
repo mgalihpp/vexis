@@ -1,4 +1,10 @@
-export type Mail = { to: string; subject: string; text: string; html?: string };
+export type Mail = {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  attachments?: { filename: string; content: string; content_id: string }[];
+};
 
 export async function sendMail(mail: Mail) {
   const key = process.env.RESEND_API_KEY;

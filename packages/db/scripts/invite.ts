@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
+import { inviteEmail } from "../src/emails.server.ts";
 import { sendMail } from "../src/mail.ts";
 import { createInvite, markInviteRequestSent, pendingInviteRequests } from "../src/queries.server.ts";
 import { users } from "../src/schema.ts";
@@ -61,18 +62,7 @@ try {
     const link = `${origin}/login?invite=${token}`;
     console.log(`Link: ${link}`);
     if (values.send && invite.email) {
-      const expires = invite.expiresAt.toUTCString();
-      await sendMail({
-        to: invite.email,
-        subject: "Your Vexis invite",
-        text: `You're invited to Vexis.
-
-Join: ${link}
-Invite code: ${token}
-Expires: ${expires}
-`,
-        html: `<p>You're invited to Vexis.</p><p><a href="${link}">Join Vexis</a></p><p>Invite code: <code>${token}</code><br>Expires: ${expires}</p>`,
-      });
+      await sendMail({ to: invite.email, ...inviteEmail({ link, code: token, expiresAt: invite.expiresAt }) });
       await markInviteRequestSent(db, invite.email, invite.id);
       console.log(`Sent to ${invite.email}`);
     }
