@@ -1,12 +1,16 @@
 // Creates an invite and prints its join link. The token is shown once; only its hash is stored.
-// Run: bun run db:invite [--email someone@x.com] [--days 7] [--uses 1] [--note "for Budi"] [--by <admin user id>]
+// Run: bun run db:invite [--email someone@x.com] [--send] [--days 7] [--uses 1] [--note "for Budi"] [--by <admin user id>]
+// --send mails the link to --email and marks that address's invite request as sent.
+// List pending invite requests: bun run db:invite --requests
 // Make an existing user an admin: bun run db:invite --admin someone@x.com
 
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { eq } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
-import { createInvite } from "../src/queries.server.ts";
+import { inviteEmail } from "../src/emails.server.ts";
+import { sendMail } from "../src/mail.ts";
+import { createInvite, markInviteRequestSent, pendingInviteRequests } from "../src/queries.server.ts";
 import { users } from "../src/schema.ts";
 
 try {
@@ -23,8 +27,11 @@ const { values } = parseArgs({
     note: { type: "string" },
     by: { type: "string" },
     admin: { type: "string" },
+    requests: { type: "boolean" },
+    send: { type: "boolean" },
   },
 });
+if (values.send && !values.email) throw new Error("--send needs --email");
 
 const db = createDb(url, { max: 1 });
 try {
@@ -35,6 +42,10 @@ try {
       .where(eq(users.email, values.admin.toLowerCase()))
       .returning({ id: users.id });
     console.log(user ? `${values.admin} is now an admin.` : `No user with email ${values.admin}.`);
+  } else if (values.requests) {
+    const requests = await pendingInviteRequests(db);
+    for (const r of requests) console.log(`${r.createdAt.toISOString()}  ${r.email}`);
+    console.log(`${requests.length} pending`);
   } else {
     const days = Number(values.days);
     const { token, invite } = await createInvite(db, {
@@ -48,7 +59,13 @@ try {
     const origin = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
     console.log(`Invite ${invite.id} (${invite.maxUses} use, expires ${invite.expiresAt.toISOString()})`);
     console.log(`Code: ${token}`);
-    console.log(`Link: ${origin}/login?invite=${token}`);
+    const link = `${origin}/login?invite=${token}`;
+    console.log(`Link: ${link}`);
+    if (values.send && invite.email) {
+      await sendMail({ to: invite.email, ...inviteEmail({ link, code: token, expiresAt: invite.expiresAt }) });
+      await markInviteRequestSent(db, invite.email, invite.id);
+      console.log(`Sent to ${invite.email}`);
+    }
   }
 } finally {
   await closeDb(db);

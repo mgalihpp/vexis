@@ -1,5 +1,4 @@
 import { Eye, ShieldCheck } from "lucide-react";
-import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 // The Vexis mark, traced from public/logo.png.
@@ -25,14 +24,14 @@ export function HeroChart() {
     <svg className="vx-hero-chart" viewBox="0 0 690 360" preserveAspectRatio="none" aria-hidden="true" data-reveal="">
       <defs>
         <linearGradient id="vxhf" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#baf448" stopOpacity=".2" />
+          <stop offset="0" stopColor="#baf448" stopOpacity=".12" />
           <stop offset=".75" stopColor="#baf448" stopOpacity=".02" />
           <stop offset="1" stopColor="#baf448" stopOpacity="0" />
         </linearGradient>
         <linearGradient id="vxhs" x1="0" x2="1" y1="0" y2="0">
           <stop offset="0" stopColor="#baf448" stopOpacity="0" />
           <stop offset=".2" stopColor="#baf448" stopOpacity=".18" />
-          <stop offset=".85" stopColor="#baf448" stopOpacity=".3" />
+          <stop offset=".85" stopColor="#baf448" stopOpacity=".2" />
           <stop offset="1" stopColor="#baf448" stopOpacity=".05" />
         </linearGradient>
       </defs>
@@ -80,83 +79,228 @@ export function BigMark() {
   );
 }
 
-// Sample week, scaled to the best day (+2.48 SOL).
-const DAYS: { day: string; v: number | null; tip?: string }[] = [
-  { day: "M", v: 0.38 },
-  { day: "T", v: 1, tip: "+2.48 SOL" },
-  { day: "W", v: -0.27 },
-  { day: "T", v: 0.17 },
-  { day: "F", v: 0.12 },
-  { day: "S", v: null },
-  { day: "S", v: 0.41 },
+// A sample month in SOL, one entry per day; null is a day with no closes.
+const MONTH: (number | null)[] = [
+  0.42,
+  0.18,
+  -0.12,
+  0.65,
+  0.31,
+  null,
+  0.09,
+  0.77,
+  1.12,
+  -0.34,
+  0.25,
+  0.58,
+  null,
+  0.14,
+  0.96,
+  2.48,
+  -0.21,
+  0.44,
+  0.37,
+  0.62,
+  null,
+  0.29,
+  -0.08,
+  0.81,
+  1.35,
+  0.48,
+  0.16,
+  -0.45,
+  0.52,
+  0.71,
 ];
+const SAMPLE_SOL_USD = 166;
+const known = MONTH.filter((v) => v !== null);
+const BEST = Math.max(...known);
+const MONTH_TOTAL = known.reduce((a, b) => a + b, 0);
 
-export function ProfitDays() {
+/** The month as the shareable PnL card the app renders, with each day as one tick along the bottom. */
+export function PnlCard() {
   return (
-    <div className="vx-days" role="img" aria-label="Daily profit for one week, sample">
-      {DAYS.map(({ day, v, tip }, i) => {
-        const cls = cn("vx-day", v === null && "off", v !== null && v < 0 && "loss", tip && "top");
-        return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: a fixed week, day letters repeat
-          <div key={i} className={cls} style={v === null ? undefined : ({ "--v": Math.abs(v) } as CSSProperties)}>
-            {tip && <b className="vx-tip">{tip}</b>}
-            <i />
-            <span>{day}</span>
-          </div>
-        );
-      })}
+    <div className="vx-pnl-stage" role="img" aria-label="Shareable monthly PnL card, sample">
+      <div className="vx-pnl vx-pnl-back" />
+      <div className="vx-pnl">
+        <div className="vx-pnl-top">
+          <span className="vx-pnl-brand">
+            <svg viewBox="-10 -10 200 184" aria-hidden="true">
+              <path d={MARK} fill="currentColor" fillRule="evenodd" />
+            </svg>
+            VEXIS
+          </span>
+          <span>Nov 2026</span>
+        </div>
+        <span className="vx-pnl-label">Monthly PnL</span>
+        <b className="vx-pnl-sol vx-num">+{MONTH_TOTAL.toFixed(2)} SOL</b>
+        <span className="vx-pnl-usd vx-num">${Math.round(MONTH_TOTAL * SAMPLE_SOL_USD).toLocaleString("en-US")}</span>
+        <div className="vx-pnl-days">
+          {MONTH.map((v, i) => (
+            <i
+              // biome-ignore lint/suspicious/noArrayIndexKey: day of the month
+              key={i}
+              className={cn(v === null && "off", v !== null && v < 0 && "loss")}
+              style={{ height: `${v === null ? 8 : 18 + 82 * (Math.abs(v) / BEST)}%` }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-// Sample liquidity per bin, in percent of the fullest; index 14 is the active bin.
+// Sample liquidity per bin, in percent of the fullest, around the active bin (index 14).
 const BINS = [
-  7, 7, 7, 7, 7, 12, 16, 27, 38, 53, 56, 71, 76, 100, 100, 81, 96, 84, 65, 51, 34, 23, 18, 10, 7, 7, 7, 7, 7,
+  14, 16, 18, 22, 27, 33, 38, 45, 53, 56, 64, 71, 76, 88, 100, 81, 96, 84, 78, 65, 58, 51, 44, 34, 28, 23, 18, 15, 12,
 ];
 const ACTIVE = 14;
+// Sample hourly closes for the candles, oldest first.
+const CLOSES = [
+  3.28, 3.31, 3.29, 3.35, 3.38, 3.36, 3.42, 3.4, 3.47, 3.45, 3.52, 3.49, 3.44, 3.46, 3.39, 3.41, 3.36, 3.38, 3.34, 3.37,
+  3.4, 3.38, 3.41,
+];
 
-export function BinsGlimpse() {
+/** A miniature of the Analytics page, cropped by the card the way the phone is. */
+export function AnalyticsWindow() {
+  const lo = Math.min(...CLOSES) - 0.04;
+  const hi = Math.max(...CLOSES) + 0.04;
+  const y = (v: number) => 100 - ((v - lo) / (hi - lo)) * 100;
   return (
-    <>
-      <div className="vx-binsfull" role="img" aria-label="Liquidity by bin around the active price, sample">
-        {BINS.map((h, i) => (
-          <i
-            // biome-ignore lint/suspicious/noArrayIndexKey: bins are positional
-            key={i}
-            className={i < ACTIVE ? "y" : i > ACTIVE ? "x" : "a"}
-            style={{ height: `${h}%` }}
-          />
-        ))}
+    <div className="vx-window" role="img" aria-label="The Analytics page for a sample JUP-SOL pool">
+      <div className="vx-app">
+        <div className="vx-app-nav">
+          <svg viewBox="-10 -10 200 184" aria-hidden="true">
+            <path d={MARK} fill="currentColor" fillRule="evenodd" />
+          </svg>
+          <b>Vexis</b>
+          <span>Portfolio</span>
+          <span className="on">Analytics</span>
+          <span>Agents</span>
+        </div>
+        <div className="vx-app-body">
+          <div className="vx-app-col">
+            <div className="vx-app-panel">
+              <div className="vx-app-pair">
+                <span className="vx-app-tokens">
+                  <img src="/brands/jupiter.png" alt="" />
+                  <img src="/Solana_logo.png" alt="" />
+                </span>
+                <span>
+                  <b>JUP-SOL</b>
+                  <small>Fee: 0.20% | Bin Step: 20</small>
+                </span>
+              </div>
+              <div className="vx-app-stats">
+                <span>
+                  <small>Current Pool Price</small>
+                  <b className="vx-num">0.003412</b>
+                </span>
+                <span>
+                  <small>Total Value Locked</small>
+                  <b className="vx-num">$4.21M</b>
+                </span>
+              </div>
+            </div>
+            <div className="vx-app-panel">
+              <b className="vx-app-title">Liquidity Distribution</b>
+              <div className="vx-app-legend">
+                <span className="x">JUP</span>
+                <span className="y">SOL</span>
+              </div>
+              <div className="vx-app-bins">
+                {BINS.map((h, i) => (
+                  <i
+                    // biome-ignore lint/suspicious/noArrayIndexKey: bins are positional
+                    key={i}
+                    className={i < ACTIVE ? "y" : i > ACTIVE ? "x" : "a"}
+                    style={{ height: `${h * 0.75}%` }}
+                  >
+                    {i === ACTIVE && (
+                      <span className="vx-app-pool">
+                        <small>Pool Price</small>
+                        <b className="vx-num">0.003412 SOL/JUP</b>
+                      </span>
+                    )}
+                  </i>
+                ))}
+              </div>
+              <div className="vx-app-axis vx-num">
+                <span>0.00318</span>
+                <span>0.00333</span>
+                <span>0.00349</span>
+                <span>0.00365</span>
+              </div>
+            </div>
+          </div>
+          <div className="vx-app-col">
+            <div className="vx-app-panel">
+              <div className="vx-app-stats">
+                <span>
+                  <small>24h Volume</small>
+                  <b className="vx-num big">$8.71M</b>
+                </span>
+                <span>
+                  <small>24h Vol / TVL</small>
+                  <b className="vx-num">2.07x</b>
+                </span>
+              </div>
+            </div>
+            <div className="vx-app-panel">
+              <b className="vx-app-title">Volume Chart</b>
+              <svg className="vx-app-candles" viewBox="0 0 230 100" preserveAspectRatio="none" aria-hidden="true">
+                {CLOSES.slice(1).map((c, i) => {
+                  const o = CLOSES[i] ?? c;
+                  const up = c >= o;
+                  const x = 6 + i * 10;
+                  return (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: candles are positional
+                    <g key={i} className={up ? "up" : "down"}>
+                      <line x1={x} x2={x} y1={y(Math.max(o, c) + 0.02)} y2={y(Math.min(o, c) - 0.02)} />
+                      <rect x={x - 3} width="6" y={y(Math.max(o, c))} height={Math.max(1.5, Math.abs(y(o) - y(c)))} />
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="vx-marker">
-        <i />
-        <i />
-      </div>
-      <div className="vx-price">
-        <b className="vx-num">0.003412</b>
-        <span>Active price · JUP-SOL</span>
-      </div>
-    </>
+    </div>
   );
 }
 
+const NOTIFS = [
+  { from: "Vexis alerts", at: "now", title: "Volume spike · JUP-SOL", text: "8.8× the usual pace in the last minute" },
+  {
+    from: "Vexis rebalance",
+    at: "4m ago",
+    title: "Back in range · SOL-USDC",
+    text: "Re-centered, 0.42 SOL in fees compounded",
+  },
+];
+
 export function AlertPhone() {
   return (
-    <div className="vx-phone" role="img" aria-label="Phone notification, sample">
-      <div className="vx-notif">
-        <span className="vx-notif-icon">
-          <svg viewBox="-10 -10 200 184" aria-hidden="true">
-            <path d={MARK} fill="#0b0b0b" fillRule="evenodd" />
-          </svg>
-        </span>
-        <span className="vx-notif-body">
-          <span className="vx-notif-top">
-            <b>Vexis alerts</b>
-            <span>now</span>
-          </span>
-          <b className="vx-notif-title">Volume spike · JUP-SOL</b>
-          <span className="vx-notif-text">8.8× the usual pace in the last minute</span>
-        </span>
+    <div className="vx-phone" role="img" aria-label="Phone notifications, sample">
+      <div className="vx-notifs">
+        {NOTIFS.map((n) => (
+          <div key={n.title} className="vx-notif">
+            <span className="vx-notif-icon">
+              <svg viewBox="-10 -10 200 184" aria-hidden="true">
+                <path d={MARK} fill="#0b0b0b" fillRule="evenodd" />
+              </svg>
+            </span>
+            <span className="vx-notif-body">
+              <span className="vx-notif-top">
+                <b>{n.from}</b>
+                <span>{n.at}</span>
+              </span>
+              <b className="vx-notif-title">{n.title}</b>
+              <span className="vx-notif-text">{n.text}</span>
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
