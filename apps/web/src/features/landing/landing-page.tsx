@@ -25,6 +25,7 @@ import {
   ProfitDays,
   SafetyCards,
 } from "./landing-art";
+import { Shader } from "./landing-shader";
 
 // Fades every [data-reveal] element in the first time it scrolls into view.
 function useReveal() {
@@ -49,7 +50,7 @@ function useReveal() {
 export function LandingPage() {
   const root = useReveal();
   return (
-    <div ref={root}>
+    <div ref={root} className="vx-page">
       <Nav />
       <Hero />
       <Sources />
@@ -242,7 +243,8 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="section home-3-banner" id="top">
+    <section className="section home-3-banner vx-shaded" id="top">
+      <Shader mode="aurora" className="vx-shader-hero" />
       <div className="w-layout-blockcontainer base-container w-container">
         <div className="images-banner-home-3 vx-hero">
           <HeroChart />
@@ -561,7 +563,8 @@ const PLANS = [
 
 function Access() {
   return (
-    <section className="section" id="access">
+    <section className="section vx-shaded vx-access" id="access">
+      <Shader mode="globe" className="vx-shader-access" />
       <div className="w-layout-blockcontainer base-container w-container">
         <div className="w-layout-grid pricing-home-wrapper">
           <div className="title-pricing-wrapper title-pricing-without-background vx-access-title" data-reveal="">
@@ -632,7 +635,8 @@ const FOOTER_LINKS = [
 
 function Footer() {
   return (
-    <div className="footer">
+    <div className="footer vx-shaded">
+      <Shader mode="streaks" className="vx-shader-footer" />
       <div className="base-container w-container">
         <div className="footer-wrapper">
           <div className="footer-brand-wrapper">
@@ -666,9 +670,6 @@ function Footer() {
         <div className="footer-bottom-wrapper">
           <div className="left-copyright-wrapper">
             <div className="footer-copyright">© 2026 Vexis. All rights reserved.</div>
-          </div>
-          <div className="right-copyright-wrapper">
-            <div className="footer-rights">Figures shown are for illustration only.</div>
           </div>
         </div>
       </div>
