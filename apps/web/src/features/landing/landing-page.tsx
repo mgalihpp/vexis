@@ -326,10 +326,8 @@ const SOURCES = [
   ["/links/meteora.png", "Meteora", "https://www.meteora.ag"],
   ["/Solana_logo.png", "Solana", "https://solana.com"],
   ["/brands/jupiter.png", "Jupiter", "https://jup.ag"],
+  ["/brands/geckoterminal.png", "GeckoTerminal", "https://www.geckoterminal.com?utm_source=vexis&utm_medium=referral"],
 ] as const;
-
-// GeckoTerminal's attribution guide asks for its unaltered logo with a link.
-const GECKOTERMINAL = "https://www.geckoterminal.com?utm_source=vexis&utm_medium=referral";
 
 function Sources() {
   return (
@@ -345,10 +343,6 @@ function Sources() {
               {name}
             </a>
           ))}
-          <a href={GECKOTERMINAL} target="_blank" rel="noopener" className="vx-source vx-source-attributed">
-            <img src="/brands/geckoterminal.png" alt="" />
-            GeckoTerminal
-          </a>
         </div>
         <div className="line" />
       </div>

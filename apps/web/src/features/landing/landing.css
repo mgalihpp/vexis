@@ -417,7 +417,7 @@
   .vx-source { display: inline-flex; align-items: center; gap: 10px; color: var(--primary-light); font-size: 17px; letter-spacing: -.2px; transition: color .3s; }
   .vx-source img { width: 26px; height: 26px; border-radius: 50%; filter: grayscale(1) brightness(1.4); opacity: .75; transition: filter .3s, opacity .3s; }
   .vx-source:hover { color: var(--primary); }
-  .vx-source:hover img, .vx-source-attributed img { filter: none; opacity: 1; }
+  .vx-source:hover img { filter: none; opacity: 1; }
   .vx-sources-label { text-align: center; color: #6f6f6f; font-size: 13px; margin-bottom: 18px; letter-spacing: .02em; }
   .content-home-1-wrapper.vx-dotted, .right-cards-wrapper.vx-dotted { background-repeat: repeat; isolation: isolate; background-color: var(--light-dark); background-image: radial-gradient(circle, rgb(255 255 255 / .13) 1px, transparent 1.5px); background-size: 12px 12px; background-position: 0 0; }
   .vx-dotted::before, .vx-dotted::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background-size: 240px 240px; -webkit-mask: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%); mask: radial-gradient(75% 70% at 50% 45%, #000 30%, transparent 100%); animation: vx-dots 6s ease-in-out infinite; }
