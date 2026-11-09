@@ -77,6 +77,8 @@ test("ticks run from the max down to the min", () => {
 
 test("age", () => {
   const day = 86_400_000;
+  expect(age(0, 59_999)).toBe("59s");
+  expect(age(0, 60_000)).toBe("1m");
   expect(age(0, 59 * 60_000)).toBe("59m");
   expect(age(0, 5 * 3_600_000)).toBe("5h");
   expect(age(0, 12 * day)).toBe("12d");
