@@ -92,7 +92,7 @@ const tabLabel = (tab: DetailTab, agent: AgentView) =>
   })[tab];
 
 const tabClass =
-  "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 hover:text-muted-foreground";
+  "relative shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 hover:text-muted-foreground";
 
 export function AgentDetail({ id, tab }: { id: string; tab: DetailTab }) {
   const { data } = useSuspenseQuery(agentsQuery);
