@@ -318,14 +318,17 @@ export function PoolTokens({ pool }: { pool: PoolView }) {
   );
 }
 
+// About 8px a bar in the narrow column; a wider zoom merges neighbouring bins instead of drawing hairlines.
+const MAX_BARS = 41;
+
 export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: ChainView | null }) {
   const [reach, setReach] = useState(20);
   const { tokenX: x, tokenY: y } = pool;
-  const bars = chain ? binDistribution(chain.bins, chain.activeBinId, reach, x.price, y.price) : [];
+  const bars = chain ? binDistribution(chain.bins, chain.activeBinId, reach, x.price, y.price, MAX_BARS) : [];
   const peak = Math.max(...bars.map((b) => b.xUsd + b.yUsd), 1e-12);
   const first = bars[0];
   const last = bars[bars.length - 1];
-  const labels = first && last ? [0, 1, 2, 3].map((i) => first.price + ((last.price - first.price) * i) / 3) : [];
+  const labels = first && last ? [0, 1, 2, 3].map((i) => first.price + ((last.lastPrice - first.price) * i) / 3) : [];
   const zoom = "text-muted-foreground hover:text-foreground disabled:opacity-30";
   const at = bars.findIndex((b) => b.active) / Math.max(1, bars.length - 1);
   const [selected, setSelected] = useState<number | null>(null);
@@ -439,7 +442,9 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
                 onPointerDownOutside={(e) => chartRef.current?.contains(e.target as Node) && e.preventDefault()}
               >
                 <div className="num text-muted-foreground">
-                  Bin {sel.id} · {formatPrice(sel.price)}
+                  {sel.lastId === sel.id
+                    ? `Bin ${sel.id} · ${formatPrice(sel.price)}`
+                    : `Bins ${sel.id} to ${sel.lastId} · ${formatPrice(sel.price)} to ${formatPrice(sel.lastPrice)}`}
                 </div>
                 <div className="num mt-0.5 text-sm font-semibold">{compactUsd(sel.xUsd + sel.yUsd)}</div>
                 <div className="mt-2 flex flex-col gap-1 border-t pt-2">
