@@ -8,7 +8,7 @@ export function CurrencyToggle() {
   const navigate = useNavigate();
   const sol = currency === "sol";
   return (
-    <div className="flex items-center gap-0.75">
+    <div className="flex shrink-0 items-center gap-0.75">
       <UsdcIcon className={`size-4 ${sol ? "opacity-50" : ""}`} />
       <button
         type="button"
