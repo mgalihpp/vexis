@@ -49,7 +49,7 @@ const TABS = [
 ] as const;
 
 const tabClass =
-  "relative px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5";
+  "relative shrink-0 whitespace-nowrap px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5";
 
 function PortfolioLayout() {
   const { wallet } = Route.useParams();
