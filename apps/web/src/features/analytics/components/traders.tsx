@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Notice } from "@/features/portfolio/components/notice";
 import { Pagination } from "@/features/portfolio/components/table-controls";
 import { useStamp } from "@/features/timezone/timezone";
+import { useNow } from "@/hooks/use-now";
 import { age } from "../analytics";
 import { tradersQuery } from "../analytics.queries";
 import {
@@ -229,6 +230,7 @@ function RecentTrades({
   onPageSize: (size: number) => void;
 }) {
   const stamp = useStamp();
+  const now = useNow(data.fetchedAt);
   const rows = data.trades.filter((t) => tradeFilter(t.tags, filter));
   const pages = Math.max(1, Math.ceil(rows.length / pageSize));
   const current = Math.min(page, pages - 1);
@@ -251,13 +253,7 @@ function RecentTrades({
           </TableHeader>
           <TableBody>
             {shown.map((t) => (
-              <TradeLine
-                key={`${t.tx}:${t.wallet}:${t.side}`}
-                t={t}
-                now={data.fetchedAt}
-                symbol={data.symbol}
-                stamp={stamp}
-              />
+              <TradeLine key={`${t.tx}:${t.wallet}:${t.side}`} t={t} now={now} symbol={data.symbol} stamp={stamp} />
             ))}
           </TableBody>
         </Table>
