@@ -10,9 +10,9 @@ export function Panel({ className = "", children }: { className?: string; childr
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between gap-2.5 text-xs">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium tabular-nums">{children}</dd>
+    <div className="flex flex-col gap-0.5 text-xs sm:flex-row sm:justify-between sm:gap-2.5">
+      <dt className="text-[0.65rem] text-muted-foreground sm:text-xs">{label}</dt>
+      <dd className="font-medium tabular-nums sm:text-right">{children}</dd>
     </div>
   );
 }
@@ -33,7 +33,7 @@ function ResultBar({
   const Trend = positive ? TrendingUpIcon : TrendingDownIcon;
   return (
     <div
-      className={`mt-3.25 flex h-13 items-center justify-between rounded-md px-3 ${
+      className={`mt-3.25 flex h-11 items-center justify-between gap-2 rounded-md px-2.5 sm:h-13 sm:px-3 ${
         positive ? "border-profit/20 bg-profit/10" : "border-loss/20 bg-loss/10"
       }`}
       style={{
@@ -41,16 +41,16 @@ function ResultBar({
         backgroundSize: "6px 6px",
       }}
     >
-      <span className="text-[0.85rem] font-semibold">{label}</span>
-      <span className={`flex items-center gap-2.5 ${tone(value)}`}>
-        <Trend className="size-4" />
+      <span className="text-xs font-semibold whitespace-nowrap sm:text-[0.85rem]">{label}</span>
+      <span className={`flex items-center gap-1.5 sm:gap-2.5 ${tone(value)}`}>
+        <Trend className="size-3.5 sm:size-4" />
         {ratio !== undefined && (
           <span className={`rounded px-1.5 py-0.5 text-xs tabular-nums ${positive ? "bg-profit/15" : "bg-loss/15"}`}>
             {ratio >= 0 ? "+" : ""}
             <AnimatedNumber value={ratio} format={pct} />
           </span>
         )}
-        <span className="text-[1.15rem] font-bold tabular-nums">
+        <span className="text-sm font-bold whitespace-nowrap tabular-nums sm:text-[1.15rem]">
           <AnimatedNumber value={value} format={(v) => money(v, currency, { signed: true })} />
         </span>
       </span>
@@ -74,7 +74,7 @@ export function ActiveSummary({ active, currency }: { active: ActivePool[]; curr
           <AnimatedNumber value={pools} /> pool{pools === 1 ? "" : "s"}
         </span>
       </p>
-      <dl className="mt-3.25 grid gap-x-4.75 gap-y-2 sm:grid-cols-2">
+      <dl className="mt-3.25 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4.75 sm:gap-y-2">
         <Row label="Total Deposited">
           <AnimatedNumber value={t.deposit} format={m} />
         </Row>
@@ -121,7 +121,7 @@ export function Performance({ stats, active, currency }: { stats: Stats; active:
           <AnimatedNumber value={stats.count} /> total
         </span>
       </p>
-      <dl className="mt-3.25 grid gap-x-4.75 gap-y-2 sm:grid-cols-2">
+      <dl className="mt-3.25 grid grid-cols-2 gap-x-3 gap-y-2.5 sm:gap-x-4.75 sm:gap-y-2">
         <Row label="Total Deposits">
           <AnimatedNumber value={stats.deposits} format={m} />
         </Row>
