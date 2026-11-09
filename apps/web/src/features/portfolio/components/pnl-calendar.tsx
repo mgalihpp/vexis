@@ -224,9 +224,18 @@ function CalendarGrid({
                   {cell.day}
                 </span>
                 {b && onShareDay && (
-                  <span className="absolute top-1.5 left-3.25 max-sm:hidden">
-                    <ShareButton label={`Share ${dayName(cell.date)}`} onClick={() => onShareDay(b)} />
-                  </span>
+                  <>
+                    <span className="absolute top-1.5 left-3.25 max-sm:hidden">
+                      <ShareButton label={`Share ${dayName(cell.date)}`} onClick={() => onShareDay(b)} />
+                    </span>
+                    {/* Phone cells have no room for the icon, so the whole cell shares. */}
+                    <button
+                      type="button"
+                      aria-label={`Share ${dayName(cell.date)}`}
+                      onClick={() => onShareDay(b)}
+                      className="absolute inset-0 z-10 sm:hidden"
+                    />
+                  </>
                 )}
                 {b && (
                   <div className="text-center leading-tight" data-share-item>
