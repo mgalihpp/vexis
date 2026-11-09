@@ -10,8 +10,9 @@ import {
   SearchIcon,
   TableIcon,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { TableHead } from "@/components/ui/table";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export type Sort<K extends string> = { key: K; dir: "asc" | "desc" };
 
@@ -107,6 +108,13 @@ const VIEWS = [
 ] as const;
 
 export type View = (typeof VIEWS)[number]["value"];
+
+/** Table/grid choice that defaults to the cards on a phone until the user picks one. */
+export function useView() {
+  const mobile = useIsMobile();
+  const [picked, setPicked] = useState<View | null>(null);
+  return [picked ?? (mobile ? "grid" : "table"), setPicked] as const;
+}
 
 export function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
   return (

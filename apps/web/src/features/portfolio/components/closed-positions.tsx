@@ -20,7 +20,7 @@ import {
   type Sort,
   SortHead,
   sortBy,
-  type View,
+  useView,
   ViewToggle,
 } from "./table-controls";
 
@@ -59,7 +59,7 @@ export function ClosedPositions({
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0] ?? 10);
   const [page, setPage] = useState(0);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [view, setView] = useState<View>("table");
+  const [view, setView] = useView();
   const [share, setShare] = useState<ShareTarget | null>(null);
   const [sharing, setSharing] = useState(false);
 

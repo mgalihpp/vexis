@@ -19,7 +19,7 @@ import {
   SortHead,
   sortBy,
   type Sort as TableSort,
-  type View,
+  useView,
   ViewToggle,
 } from "./table-controls";
 
@@ -44,7 +44,7 @@ const sortPools = (pools: ActivePool[], sort: Sort, currency: Currency) =>
 
 export function ActivePositions({ pools, currency }: { pools: ActivePool[]; currency: Currency }) {
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<View>("table");
+  const [view, setView] = useView();
   const [sort, setSort] = useState<Sort>({ key: "age", dir: "desc" });
   const [share, setShare] = useState<ShareTarget | null>(null);
   const [sharing, setSharing] = useState(false);
