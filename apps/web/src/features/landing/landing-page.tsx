@@ -328,6 +328,9 @@ const SOURCES = [
   ["/brands/jupiter.png", "Jupiter"],
 ] as const;
 
+// GeckoTerminal's attribution guide asks for its unaltered logo with a link.
+const GECKOTERMINAL = "https://www.geckoterminal.com?utm_source=vexis&utm_medium=referral";
+
 function Sources() {
   return (
     <section className="section without-space">
@@ -342,6 +345,10 @@ function Sources() {
               {name}
             </span>
           ))}
+          <a href={GECKOTERMINAL} target="_blank" rel="noopener" className="vx-source vx-source-attributed">
+            <img src="/brands/geckoterminal.png" alt="" />
+            GeckoTerminal
+          </a>
         </div>
         <div className="line" />
       </div>
