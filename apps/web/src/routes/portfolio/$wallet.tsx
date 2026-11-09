@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, Outlet, stripSearchParams, useMatchRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { z } from "zod";
 import { CurrencyToggle } from "@/features/portfolio/components/currency-toggle";
 import { Notice } from "@/features/portfolio/components/notice";
@@ -8,6 +8,7 @@ import { WalletBar } from "@/features/portfolio/components/wallet-bar";
 import { RANGE_PRESETS, type RangePreset } from "@/features/portfolio/portfolio";
 import { WalletAddress } from "@/features/portfolio/portfolio.functions";
 import { portfolioQuery } from "@/features/portfolio/portfolio.queries";
+import { useTabSwipe } from "@/features/portfolio/tab-swipe";
 import { usePortfolio } from "@/features/portfolio/use-portfolio-view";
 import { useWallets } from "@/stores/wallets";
 
@@ -67,11 +68,22 @@ function PortfolioLayout() {
   // These tabs fill the viewport and scroll inside their table, with the toolbar and header pinned.
   const fixedHeight = onActive || onClosed || onTransactions;
   const { loaded, total, running } = portfolio.closedProgress;
+  const navigate = Route.useNavigate();
+  const activeTab = TABS.findIndex((tab) => matchRoute({ to: tab.to, params: { wallet }, fuzzy: !tab.exact }));
+  const swipe = useTabSwipe(activeTab, TABS.length, (i) => {
+    const tab = TABS[i];
+    if (tab) navigate({ to: tab.to, params: { wallet }, search: (prev) => prev });
+  });
+  const nav = useRef<HTMLElement>(null);
+  // A swipe can land on a tab scrolled out of the strip on a phone.
+  useEffect(() => {
+    nav.current?.children[activeTab]?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [activeTab]);
 
   return (
     <div className="flex h-full flex-col">
       <WalletBar wallet={wallet} />
-      <nav className="flex shrink-0 overflow-x-auto border-b px-2">
+      <nav ref={nav} className="flex shrink-0 overflow-x-auto border-b px-2">
         {TABS.map((tab) => (
           <Link
             key={tab.to}
@@ -86,7 +98,7 @@ function PortfolioLayout() {
           </Link>
         ))}
       </nav>
-      <div className={`flex min-h-0 flex-1 flex-col ${fixedHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
+      <div {...swipe} className={`flex min-h-0 flex-1 flex-col ${fixedHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
         {!ownToolbar && (
           <div className="flex items-center justify-between gap-2.5 px-2 pt-1.5 pb-0.5">
             <CurrencyToggle />
