@@ -24,6 +24,14 @@ const monthName = (year: number, month: number) =>
 const dayName = (date: number) =>
   new Date(date).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
+// Phone cells are ~40px wide, so they drop the SOL unit and round to six characters; the month total stays exact.
+function cellMoney(value: number, currency: Currency) {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : value > 0 ? "+" : "";
+  if (currency === "sol") return `${sign}${abs.toFixed(abs >= 100 ? 0 : abs >= 10 ? 1 : 2)}`;
+  return `${sign}$${abs >= 1e3 ? `${(abs / 1e3).toFixed(1)}K` : abs.toFixed(abs >= 10 ? 0 : 2)}`;
+}
+
 type Share =
   | { kind: "month" }
   | { kind: "day"; bucket: Bucket }
@@ -174,12 +182,16 @@ function CalendarGrid({
   onShareDay?: (bucket: Bucket) => void;
   onShareWeek?: (week: CalendarWeek, n: number) => void;
 }) {
-  const cellH = compact ? "h-[3.6rem]" : "h-[4.35rem]";
+  const cellH = compact ? "h-[3.6rem]" : "h-12 sm:h-[4.35rem]";
   const big = compact ? "text-[0.625rem]" : "text-[0.85rem]";
   const small = compact ? "text-[0.5rem]" : "text-[0.55rem]";
   return (
     <div
-      className={`grid ${compact ? "grid-cols-[repeat(7,1fr)_1.3fr]" : "min-w-[36rem] grid-cols-[repeat(7,1fr)_6.875rem]"}`}
+      className={`grid ${
+        compact
+          ? "grid-cols-[repeat(7,1fr)_1.3fr]"
+          : "grid-cols-[repeat(7,minmax(0,1fr))_minmax(0,1.3fr)] sm:min-w-[36rem] sm:grid-cols-[repeat(7,1fr)_6.875rem]"
+      }`}
     >
       {WEEKDAYS.map((d) => (
         <div
@@ -212,42 +224,77 @@ function CalendarGrid({
                   {cell.day}
                 </span>
                 {b && onShareDay && (
-                  <span className="absolute top-1.5 left-3.25">
-                    <ShareButton label={`Share ${dayName(cell.date)}`} onClick={() => onShareDay(b)} />
-                  </span>
+                  <>
+                    <span className="absolute top-1.5 left-1.5 sm:left-3.25">
+                      <ShareButton label={`Share ${dayName(cell.date)}`} onClick={() => onShareDay(b)} />
+                    </span>
+                    {/* The icon is too small to tap on a phone, so there the whole cell shares. */}
+                    <button
+                      type="button"
+                      aria-hidden
+                      tabIndex={-1}
+                      onClick={() => onShareDay(b)}
+                      className="absolute inset-0 z-10 sm:hidden"
+                    />
+                  </>
                 )}
                 {b && (
                   <div className="text-center leading-tight" data-share-item>
-                    <div className={`${big} font-bold whitespace-nowrap tabular-nums ${tone(b.value)}`}>
-                      {money(b.value, currency, { signed: true, digits: 2 })}
+                    {!compact && (
+                      <div
+                        className={`mt-4 text-[0.6rem] font-bold whitespace-nowrap tabular-nums sm:hidden ${tone(b.value)}`}
+                      >
+                        {cellMoney(b.value, currency)}
+                      </div>
+                    )}
+                    <div className={compact ? "" : "max-sm:hidden"}>
+                      <div className={`${big} font-bold whitespace-nowrap tabular-nums ${tone(b.value)}`}>
+                        {money(b.value, currency, { signed: true, digits: 2 })}
+                      </div>
+                      <div className={`${small} text-muted-foreground`}>
+                        {b.positions} position{b.positions === 1 ? "" : "s"}
+                      </div>
+                      <div className={`${small} tabular-nums text-muted-foreground`}>
+                        {pct(b.wins / b.positions, 1)}
+                      </div>
                     </div>
-                    <div className={`${small} text-muted-foreground`}>
-                      {b.positions} position{b.positions === 1 ? "" : "s"}
-                    </div>
-                    <div className={`${small} tabular-nums text-muted-foreground`}>{pct(b.wins / b.positions, 1)}</div>
                   </div>
                 )}
               </div>
             );
           })}
           <div
-            className={`flex ${cellH} flex-col items-center justify-center leading-tight ${compact ? "border-[0.025rem] border-border" : "ml-1.5 border-l"}`}
+            className={`flex ${cellH} flex-col items-center justify-center leading-tight ${compact ? "border-[0.025rem] border-border" : "ml-1 border-l sm:ml-1.5"}`}
             data-share-item
           >
             <span
-              className={`flex items-center gap-1.25 ${compact ? "text-[0.625rem] font-semibold" : "text-[0.65rem]"}`}
+              className={`flex items-center gap-1.25 ${compact ? "text-[0.625rem] font-semibold" : "text-[0.6rem] sm:text-[0.65rem]"}`}
             >
-              Week {wi + 1}
+              {compact ? (
+                `Week ${wi + 1}`
+              ) : (
+                <>
+                  <span className="sm:hidden">W{wi + 1}</span>
+                  <span className="max-sm:hidden">Week {wi + 1}</span>
+                </>
+              )}
               {onShareWeek && week.activeDays > 0 && (
                 <ShareButton label={`Share week ${wi + 1}`} onClick={() => onShareWeek(week, wi + 1)} />
               )}
             </span>
+            {!compact && (
+              <span className={`mt-0.5 text-[0.6rem] font-semibold tabular-nums sm:hidden ${tone(week.total)}`}>
+                {cellMoney(week.total, currency)}
+              </span>
+            )}
             <span
-              className={`mt-0.75 font-semibold tabular-nums ${compact ? "text-[0.55rem]" : "text-xs"} ${tone(week.total)}`}
+              className={`mt-0.75 font-semibold tabular-nums ${compact ? "text-[0.55rem]" : "text-xs max-sm:hidden"} ${tone(week.total)}`}
             >
               {money(week.total, currency, { digits: 2 })}
             </span>
-            <span className={`mt-0.5 text-muted-foreground ${compact ? "text-[0.5625rem]" : "text-[0.55rem]"}`}>
+            <span
+              className={`mt-0.5 text-muted-foreground ${compact ? "text-[0.5625rem]" : "text-[0.55rem] max-sm:hidden"}`}
+            >
               {week.activeDays} day{week.activeDays === 1 ? "" : "s"}
             </span>
           </div>

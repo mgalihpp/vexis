@@ -60,16 +60,20 @@ export interface BinView {
 }
 
 export interface DistributionBar {
+  /** First and last bin of the bar, equal unless neighbouring bins were merged. */
   id: number;
+  lastId: number;
   price: number;
+  lastPrice: number;
   xUsd: number;
   yUsd: number;
   active: boolean;
 }
 
 /**
- * Liquidity in USD of each bin within `reach` of the active bin, one bar per bin in price order. Bins below the
- * active price hold token Y, bins above hold X, and the active bin holds both.
+ * Liquidity in USD of the bins within `reach` of the active bin, in price order. Bins below the active price hold
+ * token Y, bins above hold X, and the active bin holds both. Past `maxBars` bins, neighbours on each side are merged
+ * outward from the active bin, which stays a bar of its own, so a wide reach still draws bars a pixel can show.
  */
 export function binDistribution(
   bins: BinView[],
@@ -77,11 +81,33 @@ export function binDistribution(
   reach: number,
   xUsd: number,
   yUsd: number,
+  maxBars = Number.POSITIVE_INFINITY,
 ): DistributionBar[] {
-  return bins
-    .filter((b) => Math.abs(b.id - activeId) <= reach)
-    .sort((a, b) => a.id - b.id)
-    .map((b) => ({ id: b.id, price: b.price, xUsd: b.x * xUsd, yUsd: b.y * yUsd, active: b.id === activeId }));
+  const size = Math.max(1, Math.ceil((2 * reach + 1) / maxBars));
+  const bars = new Map<number, DistributionBar>();
+  for (const b of [...bins].sort((a, b) => a.id - b.id)) {
+    const d = b.id - activeId;
+    if (Math.abs(d) > reach) continue;
+    const key = Math.sign(d) * Math.ceil(Math.abs(d) / size);
+    const bar = bars.get(key);
+    if (bar) {
+      bar.lastId = b.id;
+      bar.lastPrice = b.price;
+      bar.xUsd += b.x * xUsd;
+      bar.yUsd += b.y * yUsd;
+    } else {
+      bars.set(key, {
+        id: b.id,
+        lastId: b.id,
+        price: b.price,
+        lastPrice: b.price,
+        xUsd: b.x * xUsd,
+        yUsd: b.y * yUsd,
+        active: d === 0,
+      });
+    }
+  }
+  return [...bars.values()];
 }
 
 /** `0` when the denominator is empty so a dead pool shows 0x, not Infinity. */

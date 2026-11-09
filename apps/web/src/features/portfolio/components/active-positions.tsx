@@ -1,4 +1,4 @@
-import { ChevronRightIcon, LinkIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -82,25 +82,6 @@ export function ActivePositions({ pools, currency }: { pools: ActivePool[]; curr
         </div>
         <div className="flex items-center gap-1.25">
           <ViewToggle view={view} onChange={setView} />
-          {/* Signing needs a connected wallet; this dashboard only reads. */}
-          <button
-            type="button"
-            disabled
-            title="Coming soon"
-            className="ml-1 inline-flex h-6 items-center gap-1.5 rounded-md border border-loss/60 px-2 text-xs font-medium text-loss disabled:cursor-not-allowed"
-          >
-            <XIcon className="size-2.75" />
-            Close all
-          </button>
-          <button
-            type="button"
-            disabled
-            title="Coming soon"
-            className="inline-flex h-6 items-center gap-1.5 rounded-md border border-brand/60 px-2 text-xs font-medium text-brand disabled:cursor-not-allowed"
-          >
-            <LinkIcon className="size-2.75" />
-            Claim all
-          </button>
         </div>
       </div>
 
