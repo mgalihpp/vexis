@@ -323,9 +323,9 @@ function Hero() {
 }
 
 const SOURCES = [
-  ["/links/meteora.png", "Meteora"],
-  ["/Solana_logo.png", "Solana"],
-  ["/brands/jupiter.png", "Jupiter"],
+  ["/links/meteora.png", "Meteora", "https://www.meteora.ag"],
+  ["/Solana_logo.png", "Solana", "https://solana.com"],
+  ["/brands/jupiter.png", "Jupiter", "https://jup.ag"],
 ] as const;
 
 // GeckoTerminal's attribution guide asks for its unaltered logo with a link.
@@ -339,11 +339,11 @@ function Sources() {
           Powered by the best of Solana
         </div>
         <div className="logos-banner vx-sources" data-reveal="">
-          {SOURCES.map(([src, name]) => (
-            <span key={name} className="vx-source">
+          {SOURCES.map(([src, name, href]) => (
+            <a key={name} href={href} target="_blank" rel="noopener" className="vx-source">
               <img src={src} alt="" />
               {name}
-            </span>
+            </a>
           ))}
           <a href={GECKOTERMINAL} target="_blank" rel="noopener" className="vx-source vx-source-attributed">
             <img src="/brands/geckoterminal.png" alt="" />
