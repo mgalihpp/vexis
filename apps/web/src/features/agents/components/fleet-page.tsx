@@ -1,12 +1,11 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { BotIcon, ChevronRightIcon, PauseIcon, PlayIcon, PlusIcon } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tile } from "@/features/portfolio/components/active-figures";
-import { SCROLL_TABLE, type View, ViewToggle } from "@/features/portfolio/components/table-controls";
+import { SCROLL_TABLE, useView, ViewToggle } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
 import { type AgentView, agentName, agentStatus, formatMinutes, ruleSummary, summarizeFleet } from "../agents";
 import { setAgentRunning } from "../agents.functions";
@@ -17,7 +16,7 @@ import { EmptyAgents } from "./empty-agents";
 
 export function FleetPage() {
   const { data } = useSuspenseQuery(agentsQuery);
-  const [view, setView] = useState<View>("table");
+  const [view, setView] = useView();
   if (data.agents.length === 0) return <EmptyAgents />;
   const summary = summarizeFleet(data.agents);
 
