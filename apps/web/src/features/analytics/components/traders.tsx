@@ -35,7 +35,7 @@ import {
   WHALE_HOLD_USD,
   WHALE_TRADE_USD,
 } from "../traders";
-import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -573,15 +573,18 @@ function Loaded({ data }: { data: Ok }) {
             <TabsTrigger value="recent">Recent trades</TabsTrigger>
             {showTop && <TabsTrigger value="top">Top traders</TabsTrigger>}
           </TabsList>
-          {tab === "recent" && (
-            <TradeFilterMenu
-              filter={filter}
-              onChange={(next) => {
-                setFilter(next);
-                setPage(0);
-              }}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            <Updated at={data.fetchedAt} />
+            {tab === "recent" && (
+              <TradeFilterMenu
+                filter={filter}
+                onChange={(next) => {
+                  setFilter(next);
+                  setPage(0);
+                }}
+              />
+            )}
+          </div>
         </div>
         <TabsContent value="recent">
           <RecentTrades

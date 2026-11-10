@@ -21,7 +21,7 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { amount, CollapsiblePanel, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, sol3, solAmount, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
@@ -544,18 +544,21 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
                 firstPage();
               }}
             />
-            <WalletFilterMenu
-              range={range}
-              pnl={pnl}
-              onRange={(next) => {
-                setRange(next);
-                firstPage();
-              }}
-              onPnl={(next) => {
-                setPnl(next);
-                firstPage();
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <Updated at={data.scannedAt} />
+              <WalletFilterMenu
+                range={range}
+                pnl={pnl}
+                onRange={(next) => {
+                  setRange(next);
+                  firstPage();
+                }}
+                onPnl={(next) => {
+                  setPnl(next);
+                  firstPage();
+                }}
+              />
+            </div>
           </div>
           {matched.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">No wallets match.</p>

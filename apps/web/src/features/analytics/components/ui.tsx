@@ -1,6 +1,9 @@
 import { ChevronDownIcon } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { useStamp } from "@/features/timezone/timezone";
+import { useNow } from "@/hooks/use-now";
+import { age } from "../analytics";
 
 /**
  * Whether a panel is expanded, remembered per browser under `key`. The server always renders it open; the saved
@@ -55,6 +58,17 @@ export function CollapsiblePanel({
     <Panel className={className} title={title} aside={<CollapseToggle open={open} onToggle={toggle} name={name} />}>
       {open && children}
     </Panel>
+  );
+}
+
+/** How long ago a section's data was fetched on the server, ticking; the exact time is in the tooltip. */
+export function Updated({ at }: { at: number }) {
+  const stamp = useStamp();
+  const now = useNow(at);
+  return (
+    <span className="whitespace-nowrap text-[11px] text-muted-foreground" title={stamp(at)}>
+      Updated {age(at, now)} ago
+    </span>
   );
 }
 
