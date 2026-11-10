@@ -603,8 +603,8 @@
   }
   
   /* In-page links land below the fixed navbar; the invite form keeps the headline above it in view. */
-  .vx-page [id] { scroll-margin-top: 90px; }
-  .vx-page #request { scroll-margin-top: 140px; }
+  [id] { scroll-margin-top: 90px; }
+  #request { scroll-margin-top: 140px; }
 }
 @keyframes vx-dots { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 @keyframes vx-flow { to { stroke-dashoffset: -440; } }
