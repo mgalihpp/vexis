@@ -1,5 +1,13 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { ChevronDownIcon, CircleCheckIcon, CircleXIcon, ExternalLinkIcon, FilterIcon, InfoIcon } from "lucide-react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ChevronDownIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  ExternalLinkIcon,
+  FilterIcon,
+  InfoIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,7 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { useStamp } from "@/features/timezone/timezone";
+import { useNow } from "@/hooks/use-now";
 import { age } from "../analytics";
+import { getTrackedPositions } from "../analytics.functions";
 import { trackedQuery } from "../analytics.queries";
 import {
   filterWallets,
@@ -16,6 +26,7 @@ import {
   rangeBar,
   sumKnown,
   TRACKED_PAGE_SIZES,
+  TRACKED_REFRESH_MS,
   type TrackedPageSize,
   type TrackedPosition,
   type TrackedResult,
@@ -483,6 +494,52 @@ function WalletFilterMenu({
   );
 }
 
+/**
+ * Asks the server for a new scan of the pool and new figures for this page. Off for a minute after a scan and while
+ * the totals are loading, which is when the server would ignore it.
+ */
+function RefreshButton({
+  pool,
+  page,
+  pageSize,
+  data,
+}: {
+  pool: string;
+  page: number;
+  pageSize: TrackedPageSize;
+  data: Extract<TrackedResult, { ok: true }>;
+}) {
+  const queryClient = useQueryClient();
+  const now = useNow(data.scannedAt);
+  const refresh = useMutation({
+    mutationFn: () => getTrackedPositions({ data: { pool, page, pageSize, refresh: true } }),
+    onSuccess: async (next) => {
+      // The other pages come from the old scan; they refetch when opened.
+      await queryClient.invalidateQueries({ queryKey: ["analytics", "tracked", pool], refetchType: "none" });
+      queryClient.setQueryData(trackedQuery({ pool, page, pageSize }).queryKey, next);
+    },
+  });
+  const why = refresh.isPending
+    ? "Refreshing"
+    : data.totals.running
+      ? "Fees and PnL are still loading"
+      : now - data.scannedAt < TRACKED_REFRESH_MS
+        ? "Refreshed less than a minute ago"
+        : null;
+  return (
+    <button
+      type="button"
+      aria-label="Refresh tracked wallets"
+      title={why ?? "Refresh"}
+      disabled={why != null}
+      onClick={() => refresh.mutate()}
+      className="p-1.25 text-foreground/80 hover:text-foreground disabled:text-muted-foreground/50"
+    >
+      <RefreshCwIcon className={`size-3.25 ${refresh.isPending ? "animate-spin" : ""}`} />
+    </button>
+  );
+}
+
 export function TrackedWallets(props: { pool: string; base: Token; quote: Token }) {
   return (
     <CollapsiblePanel
@@ -544,8 +601,9 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
                 firstPage();
               }}
             />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Updated at={data.scannedAt} />
+              <RefreshButton pool={pool} page={page} pageSize={paging.size} data={data} />
               <WalletFilterMenu
                 range={range}
                 pnl={pnl}

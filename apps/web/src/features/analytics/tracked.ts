@@ -49,6 +49,9 @@ export interface PoolTotals {
 export const TRACKED_PAGE_SIZES = [10, 25, 50] as const;
 export type TrackedPageSize = (typeof TRACKED_PAGE_SIZES)[number];
 
+/** How old a pool's scan must be before a refresh scans again. */
+export const TRACKED_REFRESH_MS = 60_000;
+
 export type TrackedResult =
   | {
       ok: true;
