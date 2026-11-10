@@ -89,7 +89,7 @@ export function PoolFilter({
   placeholder?: string;
 }) {
   return (
-    <label className="relative w-full max-w-[16rem]">
+    <label className="relative w-full min-w-0 max-w-[16rem]">
       <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.25 -translate-y-1/2 text-muted-foreground" />
       <input
         value={value}
