@@ -5,6 +5,7 @@ import {
   ExternalLinkIcon,
   FilterIcon,
   FishSymbolIcon,
+  InfoIcon,
   type LucideIcon,
   MegaphoneIcon,
 } from "lucide-react";
@@ -35,7 +36,7 @@ import {
   WHALE_HOLD_USD,
   WHALE_TRADE_USD,
 } from "../traders";
-import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, usd } from "./ui";
+import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -573,15 +574,18 @@ function Loaded({ data }: { data: Ok }) {
             <TabsTrigger value="recent">Recent trades</TabsTrigger>
             {showTop && <TabsTrigger value="top">Top traders</TabsTrigger>}
           </TabsList>
-          {tab === "recent" && (
-            <TradeFilterMenu
-              filter={filter}
-              onChange={(next) => {
-                setFilter(next);
-                setPage(0);
-              }}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            <Updated at={data.fetchedAt} />
+            {tab === "recent" && (
+              <TradeFilterMenu
+                filter={filter}
+                onChange={(next) => {
+                  setFilter(next);
+                  setPage(0);
+                }}
+              />
+            )}
+          </div>
         </div>
         <TabsContent value="recent">
           <RecentTrades
@@ -607,10 +611,25 @@ function Loaded({ data }: { data: Ok }) {
   );
 }
 
+const NOTE =
+  "Recent trades are this pool's own swaps, refreshed every minute. Whale, smart money and KOL lists cover the token on every pool and refresh once a day.";
+
 /** Loaded on the client only, since the trader lists count against the Solana Tracker quota. */
 export function Traders({ pool }: { pool: string }) {
   return (
-    <CollapsiblePanel storageKey="vexis-traders-open" name="traders" title="Traders" className="@container">
+    <CollapsiblePanel
+      storageKey="vexis-traders-open"
+      name="traders"
+      className="@container"
+      title={
+        <span className="flex items-center gap-1.5">
+          Traders
+          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
+            <InfoIcon className="size-3.5 text-muted-foreground" />
+          </InfoTip>
+        </span>
+      }
+    >
       <TradersBody pool={pool} />
     </CollapsiblePanel>
   );

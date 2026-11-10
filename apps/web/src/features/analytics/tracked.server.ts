@@ -8,6 +8,7 @@ import {
   type PoolTotals,
   sumKnown,
   TRACKED_PAGE_SIZES,
+  TRACKED_REFRESH_MS,
   type TrackedPageSize,
   type TrackedPosition,
   type TrackedResult,
@@ -237,7 +238,19 @@ function buildPosition(p: OnChainPosition, row: PnlRow | undefined): TrackedPosi
 
 const fail = (message: string): TrackedResult => ({ ok: false, message });
 
-async function buildPage(pool: string, page: number, pageSize: number): Promise<TrackedResult> {
+/**
+ * Drops the pool's scan so the next read scans again. Refused within a minute of the last scan and while the totals
+ * job runs: a new scan restarts that job, which costs one Meteora call per wallet in the pool.
+ */
+function expireScan(pool: string): boolean {
+  const hit = scanCache.get(pool);
+  if (!hit || Date.now() - hit.at < TRACKED_REFRESH_MS || totalsJobs.get(pool)?.running) return false;
+  scanCache.delete(pool);
+  return true;
+}
+
+async function buildPage(pool: string, page: number, pageSize: number, refresh: boolean): Promise<TrackedResult> {
+  const refreshed = refresh && expireScan(pool);
   let scan: Scan;
   try {
     scan = await scanFor(pool);
@@ -246,12 +259,14 @@ async function buildPage(pool: string, page: number, pageSize: number): Promise<
   }
 
   const { groups } = scan;
-  const job = totalsJobFor(pool, scan);
   const pages = Math.max(1, Math.ceil(groups.length / pageSize));
   const slice = groups.slice((page - 1) * pageSize, page * pageSize);
+  const owners = slice.map((g) => g.owner);
+  // Before the totals job starts, since it reuses cached detail.
+  if (refreshed) for (const owner of owners) detailCache.delete(`${pool}:${owner}`);
+  const job = totalsJobFor(pool, scan);
 
   const details = new Map<string, PnlRow>();
-  const owners = slice.map((g) => g.owner);
   let next = 0;
   const worker = async () => {
     while (next < owners.length) {
@@ -309,12 +324,14 @@ async function buildPage(pool: string, page: number, pageSize: number): Promise<
 
 /**
  * One page of the pool's wallets with open positions, newest activity first. The scan is cached per pool for five
- * minutes and each wallet's Meteora detail for one minute, so paging back does not refetch.
+ * minutes and each wallet's Meteora detail for one minute, so paging back does not refetch. `refresh` asks for a
+ * new scan and new detail for this page; see `expireScan` for when it is honored.
  */
 export function trackedPositions(
   pool: string,
   page = 1,
   pageSize: TrackedPageSize = TRACKED_PAGE_SIZES[0],
+  refresh = false,
 ): Promise<TrackedResult> {
-  return buildPage(pool, page, pageSize);
+  return buildPage(pool, page, pageSize, refresh);
 }
