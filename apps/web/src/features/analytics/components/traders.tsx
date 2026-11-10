@@ -5,6 +5,7 @@ import {
   ExternalLinkIcon,
   FilterIcon,
   FishSymbolIcon,
+  InfoIcon,
   type LucideIcon,
   MegaphoneIcon,
 } from "lucide-react";
@@ -610,10 +611,25 @@ function Loaded({ data }: { data: Ok }) {
   );
 }
 
+const NOTE =
+  "Recent trades are this pool's own swaps, refreshed every minute. Whale, smart money and KOL lists cover the token on every pool and refresh once a day.";
+
 /** Loaded on the client only, since the trader lists count against the Solana Tracker quota. */
 export function Traders({ pool }: { pool: string }) {
   return (
-    <CollapsiblePanel storageKey="vexis-traders-open" name="traders" title="Traders" className="@container">
+    <CollapsiblePanel
+      storageKey="vexis-traders-open"
+      name="traders"
+      className="@container"
+      title={
+        <span className="flex items-center gap-1.5">
+          Traders
+          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
+            <InfoIcon className="size-3.5 text-muted-foreground" />
+          </InfoTip>
+        </span>
+      }
+    >
       <TradersBody pool={pool} />
     </CollapsiblePanel>
   );
