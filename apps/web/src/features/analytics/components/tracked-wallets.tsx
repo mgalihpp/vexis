@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
+import { collapseZeros } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
 import { age } from "../analytics";
@@ -39,7 +40,9 @@ type Token = { symbol: string; icon: string | null };
 
 const NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
-const price = (v: number | null) => (v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
+// Five digits, not formatPrice's three, so the two ends of a narrow range stay distinct.
+const price = (v: number | null) =>
+  v == null ? NA : collapseZeros(v.toLocaleString("en-US", { maximumSignificantDigits: 5 }));
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 interface Totals {
@@ -282,7 +285,7 @@ function PositionRow({
       <Cell label="Range" className="col-span-full @2xl:col-span-1">
         {/* Price and bar share a line until the table layout, where the column is too narrow for both. */}
         <div className="flex flex-col @md:flex-row @md:items-center @md:gap-4 @2xl:flex-col @2xl:items-stretch @2xl:gap-0">
-          <span className="font-semibold whitespace-nowrap">
+          <span className="truncate font-semibold">
             {price(p.minPrice)} – {price(p.maxPrice)}
           </span>
           <div className="min-w-0 flex-1">

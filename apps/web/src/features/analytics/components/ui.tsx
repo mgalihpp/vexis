@@ -81,7 +81,7 @@ export const compact = (v: number) => compactFmt.format(v);
 
 export const short = (address: string) => `${address.slice(0, 4)}…${address.slice(-4)}`;
 export const amount = (v: number | null) =>
-  v == null ? NA : v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+  v == null ? NA : Math.abs(v) >= 1e4 ? compact(v) : v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 export const usd = (v: number | null, signed = false) =>
   v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}$${compact(Math.abs(v))}`;
 export const sol3 = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 1000);

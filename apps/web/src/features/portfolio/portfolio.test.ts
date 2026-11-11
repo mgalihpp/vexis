@@ -268,6 +268,9 @@ test("active formatters", () => {
   expect(compactUsd(114_200)).toBe("$114.20K");
   expect(compactUsd(950.123)).toBe("$950.12");
   expect(formatPrice(0.00078366)).toBe("0.000784");
+  expect(formatPrice(0.000058786)).toBe("0.0₄588");
+  expect(formatPrice(0.000000058786)).toBe("0.0₇588");
+  expect(formatPrice(0.0000000000123)).toBe("0.0₁₀123");
   expect(formatPrice(152.123456)).toBe("152.1235");
   expect(utcStamp(at("2026-10-30T20:30:10Z"), " at ")).toBe("Oct 30, 2026 at 20:30:10");
   expect(utcStamp(at("2026-10-30T00:00:01Z"))).toBe("Oct 30, 2026 00:00:01");

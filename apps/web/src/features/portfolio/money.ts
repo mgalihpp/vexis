@@ -35,8 +35,18 @@ export function compactUsd(value: number) {
 const smallPrice = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 });
 const largePrice = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });
 
+const SUBSCRIPT = "₀₁₂₃₄₅₆₇₈₉";
+
+/** `0.0000000588` reads as `0.0₇588`: four or more zeros after the point collapse into a subscript count. */
+export const collapseZeros = (formatted: string) =>
+  formatted.replace(
+    /^(-?0\.)(0{4,})/,
+    (_, head: string, zeros: string) =>
+      `${head}0${[...String(zeros.length)].map((d) => SUBSCRIPT[Number(d)]).join("")}`,
+  );
+
 /** Pool prices are often tiny (`0.000783`), so below 1 they keep three significant digits. */
-export const formatPrice = (value: number) => (value < 1 ? smallPrice : largePrice).format(value);
+export const formatPrice = (value: number) => collapseZeros((value < 1 ? smallPrice : largePrice).format(value));
 
 const largeAmount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 });
 
