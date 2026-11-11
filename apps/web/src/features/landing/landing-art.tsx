@@ -1,4 +1,4 @@
-import { Eye, ShieldCheck } from "lucide-react";
+import { Eye, ShieldCheck, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The Vexis mark, traced from public/logo.png.
@@ -290,69 +290,83 @@ export function AnalyticsWindow() {
   );
 }
 
-// A deterministic field of pools for the scanner: an integer LCG, so the server and the browser draw the same tiles.
-const COLS = 10;
-const ROWS = 6;
-const PICKS = new Map([
-  [1 * COLS + 6, 1],
-  [3 * COLS + 2, 2],
-  [4 * COLS + 8, 3],
-]);
-const FLAGS = new Set([0 * COLS + 3, 5 * COLS + 5]);
-let seed = 42;
-const TILES = Array.from({ length: COLS * ROWS }, (_, i) => {
-  seed = (seed * 48271) % 2147483647;
-  return { shade: seed % 3, pick: PICKS.get(i), flag: FLAGS.has(i) };
-});
+// Sample screener rows, highest Fee/TVL first. APR is 24h Fee/TVL times 365, as on the real page;
+// pace is Fee/TVL per hour, oldest first.
+const POOLS = [
+  {
+    x: "BONK",
+    y: "SOL",
+    step: 100,
+    feeTvl: 3.91,
+    tvl: "$310K",
+    pace: [92, 70, 58, 44, 36, 30],
+    cooling: true,
+    warn: true,
+  },
+  { x: "WIF", y: "SOL", step: 80, feeTvl: 2.27, tvl: "$1.07M", pace: [30, 34, 51, 47, 63, 82] },
+  { x: "JUP", y: "SOL", step: 20, feeTvl: 1.84, tvl: "$4.21M", pace: [40, 46, 52, 61, 74, 88] },
+  { x: "JUP", y: "USDC", step: 25, feeTvl: 0.95, tvl: "$640K", pace: [55, 50, 57, 52, 49, 54] },
+  { x: "SOL", y: "USDC", step: 10, feeTvl: 0.62, tvl: "$12.8M", pace: [48, 52, 50, 55, 51, 53] },
+];
+const LOGOS: Record<string, string> = {
+  JUP: "/brands/jupiter.png",
+  SOL: "/Solana_logo.png",
+  USDC: "/usd-coin-usdc-logo.png",
+};
 
-/** The screener as a scanner: every pool a tile, the best earners lit and the risky ones flagged. */
-export function ScreenerScan() {
+function Token({ symbol }: { symbol: string }) {
+  const logo = LOGOS[symbol];
+  return logo ? <img src={logo} alt="" /> : <span className="vx-app-letter">{symbol[0]}</span>;
+}
+
+/** A miniature of the Screener page, sorted by Fee/TVL, in the same window as the Analytics one. */
+export function ScreenerWindow() {
   return (
-    <div
-      className="vx-scan"
-      role="img"
-      aria-label="Pool screener scanning 620 sample pools, three picks and two flagged"
-    >
-      <div className="vx-scan-head vx-num">
-        <span>620 pools</span>
-        <span>
-          <i />3 picks <i className="flag" />2 flagged
-        </span>
-      </div>
-      <div className="vx-scan-grid">
-        {TILES.map((t, i) => (
-          <i
-            // biome-ignore lint/suspicious/noArrayIndexKey: tiles are positional
-            key={i}
-            className={cn(`s${t.shade}`, t.pick && "pick", t.flag && "flag")}
-          >
-            {t.pick}
-          </i>
-        ))}
-      </div>
-      <div className="vx-scan-pick">
-        <span className="vx-scan-pair">
-          <span>
-            <img src="/Solana_logo.png" alt="" />
-            <img src="/usd-coin-usdc-logo.png" alt="" />
-          </span>
-          <b>SOL-USDC</b>
-          <small>Top pick</small>
-        </span>
-        <span className="vx-scan-stats">
-          <span>
-            <small>Fee/TVL 24h</small>
-            <b className="vx-num">0.92%</b>
-          </span>
-          <span>
-            <small>APR</small>
-            <b className="vx-num">336%</b>
-          </span>
-          <span>
-            <small>Pace</small>
-            <b className="vx-num up">1.4×</b>
-          </span>
-        </span>
+    <div className="vx-window" role="img" aria-label="The Screener page ranking sample pools by Fee/TVL">
+      <div className="vx-app">
+        <AppNav on="Screener" />
+        <div className="vx-app-body vx-app-screener">
+          <div className="vx-app-panel vx-app-filters">
+            <span className="on">Fee/TVL 24h ↓</span>
+            <span>TVL ≥ $100K</span>
+            <span>Bin step 20–80</span>
+          </div>
+          <div className="vx-app-panel vx-app-table">
+            <div className="vx-app-row head">
+              <span>Pool</span>
+              <span>Fee/TVL 24h</span>
+              <span>Fee pace</span>
+              <span>APR</span>
+              <span>TVL</span>
+            </div>
+            {POOLS.map((p) => (
+              <div key={`${p.x}-${p.y}`} className="vx-app-row">
+                <span className="vx-app-pair">
+                  <span className="vx-app-tokens">
+                    <Token symbol={p.x} />
+                    <Token symbol={p.y} />
+                  </span>
+                  <span>
+                    <b>
+                      {p.x}-{p.y}
+                      {p.warn && <TriangleAlert className="vx-app-warn" aria-hidden="true" />}
+                    </b>
+                    <small>Bin step {p.step}</small>
+                  </span>
+                </span>
+                <b className="vx-num">{p.feeTvl.toFixed(2)}%</b>
+                <span className={cn("vx-app-pace", p.cooling && "down")}>
+                  {p.pace.map((h, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: hours are positional
+                    <i key={i} style={{ height: `${h}%` }} />
+                  ))}
+                </span>
+                <b className="vx-num">{Math.round(p.feeTvl * 365)}%</b>
+                <b className="vx-num">{p.tvl}</b>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
