@@ -27,6 +27,7 @@ import {
   HeroChart,
   PnlCard,
   SafetyCards,
+  ScreenerCards,
 } from "./landing-art";
 import { Shader } from "./landing-shader";
 
@@ -382,9 +383,20 @@ function Benefits() {
           </div>
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
-            <div className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted" data-reveal="">
-              <AnalyticsWindow />
+            <div className="content-home-1-wrapper home-3-central-block vx-sc-card vx-dotted" data-reveal="">
+              <ScreenerCards />
             </div>
+            <div className="content-benefits-wrapper small-content">
+              <h3 data-reveal="">Find the pools worth your liquidity.</h3>
+              <p data-reveal="">
+                Hundreds of DLMM pools in one list, ranked by how hard they earn for their size. Filter by TVL, volume
+                and bin step, watch which pools are heating up, and see the risky ones flagged before you dive in.
+              </p>
+              <Checks items={["Pool Screener", "Risk Warnings"]} />
+            </div>
+          </div>
+          <div className="benefit-line" data-reveal="" />
+          <div className="benefits-wrapper">
             <div className="content-benefits-wrapper small-content">
               <h3 data-reveal="">Stay ahead with live pool data and liquidity insights.</h3>
               <p data-reveal="">
@@ -393,9 +405,17 @@ function Benefits() {
               </p>
               <Checks items={["Live Liquidity Map", "Smart Wallet Tracking"]} />
             </div>
+            <div className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted" data-reveal="">
+              <AnalyticsWindow />
+            </div>
           </div>
           <div className="benefit-line" data-reveal="" />
-          <div className="benefits-wrapper">
+          <div className="benefits-wrapper central-block">
+            <div className="content-home-1-wrapper last-item-home-3 vx-tg-card vx-dotted" data-reveal="">
+              <h4 className="relative">Alerts that find you</h4>
+              <AlertPhone />
+              <p className="small-paragraph">Be the first to know when a pool heats up, wherever you are.</p>
+            </div>
             <div className="content-benefits-wrapper">
               <h3 className="max-w-400px" data-reveal="">
                 Automate your watchlist and never miss a big move.
@@ -405,11 +425,6 @@ function Benefits() {
                 drifts out of range, you hear about it first, and Vexis can keep your range in shape for you.
               </p>
               <Checks items={["Instant Telegram Alerts", "Hands-Free Range Care"]} />
-            </div>
-            <div className="content-home-1-wrapper last-item-home-3 vx-tg-card vx-dotted" data-reveal="">
-              <h4 className="relative">Alerts that find you</h4>
-              <AlertPhone />
-              <p className="small-paragraph">Be the first to know when a pool heats up, wherever you are.</p>
             </div>
           </div>
         </div>
@@ -422,7 +437,7 @@ const INSIGHTS = [
   [Wallet, "Net P&L", "Know exactly what you earned after fees."],
   [TrendingUp, "Profit factor", "See how far your wins outweigh your losses."],
   [Calendar, "Winning days", "Find out how often your days close green."],
-  [Gauge, "Pool yield", "Spot the pools that pay the most for their size."],
+  [Gauge, "Fee pace", "Spot the pools earning more this hour than their daily average."],
   [Target, "LPs in range", "See who is still earning in a pool right now."],
   [Users, "Smart money", "Know whether whales and KOLs are still holding."],
 ] as const;
@@ -521,8 +536,8 @@ function Security() {
 const STEPS = [
   ["Step 1 · Track", "Paste a wallet address and watch your entire DLMM history come together."],
   [
-    "Step 2 · Understand",
-    "Open any pool to see its liquidity, its earnings and its biggest players before you jump in.",
+    "Step 2 · Discover",
+    "Screen hundreds of pools, then open one to see its liquidity, its earnings and its biggest players.",
   ],
   ["Step 3 · Automate", "Set a rule once and let Vexis watch your pools, even while you sleep."],
 ] as const;
@@ -601,13 +616,25 @@ const PLANS = [
     label: "Insights",
     name: "Track",
     text: "Understand every position and every pool before your next move.",
-    items: ["Portfolio & Profit Tracking", "Daily Profit Calendar", "Pool Analytics", "Smart Wallet Tracking"],
+    items: [
+      "Portfolio & Profit Tracking",
+      "Daily Profit Calendar",
+      "Pool Screener",
+      "Pool Analytics",
+      "Smart Wallet Tracking",
+    ],
   },
   {
     label: "Automation",
     name: "Automate",
     text: "Let Vexis watch your pools and act on your rules around the clock.",
-    items: ["Instant Telegram Alerts", "Volume Spike Detection", "Hands-Free Range Care", "Safe Preview Mode"],
+    items: [
+      "Instant Telegram Alerts",
+      "Volume Spike Detection",
+      "Hands-Free Range Care",
+      "Auto-Compound Fees",
+      "Safe Preview Mode",
+    ],
   },
 ];
 
@@ -725,6 +752,7 @@ const FOOTER_LINKS = [
     links: [
       ["/portfolio", "Portfolio"],
       ["/analytics", "Analytics"],
+      ["/screener", "Screener"],
       ["/agents", "Agents"],
     ],
   },

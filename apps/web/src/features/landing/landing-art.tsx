@@ -1,4 +1,4 @@
-import { Eye, ShieldCheck } from "lucide-react";
+import { ChevronUp, CircleDollarSign, Clock, Eye, Footprints, ShieldAlert, ShieldCheck, Snowflake } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The Vexis mark, traced from public/logo.png.
@@ -161,6 +161,24 @@ const CLOSES = [
   3.4, 3.38, 3.41,
 ];
 
+const APP_PAGES = ["Portfolio", "Analytics", "Screener", "Agents"] as const;
+
+function AppNav({ on }: { on: (typeof APP_PAGES)[number] }) {
+  return (
+    <div className="vx-app-nav">
+      <svg viewBox="-10 -10 200 184" aria-hidden="true">
+        <path d={MARK} fill="currentColor" fillRule="evenodd" />
+      </svg>
+      <b>Vexis</b>
+      {APP_PAGES.map((page) => (
+        <span key={page} className={cn(page === on && "on")}>
+          {page}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** A miniature of the Analytics page, cropped by the card the way the phone is. */
 export function AnalyticsWindow() {
   const lo = Math.min(...CLOSES) - 0.04;
@@ -169,15 +187,7 @@ export function AnalyticsWindow() {
   return (
     <div className="vx-window" role="img" aria-label="The Analytics page for a sample JUP-SOL pool">
       <div className="vx-app">
-        <div className="vx-app-nav">
-          <svg viewBox="-10 -10 200 184" aria-hidden="true">
-            <path d={MARK} fill="currentColor" fillRule="evenodd" />
-          </svg>
-          <b>Vexis</b>
-          <span>Portfolio</span>
-          <span className="on">Analytics</span>
-          <span>Agents</span>
-        </div>
+        <AppNav on="Analytics" />
         <div className="vx-app-body">
           <div className="vx-app-col">
             <div className="vx-app-panel">
@@ -276,6 +286,157 @@ export function AnalyticsWindow() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Two sample pools as the Screener's mobile cards draw them, sorted by Fee/TVL 24h.
+// APR is Fee/TVL times 365 and the Fee/TVL bar is the square root of the share of the top pool, as on the real page.
+const SCREENER_CARDS = [
+  {
+    x: "NEW",
+    y: "SOL",
+    step: 100,
+    fee: "2.00%",
+    age: "3d",
+    feeTvl: 6.42,
+    flags: [
+      { Icon: ShieldAlert, label: "Unverified", tone: "amber" },
+      { Icon: Snowflake, label: "Freezable", tone: "sky" },
+    ],
+    pace: [38, 44, 52, 70, 86, 100],
+    momentum: "1.84×",
+    stats: [
+      ["Volume 24h", "$2.1M", "12.65K SOL"],
+      ["TVL", "$410K", "2.47K SOL"],
+      ["Fee pace", null, null],
+      ["APR", "2,343%", null],
+      ["Price 24h", "+38.2%", null],
+      ["Net flow", "+$62K", "+373 SOL"],
+      ["Vol/TVL", "5.12×", null],
+      ["Swaps", "18.4K", null],
+      ["Market cap", "$8.6M", null],
+    ],
+  },
+  {
+    x: "SOL",
+    y: "USDC",
+    step: 10,
+    fee: "0.10%",
+    age: "1y",
+    feeTvl: 0.92,
+    flags: [],
+    pace: [],
+    momentum: "",
+    stats: [],
+  },
+] as const;
+const TOP_FEE_TVL = SCREENER_CARDS[0].feeTvl;
+const PRICE_TREND = "0,15 8,14 16,15 24,11 32,12 40,7 48,5 56,2";
+const TOKEN_LOGOS: Partial<Record<string, string>> = { SOL: "/Solana_logo.png", USDC: "/usd-coin-usdc-logo.png" };
+const TRADE_LOGOS = ["/brands/jupiter.png", "/brands/gmgn.png", "/links/bubblemaps.png"];
+
+function CardToken({ symbol }: { symbol: string }) {
+  const logo = TOKEN_LOGOS[symbol];
+  return logo ? <img src={logo} alt="" /> : <span className="vx-sc-letter">{symbol[0]}</span>;
+}
+
+/** The Screener's pool cards, the way a phone shows them: the hottest pool in full and the next one peeking in. */
+export function ScreenerCards() {
+  return (
+    <div className="vx-sc-stage" role="img" aria-label="Screener pool cards for two sample pools, the first flagged">
+      {SCREENER_CARDS.map((c, i) => (
+        <div key={c.x} className="vx-sc">
+          <div className="vx-sc-top">
+            <span className="vx-sc-pair">
+              <span className="vx-sc-tokens">
+                <CardToken symbol={c.x} />
+                <CardToken symbol={c.y} />
+              </span>
+              <span>
+                <span className="vx-sc-name">
+                  <b>
+                    {c.x}-{c.y}
+                  </b>
+                  <small className="vx-num">#{i + 1}</small>
+                </span>
+                <span className="vx-sc-chips">
+                  <span className="blue">
+                    <Footprints aria-hidden="true" />
+                    {c.step}
+                  </span>
+                  <span className="orange">
+                    <CircleDollarSign aria-hidden="true" />
+                    {c.fee}
+                  </span>
+                  <span className="purple">
+                    <Clock aria-hidden="true" />
+                    {c.age}
+                  </span>
+                </span>
+              </span>
+            </span>
+            <span className="vx-sc-heat">
+              <b className="vx-num">{c.feeTvl.toFixed(2)}%</b>
+              <i>
+                <i style={{ width: `${Math.sqrt(c.feeTvl / TOP_FEE_TVL) * 100}%` }} />
+              </i>
+              <small>Fee/TVL 24h</small>
+            </span>
+          </div>
+          <div className="vx-sc-flags">
+            {c.flags.map(({ Icon, label, tone }) => (
+              <span key={label} className={tone}>
+                <Icon aria-hidden="true" />
+                {label}
+              </span>
+            ))}
+            <span className="vx-sc-trade">
+              {TRADE_LOGOS.map((src) => (
+                <img key={src} src={src} alt="" />
+              ))}
+            </span>
+          </div>
+          {c.stats.length > 0 && (
+            <div className="vx-sc-stats">
+              {c.stats.map(([label, value, sub]) => (
+                <span key={label}>
+                  <small>{label}</small>
+                  {label === "Fee pace" ? (
+                    <span className="vx-sc-pace">
+                      <span>
+                        {c.pace.map((h, j) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: six fixed stretches of time
+                          <i key={j} className={cn(j >= 3 && "hot")} style={{ height: `${h}%` }} />
+                        ))}
+                      </span>
+                      <b className="vx-num up">{c.momentum}</b>
+                    </span>
+                  ) : label === "Price 24h" ? (
+                    <span className="vx-sc-trend up">
+                      <svg viewBox="0 0 56 18" aria-hidden="true">
+                        <polyline points={PRICE_TREND} />
+                      </svg>
+                      <b className="vx-num">{value}</b>
+                    </span>
+                  ) : (
+                    <>
+                      <b className={cn("vx-num", label === "Net flow" && "up")}>{value}</b>
+                      {sub && <small className="vx-num">{sub}</small>}
+                    </>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+          {c.stats.length > 0 && (
+            <span className="vx-sc-more">
+              More details
+              <ChevronUp aria-hidden="true" />
+            </span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
