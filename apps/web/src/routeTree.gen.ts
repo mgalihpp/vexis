@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ScreenerRouteImport } from './routes/screener'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
@@ -44,6 +45,11 @@ const LoginRoute = LoginRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScreenerRoute = ScreenerRouteImport.update({
+  id: '/screener',
+  path: '/screener',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -113,6 +119,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/privacy': typeof PrivacyRoute
+  '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/login'
     | '/privacy'
+    | '/screener'
     | '/terms'
     | '/agents/$agentId'
     | '/agents/new'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/login'
     | '/privacy'
+    | '/screener'
     | '/terms'
     | '/agents/$agentId'
     | '/agents/new'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/login'
     | '/privacy'
+    | '/screener'
     | '/terms'
     | '/agents/$agentId'
     | '/agents/new'
@@ -223,6 +235,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   LoginRoute: typeof LoginRoute
   PrivacyRoute: typeof PrivacyRoute
+  ScreenerRoute: typeof ScreenerRoute
   TermsRoute: typeof TermsRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRoute
   AgentsNewRoute: typeof AgentsNewRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/screener': {
+      id: '/screener'
+      path: '/screener'
+      fullPath: '/screener'
+      preLoaderRoute: typeof ScreenerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -374,6 +394,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   LoginRoute: LoginRoute,
   PrivacyRoute: PrivacyRoute,
+  ScreenerRoute: ScreenerRoute,
   TermsRoute: TermsRoute,
   AgentsAgentIdRoute: AgentsAgentIdRoute,
   AgentsNewRoute: AgentsNewRoute,
