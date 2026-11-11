@@ -27,7 +27,7 @@ import {
   HeroChart,
   PnlCard,
   SafetyCards,
-  ScreenerWindow,
+  ScreenerScan,
 } from "./landing-art";
 import { Shader } from "./landing-shader";
 
@@ -383,8 +383,10 @@ function Benefits() {
           </div>
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
-            <div className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted" data-reveal="">
-              <ScreenerWindow />
+            <div className="content-home-1-wrapper home-3-central-block vx-scan-card vx-dotted" data-reveal="">
+              <h4 className="relative">Every pool, ranked</h4>
+              <ScreenerScan />
+              <p className="small-paragraph">The hardest earners light up, and the risky ones get flagged.</p>
             </div>
             <div className="content-benefits-wrapper small-content">
               <h3 data-reveal="">Find the pools worth your liquidity.</h3>
