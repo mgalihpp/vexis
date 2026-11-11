@@ -383,7 +383,7 @@ function Benefits() {
           </div>
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
-            <div className="content-home-1-wrapper home-3-central-block vx-scan-card" data-reveal="">
+            <div className="content-home-1-wrapper home-3-central-block vx-scan-card vx-dotted" data-reveal="">
               <h4 className="relative">Every pool, ranked</h4>
               <ScreenerScan />
               <p className="small-paragraph">The best earners light up. The risky ones get flagged.</p>
