@@ -148,7 +148,17 @@ const LINKS = [
   { name: "Axiom", icon: "axiom", href: (p: PoolMeta) => `https://axiom.trade/meme/${p.address}` },
   { name: "Pump.fun", icon: "pumpfun", href: (p: PoolMeta) => `https://pump.fun/coin/${p.tokenX.mint}` },
   { name: "RugCheck", icon: "rugcheck", href: (p: PoolMeta) => `https://rugcheck.xyz/tokens/${p.tokenX.mint}` },
+  { name: "Bubblemaps", icon: "bubblemaps", href: (p: PoolMeta) => bubblemapsUrl(p.tokenX.mint) },
 ] as const;
+
+export const bubblemapsUrl = (mint: string) => `https://v2.bubblemaps.io/map?address=${mint}&chain=solana`;
+
+/** Where to trade or chart a pool, shared by Analytics' Trade & Charts panel and the screener rows. */
+export const tradeLinks = (x: string, y: string) => [
+  { name: "Jupiter", logo: "/brands/jupiter.png", href: `https://jup.ag/swap/${x}-${y}` },
+  { name: "GMGN", logo: "/brands/gmgn.png", href: `https://gmgn.ai/sol/token/${x}` },
+  { name: "Bubblemaps", logo: "/links/bubblemaps.png", href: bubblemapsUrl(x) },
+];
 
 export function PoolLinks({ pool }: { pool: PoolMeta }) {
   return (

@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { age } from "@/features/analytics/analytics";
 import { Updated } from "@/features/analytics/components/ui";
-import { Badge, TokenIcon } from "@/features/portfolio/components/pool-identity";
+import { Badge, TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { PoolFilter } from "@/features/portfolio/components/table-controls";
 import { compactUsd } from "@/features/portfolio/money";
@@ -461,7 +461,7 @@ function Pace({ pool }: { pool: ScreenerPool }) {
     m === null ? "text-muted-foreground" : m >= 1.25 ? "text-profit" : m < 0.75 ? "text-muted-foreground" : "";
   return (
     <div
-      className="flex items-end gap-2"
+      className="relative z-10 flex items-end gap-2"
       title={m === null ? "No fees in the last 24h" : `Last hour is ${times(m)} the 24h hourly average`}
     >
       <span className="flex h-5 items-end gap-0.5" aria-hidden="true">
@@ -488,14 +488,45 @@ function Money({ usd, solPrice }: { usd: number; solPrice: number | null }) {
   );
 }
 
-function PoolRow({ pool, rank, top, now, solPrice }: RowProps) {
-  const flags = warnings(pool);
+function TradeIcons({ pool }: { pool: ScreenerPool }) {
+  return (
+    <span className="relative z-10 flex shrink-0 items-center gap-1.5">
+      {tradeLinks(pool.tokenX.mint, pool.tokenY.mint).map((l) => (
+        <a
+          key={l.name}
+          href={l.href}
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${pool.name} on ${l.name}`}
+          title={l.name}
+          className="opacity-80 transition-opacity hover:opacity-100"
+        >
+          <img src={l.logo} alt="" className="size-3.5 rounded-[0.15rem]" />
+        </a>
+      ))}
+    </span>
+  );
+}
+
+/** Covers the whole row so it opens Analytics, while the trade links above it stay separate anchors. */
+function RowLink({ pool }: { pool: ScreenerPool }) {
   return (
     <Link
       to="/analytics"
       search={{ pool: pool.address }}
-      className={`${GRID} group h-12 border-b text-xs transition-colors last:rounded-b-[10px] last:border-b-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none`}
+      aria-label={`${pool.name} analytics`}
+      className="absolute inset-0 rounded-[inherit] focus-visible:outline-none"
+    />
+  );
+}
+
+function PoolRow({ pool, rank, top, now, solPrice }: RowProps) {
+  const flags = warnings(pool);
+  return (
+    <div
+      className={`${GRID} group relative isolate h-12 border-b text-xs transition-colors last:rounded-b-[10px] last:border-b-0 focus-within:bg-muted/50 hover:bg-muted/50`}
     >
+      <RowLink pool={pool} />
       <span className="num text-[11px] text-muted-foreground">{rank}</span>
       <span className="flex min-w-0 items-center gap-2">
         <Pair pool={pool} size="size-5 text-[9px]" />
@@ -504,11 +535,14 @@ function PoolRow({ pool, rank, top, now, solPrice }: RowProps) {
         {flags.map((w) => {
           const { Icon, tone } = WARNING_ICON[w.kind];
           return (
-            <span key={w.label} title={w.detail} className={`shrink-0 ${tone}`}>
+            <span key={w.label} title={w.detail} className={`relative z-10 shrink-0 ${tone}`}>
               <Icon className="size-3.5" aria-label={w.detail} />
             </span>
           );
         })}
+        <span className="ml-auto pl-1">
+          <TradeIcons pool={pool} />
+        </span>
       </span>
       <Heat value={pool.feeTvl["24h"]} top={top} className="items-end" />
       <Pace pool={pool} />
@@ -518,18 +552,15 @@ function PoolRow({ pool, rank, top, now, solPrice }: RowProps) {
       <Money usd={pool.tvl} solPrice={solPrice} />
       <span className="num text-right">{times(turnover(pool))}</span>
       <span className="num hidden justify-end text-muted-foreground xl:flex">{age(pool.createdAt, now)}</span>
-    </Link>
+    </div>
   );
 }
 
 function PoolCard({ pool, rank, top, now, solPrice }: RowProps) {
   const flags = warnings(pool);
   return (
-    <Link
-      to="/analytics"
-      search={{ pool: pool.address }}
-      className="flex flex-col gap-3 rounded-[10px] border bg-card p-3 text-xs transition-colors active:bg-muted/60"
-    >
+    <div className="relative isolate flex flex-col gap-3 rounded-[10px] border bg-card p-3 text-xs transition-colors active:bg-muted/60">
+      <RowLink pool={pool} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Pair pool={pool} size="size-8 text-xs" />
@@ -551,7 +582,7 @@ function PoolCard({ pool, rank, top, now, solPrice }: RowProps) {
         </div>
       </div>
 
-      {flags.length > 0 && (
+      <div className="flex items-start gap-2">
         <ul className="flex flex-wrap gap-1">
           {flags.map((w) => {
             const { Icon, tone } = WARNING_ICON[w.kind];
@@ -563,7 +594,10 @@ function PoolCard({ pool, rank, top, now, solPrice }: RowProps) {
             );
           })}
         </ul>
-      )}
+        <span className="ml-auto pt-0.5">
+          <TradeIcons pool={pool} />
+        </span>
+      </div>
 
       <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 border-t pt-2.5">
         <CardStat label="Volume 24h">
@@ -585,7 +619,7 @@ function PoolCard({ pool, rank, top, now, solPrice }: RowProps) {
           <span className="num font-medium">{percent(pool.feeTvl["1h"])}</span>
         </CardStat>
       </div>
-    </Link>
+    </div>
   );
 }
 

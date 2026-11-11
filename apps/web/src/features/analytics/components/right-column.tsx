@@ -1,7 +1,7 @@
 import { ExternalLinkIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
-import { TokenIcon } from "@/features/portfolio/components/pool-identity";
+import { TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, formatAmount, pct } from "@/features/portfolio/money";
 import { offsetLabel, useTzOffset } from "@/features/timezone/timezone";
@@ -294,14 +294,7 @@ const linkClass =
   "flex flex-1 items-center justify-between rounded-md border px-2.5 py-1.5 text-xs font-medium hover:border-brand hover:text-brand";
 
 export function Links({ pool }: { pool: PoolView }) {
-  const items = [
-    {
-      name: "Jupiter",
-      logo: "/brands/jupiter.png",
-      href: `https://jup.ag/swap/${pool.tokenX.address}-${pool.tokenY.address}`,
-    },
-    { name: "GMGN", logo: "/brands/gmgn.png", href: `https://gmgn.ai/sol/token/${pool.tokenX.address}` },
-  ];
+  const items = tradeLinks(pool.tokenX.address, pool.tokenY.address);
   return (
     <Panel title="Trade & Charts">
       <div className="flex gap-2">
