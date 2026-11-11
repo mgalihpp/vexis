@@ -120,16 +120,16 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 
 ## Routes
 
-| Route                | Page                                                                   |
-| -------------------- | ---------------------------------------------------------------------- |
-| `/`                  | Redirects to `/portfolio`                                              |
-| `/portfolio`         | Wallet search with favorites and recent wallets                        |
-| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions                    |
-| `/analytics`         | Pool analytics; `?pool=` picks the pool                                |
+| Route                | Page                                                                    |
+| -------------------- | ----------------------------------------------------------------------- |
+| `/`                  | Redirects to `/portfolio`                                               |
+| `/portfolio`         | Wallet search with favorites and recent wallets                         |
+| `/portfolio/$wallet` | Overview, Active, Closed, Balances and Transactions                     |
+| `/analytics`         | Pool analytics; `?pool=` picks the pool                                 |
 | `/screener`          | Pool screener: every pool above $1K TVL and volume, sorted and filtered |
-| `/agents`            | Agents; `/agents/new` and `/agents/$agentId` for the wizard and detail |
-| `/login`             | Sign in, or join with an invite                                        |
-| `/terms`, `/privacy` | Public pages, readable without an account                              |
+| `/agents`            | Agents; `/agents/new` and `/agents/$agentId` for the wizard and detail  |
+| `/login`             | Sign in, or join with an invite                                         |
+| `/terms`, `/privacy` | Public pages, readable without an account                               |
 
 ## The runner
 
