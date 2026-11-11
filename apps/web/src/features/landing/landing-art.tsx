@@ -1,4 +1,4 @@
-import { Eye, ShieldCheck } from "lucide-react";
+import { Eye, ShieldCheck, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The Vexis mark, traced from public/logo.png.
@@ -161,6 +161,24 @@ const CLOSES = [
   3.4, 3.38, 3.41,
 ];
 
+const APP_PAGES = ["Portfolio", "Analytics", "Screener", "Agents"] as const;
+
+function AppNav({ on }: { on: (typeof APP_PAGES)[number] }) {
+  return (
+    <div className="vx-app-nav">
+      <svg viewBox="-10 -10 200 184" aria-hidden="true">
+        <path d={MARK} fill="currentColor" fillRule="evenodd" />
+      </svg>
+      <b>Vexis</b>
+      {APP_PAGES.map((page) => (
+        <span key={page} className={cn(page === on && "on")}>
+          {page}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** A miniature of the Analytics page, cropped by the card the way the phone is. */
 export function AnalyticsWindow() {
   const lo = Math.min(...CLOSES) - 0.04;
@@ -169,15 +187,7 @@ export function AnalyticsWindow() {
   return (
     <div className="vx-window" role="img" aria-label="The Analytics page for a sample JUP-SOL pool">
       <div className="vx-app">
-        <div className="vx-app-nav">
-          <svg viewBox="-10 -10 200 184" aria-hidden="true">
-            <path d={MARK} fill="currentColor" fillRule="evenodd" />
-          </svg>
-          <b>Vexis</b>
-          <span>Portfolio</span>
-          <span className="on">Analytics</span>
-          <span>Agents</span>
-        </div>
+        <AppNav on="Analytics" />
         <div className="vx-app-body">
           <div className="vx-app-col">
             <div className="vx-app-panel">
@@ -273,6 +283,88 @@ export function AnalyticsWindow() {
                 <span className="y">37.6%</span>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Sample screener rows, highest Fee/TVL first. APR is 24h Fee/TVL times 365, as on the real page;
+// pace is Fee/TVL per hour, oldest first.
+const POOLS = [
+  {
+    x: "BONK",
+    y: "SOL",
+    step: 100,
+    feeTvl: 3.91,
+    tvl: "$310K",
+    pace: [92, 70, 58, 44, 36, 30],
+    cooling: true,
+    warn: true,
+  },
+  { x: "WIF", y: "SOL", step: 80, feeTvl: 2.27, tvl: "$1.07M", pace: [30, 34, 51, 47, 63, 82] },
+  { x: "JUP", y: "SOL", step: 20, feeTvl: 1.84, tvl: "$4.21M", pace: [40, 46, 52, 61, 74, 88] },
+  { x: "JUP", y: "USDC", step: 25, feeTvl: 0.95, tvl: "$640K", pace: [55, 50, 57, 52, 49, 54] },
+  { x: "SOL", y: "USDC", step: 10, feeTvl: 0.62, tvl: "$12.8M", pace: [48, 52, 50, 55, 51, 53] },
+];
+const LOGOS: Record<string, string> = {
+  JUP: "/brands/jupiter.png",
+  SOL: "/Solana_logo.png",
+  USDC: "/usd-coin-usdc-logo.png",
+};
+
+function Token({ symbol }: { symbol: string }) {
+  const logo = LOGOS[symbol];
+  return logo ? <img src={logo} alt="" /> : <span className="vx-app-letter">{symbol[0]}</span>;
+}
+
+/** A miniature of the Screener page, sorted by Fee/TVL, in the same window as the Analytics one. */
+export function ScreenerWindow() {
+  return (
+    <div className="vx-window" role="img" aria-label="The Screener page ranking sample pools by Fee/TVL">
+      <div className="vx-app">
+        <AppNav on="Screener" />
+        <div className="vx-app-body vx-app-screener">
+          <div className="vx-app-panel vx-app-filters">
+            <span className="on">Fee/TVL 24h ↓</span>
+            <span>TVL ≥ $100K</span>
+            <span>Bin step 20–80</span>
+          </div>
+          <div className="vx-app-panel vx-app-table">
+            <div className="vx-app-row head">
+              <span>Pool</span>
+              <span>Fee/TVL 24h</span>
+              <span>Fee pace</span>
+              <span>APR</span>
+              <span>TVL</span>
+            </div>
+            {POOLS.map((p) => (
+              <div key={`${p.x}-${p.y}`} className="vx-app-row">
+                <span className="vx-app-pair">
+                  <span className="vx-app-tokens">
+                    <Token symbol={p.x} />
+                    <Token symbol={p.y} />
+                  </span>
+                  <span>
+                    <b>
+                      {p.x}-{p.y}
+                      {p.warn && <TriangleAlert className="vx-app-warn" aria-hidden="true" />}
+                    </b>
+                    <small>Bin step {p.step}</small>
+                  </span>
+                </span>
+                <b className="vx-num">{p.feeTvl.toFixed(2)}%</b>
+                <span className={cn("vx-app-pace", p.cooling && "down")}>
+                  {p.pace.map((h, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: hours are positional
+                    <i key={i} style={{ height: `${h}%` }} />
+                  ))}
+                </span>
+                <b className="vx-num">{Math.round(p.feeTvl * 365)}%</b>
+                <b className="vx-num">{p.tvl}</b>
+              </div>
+            ))}
           </div>
         </div>
       </div>
