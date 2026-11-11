@@ -481,37 +481,32 @@
   .vx-app-candles line { stroke-width: 1; vector-effect: non-scaling-stroke; }
   .vx-app-candles .up { fill: var(--vx-profit); stroke: var(--vx-profit); }
   .vx-app-candles .down { fill: var(--vx-loss); stroke: var(--vx-loss); }
-  .content-home-1-wrapper.home-3-central-block.vx-scan-card { justify-content: space-between; min-height: 400px; padding-bottom: 14px; }
-  .vx-scan { position: relative; width: 100%; margin: 18px 0 64px; text-align: left; }
-  .vx-scan-head { display: flex; justify-content: space-between; margin-bottom: 10px; color: #a1a1aa; font-size: 10px; }
+  .content-home-1-wrapper.home-3-central-block.vx-scan-card { justify-content: space-between; min-height: 400px; }
+  .vx-scan { width: 100%; margin: 20px 0 18px; text-align: left; }
+  .vx-scan-head { display: flex; justify-content: space-between; margin-bottom: 10px; color: #71717a; font-size: 10px; }
   .vx-scan-head i { display: inline-block; width: 7px; height: 7px; margin: 0 5px 0 10px; border-radius: 2px; background: var(--vx-brand); }
   .vx-scan-head i.flag { background: none; box-shadow: inset 0 0 0 1.5px #f5b041; }
-  .vx-scan-grid { position: relative; display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; }
-  .vx-scan-grid > i { --c: rgb(186 244 72 / var(--a)); position: relative; aspect-ratio: 1; border-radius: 3px; background: var(--c); animation: vx-scan-tile 4s linear var(--d) infinite; }
-  .vx-scan-grid > i.flag { --c: transparent; box-shadow: inset 0 0 0 1.5px #f5b041; animation: none; }
-  .vx-scan-grid > i.pick { --c: var(--vx-brand); box-shadow: 0 0 14px rgb(186 244 72 / .7); animation: none; }
-  .vx-scan-grid > i.pick span { position: absolute; inset: 0; display: grid; place-items: center; color: #0b0b0b; font: 700 9px/1 var(--vx-mono); }
-  .vx-scan-grid::after { content: ""; position: absolute; left: -10px; right: -10px; top: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--vx-brand), transparent); box-shadow: 0 0 14px var(--vx-brand); animation: vx-scan-line 4s linear infinite; pointer-events: none; }
-  .vx-scan-chip { position: absolute; top: -4px; left: 22%; display: flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 6px; background: #18181b; box-shadow: 0 0 0 1px rgb(245 176 65 / .5); color: #f5b041; font-size: 10px; white-space: nowrap; }
-  .vx-scan-chip svg { width: 11px; height: 11px; }
-  .vx-scan-pick { position: absolute; right: -18px; bottom: -58px; display: grid; gap: 7px; width: 196px; padding: 11px 12px; border-radius: 10px; background: #18181b; box-shadow: 0 0 0 1px rgb(186 244 72 / .35), 0 20px 34px -12px rgb(0 0 0 / .95); }
-  .vx-scan-rank { color: var(--vx-brand); font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
-  .vx-scan-pair { display: flex; align-items: center; gap: 8px; color: #fafafa; font-size: 14px; }
-  .vx-scan-pair span { display: flex; }
+  .vx-scan-grid { position: relative; display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; overflow: hidden; }
+  .vx-scan-grid > i { display: grid; place-items: center; aspect-ratio: 1; border-radius: 4px; background: rgb(255 255 255 / .05); color: #0b0b0b; font: 700 10px/1 var(--vx-mono); }
+  .vx-scan-grid > i.s1 { background: rgb(255 255 255 / .08); }
+  .vx-scan-grid > i.s2 { background: rgb(255 255 255 / .11); }
+  .vx-scan-grid > i.flag { background: none; box-shadow: inset 0 0 0 1.5px rgb(245 176 65 / .8); }
+  .vx-scan-grid > i.pick { background: var(--vx-brand); box-shadow: 0 0 12px rgb(186 244 72 / .45); }
+  .vx-scan-grid::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: linear-gradient(90deg, transparent, rgb(186 244 72 / .7), transparent); animation: vx-scan-line 5s ease-in-out infinite; pointer-events: none; }
+  .vx-scan-pick { display: grid; gap: 10px; margin-top: 14px; padding: 12px; border-radius: 10px; background: #18181b; box-shadow: 0 0 0 1px rgb(255 255 255 / .1); }
+  .vx-scan-pair { display: flex; align-items: center; gap: 8px; }
+  .vx-scan-pair > span { display: flex; }
   .vx-scan-pair img { width: 20px; height: 20px; border-radius: 50%; background: #0b0b0b; box-shadow: 0 0 0 2px #18181b; }
   .vx-scan-pair img + img { margin-left: -6px; }
-  .vx-scan-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vx-scan-pair b { color: #fafafa; font-size: 14px; }
+  .vx-scan-pair small { margin-left: auto; color: var(--vx-brand); font-size: 10px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+  .vx-scan-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .vx-scan-stats small { display: block; color: #a1a1aa; font-size: 10px; }
   .vx-scan-stats b { display: block; margin-top: 3px; color: #fafafa; font: 600 13px/1 var(--vx-mono); }
-  .vx-scan-up { color: var(--vx-profit); font-size: 10px; }
-  @keyframes vx-scan-line { from { top: 0; opacity: 1; } 92% { top: 100%; opacity: 1; } to { top: 100%; opacity: 0; } }
-  @keyframes vx-scan-tile { 0%, 30%, 100% { background-color: var(--c); } 4% { background-color: rgb(186 244 72 / .9); } }
+  .vx-scan-stats b.up { color: var(--vx-profit); }
+  @keyframes vx-scan-line { from { top: 0; opacity: 0; } 15%, 85% { opacity: 1; } to { top: 100%; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) {
-    .vx-scan-grid > i { animation: none; }
     .vx-scan-grid::after { display: none; }
-  }
-  @media (max-width: 479px) {
-    .vx-scan-pick { right: -6px; }
   }
   
   .vx-phone { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); width: 236px; height: 262px; border: 7px solid #0c0c0c; border-bottom: 0; border-radius: 36px 36px 0 0; background: radial-gradient(120% 90% at 50% 0%, #263a12, #101010 70%); box-shadow: 0 0 0 1px #3a3a3a, 0 30px 50px -20px rgb(0 0 0 / .9); -webkit-mask: linear-gradient(#000 88%, transparent); mask: linear-gradient(#000 88%, transparent); }

@@ -1,5 +1,4 @@
-import { Eye, ShieldCheck, TriangleAlert } from "lucide-react";
-import type { CSSProperties } from "react";
+import { Eye, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // The Vexis mark, traced from public/logo.png.
@@ -292,22 +291,21 @@ export function AnalyticsWindow() {
 }
 
 // A deterministic field of pools for the scanner: an integer LCG, so the server and the browser draw the same tiles.
-const COLS = 14;
-const ROWS = 8;
+const COLS = 10;
+const ROWS = 6;
 const PICKS = new Map([
-  [2 * COLS + 9, 1],
-  [5 * COLS + 3, 2],
-  [1 * COLS + 7, 3],
+  [1 * COLS + 6, 1],
+  [3 * COLS + 2, 2],
+  [4 * COLS + 8, 3],
 ]);
-const FLAGS = new Set([1 * COLS + 2, 4 * COLS + 12]);
+const FLAGS = new Set([0 * COLS + 3, 5 * COLS + 5]);
 let seed = 42;
 const TILES = Array.from({ length: COLS * ROWS }, (_, i) => {
   seed = (seed * 48271) % 2147483647;
-  const heat = (seed / 2147483647) ** 2;
-  return { row: Math.floor(i / COLS), heat, pick: PICKS.get(i), flag: FLAGS.has(i) };
+  return { shade: seed % 3, pick: PICKS.get(i), flag: FLAGS.has(i) };
 });
 
-/** The screener as a scanner: every pool a tile, a sweep that lights the best earners and flags the risky ones. */
+/** The screener as a scanner: every pool a tile, the best earners lit and the risky ones flagged. */
 export function ScreenerScan() {
   return (
     <div
@@ -316,9 +314,9 @@ export function ScreenerScan() {
       aria-label="Pool screener scanning 620 sample pools, three picks and two flagged"
     >
       <div className="vx-scan-head vx-num">
-        <span>620 pools scanned</span>
+        <span>620 pools</span>
         <span>
-          <i className="pick" />3 picks <i className="flag" />2 flagged
+          <i />3 picks <i className="flag" />2 flagged
         </span>
       </div>
       <div className="vx-scan-grid">
@@ -326,39 +324,35 @@ export function ScreenerScan() {
           <i
             // biome-ignore lint/suspicious/noArrayIndexKey: tiles are positional
             key={i}
-            className={cn(t.pick && "pick", t.flag && "flag")}
-            style={
-              { "--a": (0.06 + t.heat * 0.42).toFixed(3), "--d": `${((t.row + 0.5) / ROWS) * 4}s` } as CSSProperties
-            }
+            className={cn(`s${t.shade}`, t.pick && "pick", t.flag && "flag")}
           >
-            {t.pick && <span>{t.pick}</span>}
+            {t.pick}
           </i>
         ))}
-        <span className="vx-scan-chip">
-          <TriangleAlert aria-hidden="true" />
-          Freeze authority held
-        </span>
       </div>
       <div className="vx-scan-pick">
-        <span className="vx-scan-rank">#1 by Fee/TVL</span>
-        <b className="vx-scan-pair">
+        <span className="vx-scan-pair">
           <span>
-            <img src="/brands/jupiter.png" alt="" />
             <img src="/Solana_logo.png" alt="" />
+            <img src="/usd-coin-usdc-logo.png" alt="" />
           </span>
-          JUP-SOL
-        </b>
+          <b>SOL-USDC</b>
+          <small>Top pick</small>
+        </span>
         <span className="vx-scan-stats">
           <span>
             <small>Fee/TVL 24h</small>
-            <b className="vx-num">1.84%</b>
+            <b className="vx-num">0.92%</b>
           </span>
           <span>
             <small>APR</small>
-            <b className="vx-num">672%</b>
+            <b className="vx-num">336%</b>
+          </span>
+          <span>
+            <small>Pace</small>
+            <b className="vx-num up">1.4×</b>
           </span>
         </span>
-        <span className="vx-scan-up vx-num">▲ 1.6× the day's hourly pace</span>
       </div>
     </div>
   );
