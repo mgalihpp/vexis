@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  baseToken,
   type FeeWindows,
   feePace,
   momentum,
@@ -10,6 +11,7 @@ import {
   totals,
   turnover,
   warnings,
+  xShare,
 } from "./screener";
 
 const SOL = "So11111111111111111111111111111111111111112";
@@ -24,6 +26,19 @@ const flat = (perHour: number): FeeWindows => ({
   "24h": perHour * 24,
 });
 
+const token = (mint: string, symbol: string) => ({
+  mint,
+  symbol,
+  icon: null,
+  verified: true,
+  freezable: false,
+  mintable: false,
+  marketCap: null,
+  holders: null,
+  organic: null,
+  topHolders: null,
+});
+
 const pool = (over: Partial<ScreenerPool> & { name: string }): ScreenerPool => {
   const [x = "X", y = "Y"] = over.name.split("-");
   return {
@@ -31,20 +46,48 @@ const pool = (over: Partial<ScreenerPool> & { name: string }): ScreenerPool => {
     binStep: 20,
     baseFeePct: 0.2,
     tvl: 100_000,
-    volume24h: 50_000,
+    volume: flat(50_000 / 24),
     fees24h: 100,
     feeTvl: flat(0.01),
     createdAt: 0,
     blacklisted: false,
     tags: [],
     launchpad: null,
-    tokenX: { mint: `mint-${x}`, symbol: x, icon: null, verified: true, freezable: false },
-    tokenY: { mint: y === "SOL" ? SOL : `mint-${y}`, symbol: y, icon: null, verified: true, freezable: false },
+    tokenX: token(`mint-${x}`, x),
+    tokenY: token(y === "SOL" ? SOL : `mint-${y}`, y),
+    xShare: 0.5,
+    stats: null,
     ...over,
   };
 };
 
-const open: ScreenerFilters = { minTvl: 0, minVolume: 0, step: "all", query: "", blacklisted: false };
+const STATS = {
+  activeTvl: 0,
+  feeActiveTvl: 0,
+  swaps: 0,
+  traders: 0,
+  lps: 0,
+  openPositions: 0,
+  inRangePct: 0,
+  deposits: 0,
+  withdrawals: 0,
+  netDeposits: 0,
+  volatility: 0,
+  priceChange: 0,
+  volumeChange: 0,
+  trend: [],
+};
+
+const open: ScreenerFilters = {
+  minTvl: 0,
+  minVolume: 0,
+  minMcap: 0,
+  maxMcap: 0,
+  window: "24h",
+  step: "all",
+  query: "",
+  blacklisted: false,
+};
 const names = (pools: ScreenerPool[]) => pools.map((p) => p.name);
 
 describe("feePace", () => {
@@ -70,8 +113,19 @@ describe("derived ratios", () => {
   });
   test("no fees in 24h or no TVL is unknown, not zero", () => {
     expect(momentum(flat(0))).toBeNull();
-    expect(turnover({ volume24h: 10, tvl: 0 })).toBeNull();
-    expect(turnover({ volume24h: 50, tvl: 100 })).toBe(0.5);
+    expect(turnover({ volume: flat(10 / 24), tvl: 0 })).toBeNull();
+    expect(turnover({ volume: flat(50 / 24), tvl: 100 })).toBe(0.5);
+  });
+  test("composition is token X's USD share, unknown when the pool holds nothing", () => {
+    expect(xShare(30, 10)).toBe(0.75);
+    expect(xShare(0, 0)).toBeNull();
+    expect(xShare(Number.NaN, 5)).toBeNull();
+  });
+  test("the base token is the side that is not a quote", () => {
+    const p = pool({ name: "SOL-BONK" });
+    p.tokenX = { ...p.tokenX, mint: SOL };
+    expect(baseToken(p).symbol).toBe("BONK");
+    expect(baseToken(pool({ name: "BONK-SOL" })).symbol).toBe("BONK");
   });
   test("bin step bands", () => {
     expect([1, 20, 25, 80, 100, 400].map(stepBand)).toEqual(["tight", "tight", "medium", "medium", "wide", "wide"]);
@@ -84,19 +138,38 @@ describe("warnings", () => {
     p.tokenY = { ...p.tokenY, mint: USDC, freezable: true };
     expect(warnings(p)).toEqual([]);
   });
-  test("blacklist, unverified, freezable and tags each show up", () => {
+  test("blacklist, unverified, freezable, mintable, concentration and tags each show up", () => {
     const p = pool({ name: "RUG-SOL", blacklisted: true, tags: ["honeypot"] });
-    p.tokenX = { ...p.tokenX, verified: false, freezable: true };
-    expect(warnings(p).map((w) => w.kind)).toEqual(["blacklisted", "unverified", "freezable", "tag"]);
+    p.tokenX = { ...p.tokenX, verified: false, freezable: true, mintable: true, topHolders: 50 };
+    expect(warnings(p).map((w) => w.kind)).toEqual([
+      "blacklisted",
+      "unverified",
+      "freezable",
+      "mintable",
+      "concentrated",
+      "tag",
+    ]);
+  });
+  test("holders below the threshold are not concentrated", () => {
+    const p = pool({ name: "OK-SOL" });
+    p.tokenX = { ...p.tokenX, topHolders: 49.9 };
+    expect(warnings(p)).toEqual([]);
   });
 });
 
 describe("screen", () => {
   const pools = [
-    pool({ name: "A-SOL", feeTvl: flat(0.01), tvl: 5_000, volume24h: 9_000, binStep: 100 }),
-    pool({ name: "B-SOL", feeTvl: flat(0.05), tvl: 50_000, volume24h: 2_000, binStep: 20 }),
-    pool({ name: "C-USDC", feeTvl: flat(0.03), tvl: 80_000, volume24h: 90_000, binStep: 50, blacklisted: true }),
-    pool({ name: "D-USDC", feeTvl: flat(0), tvl: 20_000, volume24h: 20_000, binStep: 80 }),
+    pool({ name: "A-SOL", feeTvl: flat(0.01), tvl: 5_000, volume: flat(9_000 / 24), binStep: 100 }),
+    pool({ name: "B-SOL", feeTvl: flat(0.05), tvl: 50_000, volume: flat(2_000 / 24), binStep: 20 }),
+    pool({
+      name: "C-USDC",
+      feeTvl: flat(0.03),
+      tvl: 80_000,
+      volume: flat(90_000 / 24),
+      binStep: 50,
+      blacklisted: true,
+    }),
+    pool({ name: "D-USDC", feeTvl: flat(0), tvl: 20_000, volume: flat(20_000 / 24), binStep: 80 }),
   ];
   test("default order is Fee/TVL 24h, highest first, with blacklisted pools hidden", () => {
     expect(names(screen(pools, open, "feeTvl24h", "desc"))).toEqual(["B-SOL", "A-SOL", "D-USDC"]);
@@ -113,17 +186,47 @@ describe("screen", () => {
     expect(names(screen(pools, { ...open, query: SOL }, "name", "asc"))).toEqual(["A-SOL", "B-SOL"]);
     expect(screen(pools, { ...open, query: "zzz" }, "name", "asc")).toEqual([]);
   });
+  test("market cap bounds use the non-quote token, and a pool with no market cap only passes with no bound", () => {
+    const capped = (name: string, cap: number | null) => {
+      const p = pool({ name });
+      p.tokenX = { ...p.tokenX, marketCap: cap };
+      return p;
+    };
+    const list = [capped("S-SOL", 200_000), capped("M-SOL", 5_000_000), capped("L-SOL", 2e9), capped("N-SOL", null)];
+    expect(names(screen(list, { ...open, minMcap: 1_000_000 }, "name", "asc"))).toEqual(["L-SOL", "M-SOL"]);
+    expect(names(screen(list, { ...open, maxMcap: 10_000_000 }, "name", "asc"))).toEqual(["M-SOL", "S-SOL"]);
+    expect(screen(list, open, "name", "asc")).toHaveLength(4);
+  });
+  test("the volume sort follows the chosen window", () => {
+    const list = [
+      pool({ name: "DAY-SOL", volume: { ...flat(100), "1h": 1 } }),
+      pool({ name: "HOUR-SOL", volume: { ...flat(1), "1h": 500 } }),
+    ];
+    expect(names(screen(list, open, "volume", "desc"))[0]).toBe("DAY-SOL");
+    expect(names(screen(list, { ...open, window: "1h" }, "volume", "desc"))[0]).toBe("HOUR-SOL");
+  });
   test("a pool with no value for the sort column is last in both directions", () => {
     expect(names(screen(pools, open, "momentum", "desc")).at(-1)).toBe("D-USDC");
     expect(names(screen(pools, open, "momentum", "asc")).at(-1)).toBe("D-USDC");
+    const flows = [pool({ name: "E-SOL", stats: { ...STATS, netDeposits: -5 } }), ...pools];
+    expect(names(screen(flows, open, "netDeposits", "asc"))[0]).toBe("E-SOL");
+    expect(names(screen(flows, open, "netDeposits", "desc"))[0]).toBe("E-SOL");
   });
 });
 
 test("totals add up the listed pools and weight Fee/TVL by TVL", () => {
   const t = totals([
-    pool({ name: "A-SOL", tvl: 100, fees24h: 1, volume24h: 10 }),
-    pool({ name: "B-SOL", tvl: 300, fees24h: 1, volume24h: 30 }),
+    pool({ name: "A-SOL", tvl: 100, fees24h: 1, volume: flat(10 / 24) }),
+    pool({ name: "B-SOL", tvl: 300, fees24h: 1, volume: flat(30 / 24) }),
   ]);
-  expect(t).toEqual({ tvl: 400, volume24h: 40, fees24h: 2, feeTvl: 0.5 });
+  expect(t).toEqual({ tvl: 400, volume: 40, fees24h: 2, feeTvl: 0.5, turnover: 0.1, swaps: null, netDeposits: null });
+  expect(totals([pool({ name: "A-SOL", volume: { ...flat(1), "1h": 7 } })], "1h").volume).toBe(7);
   expect(totals([]).feeTvl).toBeNull();
+  const stats = (swaps: number, netDeposits: number) => ({ ...STATS, swaps, netDeposits });
+  const flow = totals([
+    pool({ name: "A-SOL", stats: stats(10, -500) }),
+    pool({ name: "B-SOL", stats: stats(5, 200) }),
+    pool({ name: "C-SOL" }),
+  ]);
+  expect([flow.swaps, flow.netDeposits]).toEqual([15, -300]);
 });
