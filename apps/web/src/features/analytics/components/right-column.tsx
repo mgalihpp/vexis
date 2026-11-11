@@ -291,20 +291,20 @@ export function FeesPanel({ pool }: { pool: PoolView }) {
 }
 
 const linkClass =
-  "flex flex-1 items-center justify-between rounded-md border px-2.5 py-1.5 text-xs font-medium hover:border-brand hover:text-brand";
+  "flex min-w-0 items-center justify-between gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:border-brand hover:text-brand";
 
 export function Links({ pool }: { pool: PoolView }) {
   const items = tradeLinks(pool.tokenX.address, pool.tokenY.address);
   return (
     <Panel title="Trade & Charts">
-      <div className="flex gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {items.map((i) => (
           <a key={i.name} className={linkClass} href={i.href} target="_blank" rel="noreferrer">
-            <span className="flex items-center gap-1.5">
-              <img src={i.logo} alt="" className="size-4 rounded-sm" />
-              {i.name}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <img src={i.logo} alt="" className="size-4 shrink-0 rounded-sm" />
+              <span className="truncate">{i.name}</span>
             </span>
-            <ExternalLinkIcon className="size-3" />
+            <ExternalLinkIcon className="size-3 shrink-0" />
           </a>
         ))}
       </div>
