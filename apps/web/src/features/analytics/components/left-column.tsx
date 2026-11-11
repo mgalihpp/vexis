@@ -418,8 +418,9 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
                       className="flex flex-col overflow-hidden rounded-t-sm"
                       style={{ height: `${Math.max(1, (b.height / peak) * 75)}%` }}
                     >
-                      <div className="bg-brand" style={{ flex: b.xUsd }} />
-                      <div style={{ flex: b.yUsd, background: "var(--sol)" }} />
+                      {/* Shares, not raw USD: flex-grow summing under 1 leaves the bottom of the bar empty. */}
+                      <div className="bg-brand" style={{ flex: ratio(b.xUsd, b.xUsd + b.yUsd) }} />
+                      <div style={{ flex: ratio(b.yUsd, b.xUsd + b.yUsd), background: "var(--sol)" }} />
                     </div>
                   </div>
                 );
