@@ -1226,22 +1226,21 @@ function Ring({ value, label }: { value: number | null; label?: string }) {
 
 /** Deposits pull right from the middle and withdrawals pull left, each scaled to the larger of the two. */
 function TugOfWar({ inflow, outflow }: { inflow: number; outflow: number }) {
-  const max = Math.max(inflow, outflow);
-  if (max <= 0) return null;
+  const total = inflow + outflow;
+  if (total <= 0) return null;
+  const outPct = (outflow / total) * 100;
   return (
     <div className="flex flex-col gap-1">
       <div className="relative flex h-2 items-center">
-        <span className="flex h-full flex-1 justify-end overflow-hidden rounded-l-full bg-muted">
-          <span className="h-full rounded-l-full bg-loss" style={{ width: `${(outflow / max) * 100}%` }} />
+        <span className="flex h-full w-full overflow-hidden rounded-full">
+          <span className="h-full bg-loss" style={{ width: `${outPct}%` }} />
+          <span className="h-full flex-1 bg-profit" />
         </span>
-        <span className="z-10 h-3.5 w-0.5 rounded-full bg-foreground" />
-        <span className="flex h-full flex-1 overflow-hidden rounded-r-full bg-muted">
-          <span className="h-full rounded-r-full bg-profit" style={{ width: `${(inflow / max) * 100}%` }} />
-        </span>
+        <span className="absolute left-1/2 h-3.5 w-0.5 -translate-x-1/2 rounded-full bg-foreground" />
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>Out</span>
-        <span>In</span>
+      <div className="num flex justify-between text-[10px] text-muted-foreground">
+        <span>Out {outPct.toFixed(1)}%</span>
+        <span>In {(100 - outPct).toFixed(1)}%</span>
       </div>
     </div>
   );
