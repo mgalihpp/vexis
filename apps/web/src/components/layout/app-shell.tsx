@@ -28,9 +28,12 @@ const DATA_SOURCES = [
   { name: "Jupiter", href: "https://jup.ag", icon: "https://static.jup.ag/jup/icon.png" },
 ];
 
-const MOBILE_LINKS: { to: "/portfolio" | "/analytics" | "/agents"; label: string; badge?: string }[] = [
+type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents";
+
+const MOBILE_LINKS: { to: NavTarget; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
   { to: "/analytics", label: "Analytics" },
+  { to: "/screener", label: "Screener" },
   { to: "/agents", label: "Agents" },
 ];
 
@@ -67,15 +70,7 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
   );
 }
 
-function NavItem({
-  to,
-  children,
-  badge,
-}: {
-  to: "/portfolio" | "/analytics" | "/agents";
-  children: ReactNode;
-  badge?: string;
-}) {
+function NavItem({ to, children, badge }: { to: NavTarget; children: ReactNode; badge?: string }) {
   return (
     <Link
       to={to}
@@ -107,6 +102,7 @@ function AppHeader() {
         <nav className="hidden items-center gap-5 md:flex">
           <NavItem to="/portfolio">Portfolio</NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
+          <NavItem to="/screener">Screener</NavItem>
           <NavItem to="/agents">Agents</NavItem>
         </nav>
         <HeaderActions />
