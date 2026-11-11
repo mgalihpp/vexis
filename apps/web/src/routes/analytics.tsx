@@ -39,8 +39,11 @@ export const Route = createFileRoute("/analytics")({
     // Browser only: on the server a warm cache would stream the data in after the HTML already showed the skeleton,
     // and hydration would then see different markup.
     if (typeof window !== "undefined") void context.queryClient.prefetchQuery(trackedQuery({ pool: pool.address }));
+    return { pair: `${pool.tokenX.symbol}-${pool.tokenY.symbol}` };
   },
-  head: () => ({ meta: [{ title: "Analytics | Vexis" }] }),
+  head: ({ loaderData }) => ({
+    meta: [{ title: loaderData ? `${loaderData.pair} | Vexis` : "Analytics | Vexis" }],
+  }),
   pendingComponent: AnalyticsSkeleton,
   component: Analytics,
 });
