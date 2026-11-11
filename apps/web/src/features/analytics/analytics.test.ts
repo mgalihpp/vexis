@@ -60,12 +60,12 @@ describe("binDistribution", () => {
   test("past maxBars, neighbours merge outward and the active bin stays alone", () => {
     const wide: BinView[] = Array.from({ length: 9 }, (_, i) => ({ id: i - 4, price: i, x: 1, y: 1 }));
     const d = binDistribution(wide, 0, 4, 1, 1, 5);
-    expect(d.map((b) => [b.id, b.lastId, b.xUsd, b.active])).toEqual([
-      [-4, -3, 2, false],
-      [-2, -1, 2, false],
-      [0, 0, 1, true],
-      [1, 2, 2, false],
-      [3, 4, 2, false],
+    expect(d.map((b) => [b.id, b.lastId, b.xUsd, b.height, b.active])).toEqual([
+      [-4, -3, 2, 2, false],
+      [-2, -1, 2, 2, false],
+      [0, 0, 1, 2, true],
+      [1, 2, 2, 2, false],
+      [3, 4, 2, 2, false],
     ]);
     expect(d[0]).toMatchObject({ price: 0, lastPrice: 1 });
   });

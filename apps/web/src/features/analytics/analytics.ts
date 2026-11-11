@@ -67,6 +67,8 @@ export interface DistributionBar {
   lastPrice: number;
   xUsd: number;
   yUsd: number;
+  /** USD per bin, so a merged bar stands as tall as its bins do beside the lone active bin. */
+  height: number;
   active: boolean;
 }
 
@@ -84,7 +86,7 @@ export function binDistribution(
   maxBars = Number.POSITIVE_INFINITY,
 ): DistributionBar[] {
   const size = Math.max(1, Math.ceil((2 * reach + 1) / maxBars));
-  const bars = new Map<number, DistributionBar>();
+  const bars = new Map<number, Omit<DistributionBar, "height">>();
   for (const b of [...bins].sort((a, b) => a.id - b.id)) {
     const d = b.id - activeId;
     if (Math.abs(d) > reach) continue;
@@ -107,7 +109,7 @@ export function binDistribution(
       });
     }
   }
-  return [...bars.values()];
+  return [...bars.values()].map((b) => ({ ...b, height: (b.xUsd + b.yUsd) / (Math.abs(b.lastId - b.id) + 1) }));
 }
 
 /** `0` when the denominator is empty so a dead pool shows 0x, not Infinity. */

@@ -325,7 +325,7 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
   const [reach, setReach] = useState(20);
   const { tokenX: x, tokenY: y } = pool;
   const bars = chain ? binDistribution(chain.bins, chain.activeBinId, reach, x.price, y.price, MAX_BARS) : [];
-  const peak = Math.max(...bars.map((b) => b.xUsd + b.yUsd), 1e-12);
+  const peak = Math.max(...bars.map((b) => b.height), 1e-12);
   const first = bars[0];
   const last = bars[bars.length - 1];
   const labels = first && last ? [0, 1, 2, 3].map((i) => first.price + ((last.lastPrice - first.price) * i) / 3) : [];
@@ -393,7 +393,6 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
               onPointerLeave={(e) => e.pointerType === "mouse" && setSelected(null)}
             >
               {bars.map((b, i) => {
-                const total = b.xUsd + b.yUsd;
                 const bar = (
                   <div
                     key={b.id}
@@ -417,7 +416,7 @@ export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: 
                     )}
                     <div
                       className="flex flex-col overflow-hidden rounded-t-sm"
-                      style={{ height: `${Math.max(1, (total / peak) * 75)}%` }}
+                      style={{ height: `${Math.max(1, (b.height / peak) * 75)}%` }}
                     >
                       <div className="bg-brand" style={{ flex: b.xUsd }} />
                       <div style={{ flex: b.yUsd, background: "var(--sol)" }} />
