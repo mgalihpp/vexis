@@ -1,6 +1,6 @@
 import { Keypair } from "@solana/web3.js";
 import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/AppConfig.ts";
 import { Chain, type ChainPosition, type PoolState } from "../src/Chain.ts";
@@ -11,13 +11,16 @@ import {
   type NewMinute,
   type NewRebalance,
   type RebalanceWatch,
+  type ScreenerAgent,
   type WalletSigner,
   type Watch,
 } from "../src/Db.ts";
 import { ChainError, MeteoraError, TelegramError, ZapError } from "../src/errors.ts";
 import { WSOL_MINT } from "../src/fees.ts";
 import type { LinkButton } from "../src/format.ts";
-import { Meteora, type PoolReading } from "../src/Meteora.ts";
+import { Meteora, type PoolReading, type ScreenerReading } from "../src/Meteora.ts";
+import { ScreenerHistory } from "../src/ScreenerHistory.ts";
+import type { History } from "../src/screener-history.ts";
 import { Telegram } from "../src/Telegram.ts";
 import { type ClaimRequest, type CompoundRequest, type SweepRequest, Zap, type ZapRequest } from "../src/Zap.ts";
 
@@ -47,9 +50,12 @@ export type StoredRebalance = NewRebalance & {
 export const link = (userId: string, kind: AgentKind) => `${userId}/${kind}`;
 
 /** In-memory `Db`: same contract as the Postgres one, state exposed for assertions. */
-export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] } = {}) {
+export function fakeDb(
+  seed: { watches?: Watch[]; rebalances?: RebalanceWatch[]; screenerAgents?: ScreenerAgent[] } = {},
+) {
   const state = {
     watches: seed.watches ?? [],
+    screenerAgents: seed.screenerAgents ?? [],
     rebalanceWatches: seed.rebalances ?? [],
     rebalances: [] as StoredRebalance[],
     minutes: new Map<string, NewMinute[]>(),
@@ -71,6 +77,15 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
     Db,
     Db.of({
       runnableWatches: () => Effect.succeed(state.watches.filter((w) => !state.paused.has(w.agentId))),
+      runnableScreenerAgents: () => Effect.succeed(state.screenerAgents.filter((a) => !state.paused.has(a.agentId))),
+      alertedPools: (agentId, userId, since) =>
+        Effect.succeed(
+          new Set(
+            state.alerts
+              .filter((a) => a.agentId === agentId && a.userId === userId && a.at > since && a.error === null)
+              .map((a) => a.poolAddress),
+          ),
+        ),
       runnableRebalances: () => Effect.succeed(state.rebalanceWatches.filter((w) => !state.paused.has(w.agentId))),
       recordRebalance: (row) =>
         Effect.sync(() => {
@@ -184,21 +199,74 @@ export function fakeDb(seed: { watches?: Watch[]; rebalances?: RebalanceWatch[] 
   return { state, layer };
 }
 
-/** Meteora stand-in: `readings` is what the next call returns. */
+/** Meteora stand-in: `readings` and `screener` are what the next calls return. */
 export function fakeMeteora() {
-  const state = { readings: [] as PoolReading[], calls: [] as string[][], failing: false };
+  const state = {
+    readings: [] as PoolReading[],
+    calls: [] as string[][],
+    screener: [] as ScreenerReading[],
+    screenerCalls: 0,
+    failing: false,
+  };
+  const down = () => Effect.fail(new MeteoraError({ cause: new Error("down") }));
   const layer = Layer.succeed(
     Meteora,
     Meteora.of({
       pools: (addresses) => {
         state.calls.push([...addresses]);
-        return state.failing
-          ? Effect.fail(new MeteoraError({ cause: new Error("down") }))
-          : Effect.succeed(state.readings.filter((r) => addresses.includes(r.address)));
+        return state.failing ? down() : Effect.succeed(state.readings.filter((r) => addresses.includes(r.address)));
+      },
+      screener: () => {
+        state.screenerCalls++;
+        return state.failing ? down() : Effect.succeed(state.screener);
       },
     }),
   );
   return { state, layer };
+}
+
+/** In-memory history that, like the runner's, outlives a single tick. */
+export const screenerHistory = () =>
+  Layer.succeed(ScreenerHistory, ScreenerHistory.make(Ref.makeUnsafe<History>(new Map())));
+
+/** A screener-source volume-watch agent on a custom filter that only asks for $10k TVL. */
+export function screenerAgent(overrides: Partial<ScreenerAgent> = {}): ScreenerAgent {
+  return {
+    agentId: "agent-1",
+    userId: "user-1",
+    config: {
+      source: "screener",
+      preset: "custom",
+      custom: {
+        minTvl: 10_000,
+        minVolume: 0,
+        minMcap: 0,
+        maxMcap: 0,
+        minStep: 0,
+        maxStep: null,
+        verified: false,
+        minOrganic: 0,
+      },
+      mult: 3,
+      minUsd: 1000,
+      cooldownSec: 300,
+    },
+    ...overrides,
+  };
+}
+
+/** A clean, verified screener pool with $1M TVL. */
+export function screenerReading(overrides: Partial<ScreenerReading> = {}): ScreenerReading {
+  return {
+    ...reading(),
+    volume24h: 1_000_000,
+    blacklisted: false,
+    baseMcap: 50_000_000,
+    bothVerified: true,
+    baseOrganic: 80,
+    freezable: false,
+    ...overrides,
+  };
 }
 
 /** Telegram stand-in. Set `failSend` to make the next sends fail. */

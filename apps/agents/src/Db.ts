@@ -20,7 +20,7 @@ import {
   telegramLinks,
 } from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
-import { and, desc, eq, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, type SQL, sql } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "./errors.ts";
 import { walletSigner } from "./wallet.ts";
@@ -35,6 +35,13 @@ export type Watch = {
   readonly config: unknown;
   readonly lastAlertAt: Date | null;
 };
+
+/** A runnable volume-watch agent whose source is the screener. `config` is raw jsonb. */
+export type ScreenerAgent = { readonly agentId: string; readonly userId: string; readonly config: unknown };
+
+/** Stored configs from before `source` existed watch their hand-picked pools. */
+const volumeSource = (source: "pools" | "screener"): SQL =>
+  sql`coalesce(${agents.config}->>'source', 'pools') = ${source}`;
 
 /**
  * The RPC the user gave with the agent wallet. `missing` on wallets saved before it was required; `unreadable` when it
@@ -124,8 +131,12 @@ const MAX_STORED_RATIO = 1_000_000;
 export class Db extends Context.Service<
   Db,
   {
-    /** Enabled, unpaused volume-watch agents joined with their pools. */
+    /** Enabled, unpaused volume-watch agents on hand-picked pools, joined with their pools. */
     runnableWatches(): Effect.Effect<ReadonlyArray<Watch>, DbError>;
+    /** Enabled, unpaused volume-watch agents whose source is the screener. */
+    runnableScreenerAgents(): Effect.Effect<ReadonlyArray<ScreenerAgent>, DbError>;
+    /** Pools the agent alerted on after `since`, counting alerts still being sent but not failed sends. */
+    alertedPools(agentId: string, userId: string, since: Date): Effect.Effect<ReadonlySet<string>, DbError>;
     /** Enabled, unpaused auto-rebalance agents with a saved wallet, joined with their pools. Decrypts the RPC URL. */
     runnableRebalances(): Effect.Effect<ReadonlyArray<RebalanceWatch>, DbError>;
     /** Inserts with `delivered = false` and returns the new id. */
@@ -197,8 +208,45 @@ export class Db extends Context.Service<
               })
               .from(agents)
               .innerJoin(agentPools, and(eq(agentPools.agentId, agents.id), eq(agentPools.userId, agents.userId)))
-              .where(and(eq(agents.kind, "volume-watch"), eq(agents.enabled, true), eq(agents.paused, false))),
+              .where(
+                and(
+                  eq(agents.kind, "volume-watch"),
+                  eq(agents.enabled, true),
+                  eq(agents.paused, false),
+                  volumeSource("pools"),
+                ),
+              ),
           ),
+
+        runnableScreenerAgents: () =>
+          run("runnableScreenerAgents", () =>
+            db
+              .select({ agentId: agents.id, userId: agents.userId, config: agents.config })
+              .from(agents)
+              .where(
+                and(
+                  eq(agents.kind, "volume-watch"),
+                  eq(agents.enabled, true),
+                  eq(agents.paused, false),
+                  volumeSource("screener"),
+                ),
+              ),
+          ),
+
+        alertedPools: (agentId, userId, since) =>
+          run("alertedPools", () =>
+            db
+              .selectDistinct({ poolAddress: agentAlerts.poolAddress })
+              .from(agentAlerts)
+              .where(
+                and(
+                  eq(agentAlerts.userId, userId),
+                  gt(agentAlerts.at, since),
+                  eq(agentAlerts.agentId, agentId),
+                  isNull(agentAlerts.error),
+                ),
+              ),
+          ).pipe(Effect.map((rows) => new Set(rows.map((r) => r.poolAddress)))),
 
         runnableRebalances: () =>
           run("runnableRebalances", async () => {

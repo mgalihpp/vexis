@@ -71,6 +71,23 @@ export const evaluate = Effect.fn("evaluate")(function* (
   );
 });
 
+/** The chat and bot a volume-watch agent alerts through; with none linked, or one that no longer decrypts, it pauses. */
+export const volumeTarget = Effect.fn("volumeTarget")(function* (agentId: string, userId: string) {
+  const db = yield* Db;
+  const target = yield* db.telegramTarget(userId, "volume-watch");
+  if (target._tag === "missing") {
+    yield* db.pauseAgent(agentId, TELEGRAM_NOT_LINKED);
+    yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked a Telegram bot`);
+    return Option.none();
+  }
+  if (target._tag === "unreadable") {
+    yield* db.pauseAgent(agentId, TELEGRAM_RELINK);
+    yield* Effect.logWarning(`agent ${agentId} paused: ${userId}'s bot token does not decrypt with TOKEN_ENC_KEY`);
+    return Option.none();
+  }
+  return Option.some(target);
+});
+
 /**
  * One message for the agent's spiking pools. Order matters: take the cooldown slots, write the
  * alerts as undelivered, send, then settle. A failed send hands the slots back, so the next
@@ -85,18 +102,9 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
   const { webUrl } = yield* AppConfig;
   const { agentId, userId } = hits[0].watch;
 
-  const target = yield* db.telegramTarget(userId, "volume-watch");
-  if (target._tag === "missing") {
-    yield* db.pauseAgent(agentId, TELEGRAM_NOT_LINKED);
-    yield* Effect.logInfo(`agent ${agentId} paused: ${userId} has not linked a Telegram bot`);
-    return;
-  }
-  if (target._tag === "unreadable") {
-    yield* db.pauseAgent(agentId, TELEGRAM_RELINK);
-    yield* Effect.logWarning(`agent ${agentId} paused: ${userId}'s bot token does not decrypt with TOKEN_ENC_KEY`);
-    return;
-  }
-  const { chatId, botToken } = target;
+  const target = yield* volumeTarget(agentId, userId);
+  if (Option.isNone(target)) return;
+  const { chatId, botToken } = target.value;
 
   const at = new Date(yield* Clock.currentTimeMillis);
   const claimed = (yield* Effect.forEach(hits, (hit) =>

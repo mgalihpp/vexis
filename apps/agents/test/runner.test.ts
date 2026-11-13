@@ -7,6 +7,7 @@ import { formatMessage, formatUsd, linkButtons, type SpikeLine } from "../src/fo
 import { prune, RETENTION_MS } from "../src/Ingest.ts";
 import type { Meteora } from "../src/Meteora.ts";
 import { rebalanceCycle } from "../src/Rebalance.ts";
+import { screenerCycle } from "../src/Screener.ts";
 import type { Telegram } from "../src/Telegram.ts";
 import {
   chainPosition,
@@ -22,6 +23,9 @@ import {
   reading,
   rebalanceWatch,
   runAt,
+  screenerAgent,
+  screenerHistory,
+  screenerReading,
   T0,
   TEST_RPC,
   testConfig,
@@ -641,6 +645,99 @@ describe("auto-rebalance fee claim in range", () => {
     s.chain.pools.POOL1 = poolState({ activeBinId: 130, positions: fees });
     await s.run(T0 + 15 * MINUTE);
     expect(s.db.paused.size).toBe(0);
+  });
+});
+
+/**
+ * Screener-mode agents over `pools` (address to TVL). `tick(m, spikes)` runs the minute `T0 + m` with every pool
+ * trading $100 except the USD amounts in `spikes`; `warm()` runs minutes 0 to 30, a full 30-minute baseline.
+ */
+function screenerSetup(pools: Record<string, number> = { POOL1: 1_000_000 }, agents = [screenerAgent()]) {
+  const db = fakeDb({ screenerAgents: agents });
+  db.state.chats.set(link("user-1", "volume-watch"), 42n);
+  const meteora = fakeMeteora();
+  const telegram = fakeTelegram();
+  const layer = Layer.mergeAll(db.layer, meteora.layer, telegram.layer, screenerHistory(), testConfig);
+  const tvl = new Map(Object.entries(pools));
+  const cumulative = new Map<string, number>();
+  const tick = (minute: number, spikes: Record<string, number> = {}) => {
+    meteora.state.screener = [...tvl].map(([address, poolTvl]) => {
+      const total = (cumulative.get(address) ?? 0) + (spikes[address] ?? 100);
+      cumulative.set(address, total);
+      return screenerReading({ address, name: `${address}-SOL`, tvl: poolTvl, cumulativeVolume: total });
+    });
+    return runAt(screenerCycle().pipe(Effect.provide(layer)), T0 + minute * MINUTE);
+  };
+  const warm = async () => {
+    for (let m = 0; m <= 30; m++) await tick(m);
+  };
+  return { db: db.state, meteora: meteora.state, telegram: telegram.state, tvl, tick, warm };
+}
+
+describe("screener mode", () => {
+  test("no screener agent: the screener is never fetched", async () => {
+    const s = screenerSetup({ POOL1: 1_000_000 }, []);
+    await s.tick(0);
+    expect(s.meteora.screenerCalls).toBe(0);
+  });
+
+  test("warm-up: a spike before 30 known minutes gives no alert", async () => {
+    const s = screenerSetup();
+    for (let m = 0; m < 30; m++) await s.tick(m);
+    await s.tick(30, { POOL1: 5000 });
+    expect(s.db.alerts).toEqual([]);
+    expect(s.telegram.sent).toEqual([]);
+  });
+
+  test("a spike after warm-up writes a delivered alert and sends one message", async () => {
+    const s = screenerSetup();
+    await s.warm();
+    await s.tick(31, { POOL1: 5000 });
+    expect(s.db.alerts).toMatchObject([
+      { agentId: "agent-1", poolAddress: "POOL1", vol1m: 5000, baseline: 100, ratio: 50, delivered: true },
+    ]);
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.telegram.sent[0]?.text).toContain("Median 30m: $100");
+  });
+
+  test("cooldown: the next minute's spike is held back, one after the window goes out", async () => {
+    const s = screenerSetup();
+    await s.warm();
+    await s.tick(31, { POOL1: 5000 });
+    await s.tick(32, { POOL1: 5000 });
+    expect(s.telegram.sent).toHaveLength(1);
+    for (const m of [33, 34, 35]) await s.tick(m);
+    await s.tick(36, { POOL1: 5000 });
+    expect(s.telegram.sent).toHaveLength(2);
+  });
+
+  test("more than five spikes: the five strongest, and a line counting the rest", async () => {
+    const pools = Object.fromEntries(Array.from({ length: 7 }, (_, i) => [`P${i}`, 1_000_000]));
+    const s = screenerSetup(pools);
+    await s.warm();
+    await s.tick(31, Object.fromEntries(Object.keys(pools).map((p, i) => [p, 2000 + i * 1000])));
+    expect(s.db.alerts.map((a) => a.poolAddress)).toEqual(["P6", "P5", "P4", "P3", "P2"]);
+    expect(s.telegram.sent).toHaveLength(1);
+    expect(s.telegram.sent[0]?.text).toEndWith("<i>+2 more pools spiked this minute.</i>");
+  });
+
+  test("a failed send is recorded and does not hold the cooldown", async () => {
+    const s = screenerSetup();
+    await s.warm();
+    s.telegram.failSend = true;
+    await s.tick(31, { POOL1: 5000 });
+    expect(s.db.alerts).toMatchObject([{ delivered: false, error: expect.stringContaining("chat not found") }]);
+    s.telegram.failSend = false;
+    await s.tick(32, { POOL1: 5000 });
+    expect(s.telegram.sent).toHaveLength(1);
+  });
+
+  test("a pool that leaves the filter is not alerted; one still in it is", async () => {
+    const s = screenerSetup({ POOL1: 1_000_000, POOL2: 1_000_000 });
+    await s.warm();
+    s.tvl.set("POOL2", 5_000);
+    await s.tick(31, { POOL1: 5000, POOL2: 5000 });
+    expect(s.db.alerts.map((a) => a.poolAddress)).toEqual(["POOL1"]);
   });
 });
 
