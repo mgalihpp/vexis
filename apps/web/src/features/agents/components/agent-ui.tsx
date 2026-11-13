@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, XIcon, ZapIcon } from "lucide-react";
+import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, UnlinkIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -675,8 +675,8 @@ export function TelegramPanel({ kind }: { kind: AgentKind }) {
           </p>
         </div>
         {bot?.linked && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
-            {disconnect.isPending && <Spinner />}
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
+            {disconnect.isPending ? <Spinner /> : <UnlinkIcon />}
             Unlink
           </Button>
         )}

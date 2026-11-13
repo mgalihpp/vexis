@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { CheckIcon, FilterIcon, ListIcon } from "lucide-react";
+import {
+  CheckIcon,
+  FlameIcon,
+  GemIcon,
+  ListIcon,
+  type LucideIcon,
+  SlidersHorizontalIcon,
+  TrendingUpIcon,
+} from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { compactUsd } from "@/features/portfolio/money";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
@@ -23,6 +31,14 @@ import {
 import { PoolCell } from "./agent-layout";
 
 type Source = Draft["source"];
+
+const SOURCE_ICON: Record<"pools" | PresetChoice, LucideIcon> = {
+  pools: ListIcon,
+  "blue-chip": GemIcon,
+  "mid-cap": TrendingUpIcon,
+  degen: FlameIcon,
+  custom: SlidersHorizontalIcon,
+};
 
 /**
  * Where a volume-watch agent finds its pools: picked by hand, or every screener pool that passes a preset. Match counts
@@ -59,35 +75,38 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
   return (
     <div className="space-y-2">
       <ul className="space-y-2">
-        {options.map((o) => (
-          <li key={o.id}>
-            <button
-              type="button"
-              disabled={o.disabled}
-              aria-pressed={selected === o.id}
-              onClick={() => pick(o.id)}
-              className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left ${
-                o.disabled ? "opacity-60" : selected === o.id ? "border-brand/50 bg-brand/5" : "hover:bg-muted/40"
-              }`}
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
-                {o.id === "pools" ? <ListIcon className="size-4" /> : <FilterIcon className="size-4" />}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{o.name}</span>
-                <span className="block text-xs text-muted-foreground">{o.sub}</span>
-              </span>
-              {o.meta && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{o.meta}</span>}
-              {selected === o.id ? (
-                <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
-                  <CheckIcon className="size-3" />
+        {options.map((o) => {
+          const Icon = SOURCE_ICON[o.id];
+          return (
+            <li key={o.id}>
+              <button
+                type="button"
+                disabled={o.disabled}
+                aria-pressed={selected === o.id}
+                onClick={() => pick(o.id)}
+                className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left ${
+                  o.disabled ? "opacity-60" : selected === o.id ? "border-brand/50 bg-brand/5" : "hover:bg-muted/40"
+                }`}
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-brand/25 bg-brand/10 text-brand">
+                  <Icon className="size-4" />
                 </span>
-              ) : (
-                <span className="size-5 shrink-0 rounded-full border" />
-              )}
-            </button>
-          </li>
-        ))}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{o.name}</span>
+                  <span className="block text-xs text-muted-foreground">{o.sub}</span>
+                </span>
+                {o.meta && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{o.meta}</span>}
+                {selected === o.id ? (
+                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-brand text-brand-foreground">
+                    <CheckIcon className="size-3" />
+                  </span>
+                ) : (
+                  <span className="size-5 shrink-0 rounded-full border" />
+                )}
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {!value.custom && (
         <p className="text-xs text-muted-foreground">
