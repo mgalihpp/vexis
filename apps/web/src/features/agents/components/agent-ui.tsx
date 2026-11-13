@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, XIcon, ZapIcon } from "lucide-react";
+import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, UnlinkIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -510,83 +510,95 @@ function PresetRow({
 const MULT_MIN = 1.5;
 const MULT_MAX = 10;
 
-/** The spike rule's fields. No frame of its own: the settings card and the wizard step set the inset. */
+/**
+ * The spike rule's fields, or only `editable` of them (a screener preset sets the rest). No frame of its own: the
+ * settings card and the wizard step set the inset.
+ */
 export function ConfigForm({
   fields,
   errors,
   onChange,
+  editable,
 }: {
   fields: ConfigFields;
   errors: Partial<Record<keyof ConfigFields, string>>;
   onChange: (key: keyof ConfigFields, value: string) => void;
+  editable: ReadonlyArray<keyof ConfigFields>;
 }) {
   const mult = Number(fields.mult);
   const shown = Number.isFinite(mult) && mult > 0 ? mult : 3;
   const clamped = Math.min(MULT_MAX, Math.max(MULT_MIN, shown));
   const fill = ((clamped - MULT_MIN) / (MULT_MAX - MULT_MIN)) * 100;
+  const show = (key: keyof ConfigFields) => editable.includes(key);
   return (
     <div className="@container divide-y divide-border">
-      <SettingRow
-        label="Spike multiplier"
-        hint="Alert when a minute's volume reaches this many times the baseline."
-        error={errors.mult}
-      >
-        <div className="flex items-center gap-3 @2xl:w-72">
-          <input
-            type="range"
-            min={MULT_MIN}
-            max={MULT_MAX}
-            step={0.5}
-            value={clamped}
-            aria-label="Spike multiplier"
-            onChange={(e) => onChange("mult", e.target.value)}
-            className={SLIDER}
-            style={{ "--p": `${fill}%` } as React.CSSProperties}
-          />
-          <label
-            htmlFor="cfg-mult"
-            className={`flex h-7 shrink-0 items-center rounded-md bg-muted px-2 font-mono text-xs font-semibold tabular-nums ${
-              errors.mult ? "text-loss" : "text-brand"
-            }`}
-          >
+      {show("mult") && (
+        <SettingRow
+          label="Spike multiplier"
+          hint="Alert when a minute's volume reaches this many times the baseline."
+          error={errors.mult}
+        >
+          <div className="flex items-center gap-3 @2xl:w-72">
             <input
-              id="cfg-mult"
-              type="number"
-              inputMode="decimal"
-              step="0.5"
-              value={fields.mult}
-              aria-invalid={Boolean(errors.mult)}
+              type="range"
+              min={MULT_MIN}
+              max={MULT_MAX}
+              step={0.5}
+              value={clamped}
+              aria-label="Spike multiplier"
               onChange={(e) => onChange("mult", e.target.value)}
-              className={`w-9 text-right ${NUMBER_INPUT}`}
+              className={SLIDER}
+              style={{ "--p": `${fill}%` } as React.CSSProperties}
             />
-            ×
-          </label>
-        </div>
-      </SettingRow>
-      <PresetRow
-        label="Baseline window"
-        hint="The normal level is the median volume over this many past minutes."
-        field="baseline"
-        presets={BASELINE_PRESETS}
-        fields={fields}
-        error={errors.baseline}
-        fmt={minutesLabel}
-        suffix="min"
-        step="1"
-        onChange={onChange}
-      />
-      <PresetRow
-        label="Minimum volume"
-        hint="Ignore spikes smaller than this, in USD per minute."
-        field="minUsd"
-        presets={MIN_USD_PRESETS}
-        fields={fields}
-        error={errors.minUsd}
-        fmt={usdLabel}
-        prefix="$"
-        step="100"
-        onChange={onChange}
-      />
+            <label
+              htmlFor="cfg-mult"
+              className={`flex h-7 shrink-0 items-center rounded-md bg-muted px-2 font-mono text-xs font-semibold tabular-nums ${
+                errors.mult ? "text-loss" : "text-brand"
+              }`}
+            >
+              <input
+                id="cfg-mult"
+                type="number"
+                inputMode="decimal"
+                step="0.5"
+                value={fields.mult}
+                aria-invalid={Boolean(errors.mult)}
+                onChange={(e) => onChange("mult", e.target.value)}
+                className={`w-9 text-right ${NUMBER_INPUT}`}
+              />
+              ×
+            </label>
+          </div>
+        </SettingRow>
+      )}
+      {show("baseline") && (
+        <PresetRow
+          label="Baseline window"
+          hint="The normal level is the median volume over this many past minutes."
+          field="baseline"
+          presets={BASELINE_PRESETS}
+          fields={fields}
+          error={errors.baseline}
+          fmt={minutesLabel}
+          suffix="min"
+          step="1"
+          onChange={onChange}
+        />
+      )}
+      {show("minUsd") && (
+        <PresetRow
+          label="Minimum volume"
+          hint="Ignore spikes smaller than this, in USD per minute."
+          field="minUsd"
+          presets={MIN_USD_PRESETS}
+          fields={fields}
+          error={errors.minUsd}
+          fmt={usdLabel}
+          prefix="$"
+          step="100"
+          onChange={onChange}
+        />
+      )}
       <PresetRow
         label="Cooldown per pool"
         hint="After an alert, wait this long before alerting the same pool again."
@@ -663,8 +675,8 @@ export function TelegramPanel({ kind }: { kind: AgentKind }) {
           </p>
         </div>
         {bot?.linked && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
-            {disconnect.isPending && <Spinner />}
+          <Button variant="outline" size="sm" disabled={busy} onClick={() => disconnect.mutate(undefined)}>
+            {disconnect.isPending ? <Spinner /> : <UnlinkIcon />}
             Unlink
           </Button>
         )}

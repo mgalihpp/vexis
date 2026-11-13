@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { BotIcon, ChevronRightIcon, PauseIcon, PlayIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tile } from "@/features/portfolio/components/active-figures";
 import { SCROLL_TABLE, useView, ViewToggle } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
-import { type AgentView, agentName, agentStatus, formatMinutes, ruleSummary, summarizeFleet } from "../agents";
+import { screenerQuery } from "@/features/screener/screener.queries";
+import {
+  type AgentView,
+  agentName,
+  agentStatus,
+  formatMinutes,
+  presetLabel,
+  ruleSummary,
+  screenerPreset,
+  summarizeFleet,
+} from "../agents";
 import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
 import { AgentsBar, BarPill, PairLogo, StatCard } from "./agent-layout";
@@ -17,8 +27,9 @@ import { EmptyAgents } from "./empty-agents";
 export function FleetPage() {
   const { data } = useSuspenseQuery(agentsQuery);
   const [view, setView] = useView();
+  const { data: screener } = useQuery({ ...screenerQuery, enabled: data.agents.some((a) => screenerPreset(a)) });
   if (data.agents.length === 0) return <EmptyAgents />;
-  const summary = summarizeFleet(data.agents);
+  const summary = summarizeFleet(data.agents, screener?.pools);
 
   return (
     <div className="flex h-full flex-col">
@@ -83,6 +94,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   const [first, ...rest] = agent.pools;
+  const preset = screenerPreset(agent);
   return (
     <TableRow>
       <TableCell className="pl-3.25">
@@ -101,7 +113,9 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
         <FormError error={toggle.error} />
       </TableCell>
       <TableCell>
-        {first ? (
+        {preset ? (
+          <span className="font-medium">{presetLabel(preset)} screener</span>
+        ) : first ? (
           <div className="flex items-center gap-2">
             <PairLogo tokens={first.tokens} name={poolName(first)} />
             <span className="font-medium">{poolName(first)}</span>
@@ -154,6 +168,7 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
 
 function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
+  const preset = screenerPreset(agent);
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   return (
     <article className="rounded-lg border bg-card p-2.5 text-xs tabular-nums">
@@ -194,8 +209,10 @@ function AgentCard({ agent, now }: { agent: AgentView; now: number }) {
         </div>
       </div>
       <FormError error={toggle.error} />
-      <Tile label={`Pools · ${agent.pools.length}`} className="mt-2.5">
-        {agent.pools.length === 0 ? (
+      <Tile label={preset ? "Pools · screener" : `Pools · ${agent.pools.length}`} className="mt-2.5">
+        {preset ? (
+          <span className="font-medium">Every pool the {presetLabel(preset)} filter passes</span>
+        ) : agent.pools.length === 0 ? (
           <span className="text-muted-foreground">No pools</span>
         ) : (
           <div className="flex flex-wrap gap-x-3 gap-y-1.5">

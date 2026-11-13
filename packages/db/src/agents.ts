@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PoolFilter, PRESETS } from "./screen.ts";
 
 // Agent kinds and their config schemas. `agents.config` is jsonb; every write goes through
 // `parseAgentConfig`, and the runner parses again on read so a bad row is skipped, not run.
@@ -6,18 +7,31 @@ import { z } from "zod";
 export const AGENT_KINDS = ["volume-watch", "auto-rebalance"] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
-export const VolumeWatchConfig = z.object({
-  /** Alert when vol1m >= mult × median of the last `baseline` readings. */
-  mult: z.number().positive().default(3),
-  /** Number of per-minute readings in the rolling median. */
-  baseline: z.number().int().min(3).max(1440).default(30),
-  /** Alert only when vol1m is at least this many USD. */
-  minUsd: z.number().nonnegative().default(5000),
-  /** Poll interval in seconds. */
-  intervalSec: z.number().int().min(30).max(3600).default(60),
-  /** Per-pool cooldown between alerts, in seconds. */
-  cooldownSec: z.number().int().min(0).max(86_400).default(300),
-});
+export const VOLUME_SOURCES = ["pools", "screener"] as const;
+export type VolumeSource = (typeof VOLUME_SOURCES)[number];
+
+export const VolumeWatchConfig = z
+  .object({
+    /** Alert when vol1m >= mult × median of the last `baseline` readings. */
+    mult: z.number().positive().default(3),
+    /** Number of per-minute readings in the rolling median. */
+    baseline: z.number().int().min(3).max(1440).default(30),
+    /** Alert only when vol1m is at least this many USD. */
+    minUsd: z.number().nonnegative().default(5000),
+    /** Poll interval in seconds. */
+    intervalSec: z.number().int().min(30).max(3600).default(60),
+    /** Per-pool cooldown between alerts, in seconds. */
+    cooldownSec: z.number().int().min(0).max(86_400).default(300),
+    /** `pools` judges the hand-picked `agent_pools`; `screener` judges every screener pool that passes `preset`. */
+    source: z.enum(VOLUME_SOURCES).default("pools"),
+    /** A preset id reads `SCREENER_PRESETS` (filter and spike rule); `custom` reads `custom` with `mult` and `minUsd`. */
+    preset: z.enum(PRESETS).default("blue-chip"),
+    custom: PoolFilter.nullable().default(null),
+  })
+  .refine((c) => c.preset !== "custom" || c.custom !== null, {
+    path: ["custom"],
+    message: "A custom screener alert needs a filter",
+  });
 export type VolumeWatchConfig = z.infer<typeof VolumeWatchConfig>;
 
 export const REBALANCE_STRATEGIES = ["Spot", "Curve", "BidAsk"] as const;

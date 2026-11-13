@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { alertable } from "@vexis/db/screen";
 import {
+  alertFilter,
+  asFilterPool,
   baseToken,
   type FeeWindows,
   feePace,
@@ -129,6 +132,16 @@ describe("derived ratios", () => {
   });
   test("bin step bands", () => {
     expect([1, 20, 25, 80, 100, 400].map(stepBand)).toEqual(["tight", "tight", "medium", "medium", "wide", "wide"]);
+  });
+  test("an alert filter's step range holds exactly the band's bin steps", () => {
+    const bands = ["tight", "medium", "wide"] as const;
+    for (const binStep of [1, 20, 21, 80, 99, 100, 400]) {
+      const inBand = bands.filter((step) => {
+        const f = alertFilter({ minTvl: 0, minVolume: 0, minMcap: 0, maxMcap: 0, step });
+        return alertable({ ...asFilterPool(pool({ name: "X-SOL" })), binStep }, f);
+      });
+      expect(inBand).toEqual([stepBand(binStep)]);
+    }
   });
 });
 

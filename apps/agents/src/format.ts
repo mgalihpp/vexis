@@ -34,9 +34,10 @@ export function formatSpike(line: SpikeLine): string {
   return [`⚡ <b>Volume spike</b> ${escapeHtml(line.name)}`, "", ...rows].join("\n");
 }
 
-/** One message per agent per cycle, however many pools spiked. */
-export function formatMessage(lines: ReadonlyArray<SpikeLine>): string {
-  return lines.map(formatSpike).join("\n\n");
+/** One message per agent per cycle. `more` counts spiking pools left out of it, named in one closing line. */
+export function formatMessage(lines: ReadonlyArray<SpikeLine>, more = 0): string {
+  const tail = more > 0 ? [`<i>+${more} more pool${more === 1 ? "" : "s"} spiked this minute.</i>`] : [];
+  return [...lines.map(formatSpike), ...tail].join("\n\n");
 }
 
 export type LinkButton = { readonly text: string; readonly url: string };

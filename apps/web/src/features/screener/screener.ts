@@ -1,3 +1,5 @@
+import { baseOf, type FilterToken, filterPool, inBounds, type PoolFilter, QUOTES } from "@vexis/db/screen";
+
 export const WINDOWS = ["30m", "1h", "2h", "4h", "12h", "24h"] as const;
 export type FeeWindow = (typeof WINDOWS)[number];
 export type Windowed = Record<FeeWindow, number>;
@@ -112,12 +114,13 @@ export const STEP_BANDS: { id: StepBand; label: string }[] = [
   { id: "wide", label: "≥100" },
 ];
 export const stepBand = (binStep: number): StepBand => (binStep <= 20 ? "tight" : binStep < 100 ? "medium" : "wide");
-
-const QUOTES = new Set([
-  "So11111111111111111111111111111111111111112",
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-]);
+/** Each band as the bin step range `stepBand` gives it; bin steps are whole numbers. */
+export const STEP_RANGE: Record<StepBand | "all", Pick<PoolFilter, "minStep" | "maxStep">> = {
+  all: { minStep: 0, maxStep: null },
+  tight: { minStep: 0, maxStep: 20 },
+  medium: { minStep: 21, maxStep: 99 },
+  wide: { minStep: 100, maxStep: null },
+};
 
 /** Token X's share of the pool by USD value; unknown when either side has no value. */
 export function xShare(xUsd: number, yUsd: number) {
@@ -126,8 +129,7 @@ export function xShare(xUsd: number, yUsd: number) {
 }
 
 /** The side that is not SOL, USDC or USDT, whose market cap and holders describe the pool's risk. */
-export const baseToken = (p: Pick<ScreenerPool, "tokenX" | "tokenY">) =>
-  QUOTES.has(p.tokenX.mint) && !QUOTES.has(p.tokenY.mint) ? p.tokenY : p.tokenX;
+export const baseToken = (p: Pick<ScreenerPool, "tokenX" | "tokenY">) => baseOf(p.tokenX, p.tokenY);
 
 /** Top holders owning this share of supply or more is flagged. */
 export const CONCENTRATED_PCT = 50;
@@ -215,12 +217,6 @@ export interface ScreenerFilters {
   blacklisted: boolean;
 }
 
-function inCapRange(p: ScreenerPool, min: number, max: number) {
-  if (min === 0 && max === 0) return true;
-  const cap = baseToken(p).marketCap;
-  return cap !== null && cap >= min && (max === 0 || cap <= max);
-}
-
 function matches(p: ScreenerPool, query: string) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -239,11 +235,11 @@ export function screen(pools: ScreenerPool[], f: ScreenerFilters, sort: SortKey,
   return pools
     .filter(
       (p) =>
-        p.tvl >= f.minTvl &&
-        p.volume["24h"] >= f.minVolume &&
-        inCapRange(p, f.minMcap, f.maxMcap) &&
+        inBounds(
+          { tvl: p.tvl, volume24h: p.volume["24h"], binStep: p.binStep, baseMcap: baseToken(p).marketCap },
+          { ...f, ...STEP_RANGE[f.step] },
+        ) &&
         (f.blacklisted || !p.blacklisted) &&
-        (f.step === "all" || stepBand(p.binStep) === f.step) &&
         matches(p, f.query),
     )
     .map((pool) => ({ pool, key: value(pool, f.window) }))
@@ -254,6 +250,28 @@ export function screen(pools: ScreenerPool[], f: ScreenerFilters, sort: SortKey,
     })
     .map((r) => r.pool);
 }
+
+/** The screener's bounds as a custom alert filter. Search, window, sort and the blacklist toggle only change the view. */
+export const alertFilter = (
+  f: Pick<ScreenerFilters, "minTvl" | "minVolume" | "minMcap" | "maxMcap" | "step">,
+): PoolFilter => ({
+  minTvl: f.minTvl,
+  minVolume: f.minVolume,
+  minMcap: f.minMcap,
+  maxMcap: f.maxMcap,
+  ...STEP_RANGE[f.step],
+  verified: false,
+  minOrganic: 0,
+});
+
+/** What the shared alert filter reads of a screener pool. */
+export type AlertPool = Pick<ScreenerPool, "tvl" | "binStep" | "blacklisted"> & {
+  volume: Pick<Windowed, "24h">;
+  tokenX: FilterToken;
+  tokenY: FilterToken;
+};
+
+export const asFilterPool = (p: AlertPool) => filterPool({ ...p, volume24h: p.volume["24h"] });
 
 export function totals(pools: ScreenerPool[], window: FeeWindow = "24h") {
   let tvl = 0;

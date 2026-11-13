@@ -1,4 +1,4 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BotIcon,
@@ -37,18 +37,23 @@ import {
   sortBy,
 } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
+import { screenerQuery } from "@/features/screener/screener.queries";
 import {
   type AgentView,
   agentName,
   agentStatus,
-  type ConfigFields,
   compactUsd,
   configFields,
+  editableFields,
   formatMinutes,
   parseConfigFields,
+  presetLabel,
   STATUS_LABEL,
+  sourceOf,
+  spikeRule,
   statusHint,
   type VolumeAgentView,
+  watchedCount,
 } from "../agents";
 import {
   addAgentPoolFn,
@@ -79,6 +84,7 @@ import {
   useAgentMutation,
 } from "./agent-ui";
 import { RebalanceHistory, RebalanceOverview, RebalanceRuleSection, WalletPanel } from "./rebalance-ui";
+import { PresetRule, ScreenerMatches, SourcePicker } from "./screener-source";
 
 export const DETAIL_TABS = ["overview", "pools", "alerts", "settings"] as const;
 export type DetailTab = (typeof DETAIL_TABS)[number];
@@ -166,7 +172,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
             aria-current={t === tab ? "page" : undefined}
           >
             {tabLabel(t, agent)}
-            {t === "pools" && agent.kind === "volume-watch" && (
+            {t === "pools" && agent.kind === "volume-watch" && agent.config.source === "pools" && (
               <span className="ml-1 text-muted-foreground">{agent.pools.length}</span>
             )}
           </Link>
@@ -220,11 +226,16 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
     </Link>
   );
   const c = agent.config;
+  const r = spikeRule(c);
+  const { data: screener } = useQuery({ ...screenerQuery, enabled: c.source === "screener" });
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
         <StatCard label="Status" value={STATUS_LABEL[status]} tone={STATUS_STYLE[status].text} />
-        <StatCard label="Pools watched" value={agent.pools.length} />
+        <StatCard
+          label="Pools watched"
+          value={c.source === "pools" || screener ? watchedCount(agent, screener?.pools) : "—"}
+        />
         <StatCard label="Alerts, 24h" value={agent.alerts24h} />
         <StatCard label="Last alert" value={agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"} />
         <StatCard label="Cooldown" value={formatMinutes(c.cooldownSec)} />
@@ -234,9 +245,10 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
           <Panel title="Spike rule" action={tabLink("settings", "Edit")}>
             <Rows
               rows={[
-                ["Spike", `≥ ${c.mult}× the median`],
-                ["Baseline", formatMinutes(c.baseline * 60)],
-                ["Min volume", `${compactUsd(c.minUsd)}/min`],
+                ["Pools", c.source === "pools" ? "Picked by hand" : `${presetLabel(c.preset)} screener`],
+                ["Spike", `≥ ${r.mult}× the median`],
+                ["Baseline", formatMinutes(r.baseline * 60)],
+                ["Min volume", `${compactUsd(r.minUsd)}/min`],
                 ["Cooldown", formatMinutes(c.cooldownSec)],
               ]}
             />
@@ -258,6 +270,11 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
 }
 
 function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
+  if (agent.kind === "volume-watch" && agent.config.source === "screener") return <ScreenerMatches agent={agent} />;
+  return <PickedPools agent={agent} now={now} />;
+}
+
+function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
   const add = useAgentMutation(addAgentPoolFn);
   const remove = useAgentMutation(removeAgentPoolFn);
   // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
@@ -535,32 +552,38 @@ function VolumeRuleSection({
   onSaved: (message: string) => void;
   onDirty: (dirty: boolean) => void;
 }) {
-  const [fields, setFields] = useState<ConfigFields>(() => configFields(agent.config));
+  const saved = { fields: configFields(agent.config), source: sourceOf(agent.config) };
+  const [form, setForm] = useState(saved);
   const save = useAgentMutation(saveAgentConfig);
-  const result = parseConfigFields(fields, agent.config);
-  const dirty = JSON.stringify(fields) !== JSON.stringify(configFields(agent.config));
-  const update = (next: ConfigFields) => {
-    setFields(next);
-    onDirty(JSON.stringify(next) !== JSON.stringify(configFields(agent.config)));
+  const result = parseConfigFields(form.fields, { ...agent.config, ...form.source });
+  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  const update = (next: typeof form) => {
+    setForm(next);
+    onDirty(JSON.stringify(next) !== JSON.stringify(saved));
   };
+  const { source } = form;
   return (
     <>
-      <div className="p-4 sm:p-5">
+      <div className="space-y-4 p-4 sm:p-5">
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">Pools to watch</h3>
+          <p className="text-xs text-muted-foreground">
+            Switching to the screener keeps your hand-picked pools, so switching back restores them.
+          </p>
+          <SourcePicker value={source} onChange={(next) => update({ ...form, source: next })} />
+        </section>
+        {source.source === "screener" && source.preset !== "custom" && <PresetRule config={source} />}
         <ConfigForm
-          fields={fields}
+          fields={form.fields}
+          editable={editableFields(source)}
           errors={result.ok ? {} : result.errors}
-          onChange={(key, value) => update({ ...fields, [key]: value })}
+          onChange={(key, value) => update({ ...form, fields: { ...form.fields, [key]: value } })}
         />
       </div>
       <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
         <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
         <FormError error={save.error} />
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!dirty || save.isPending}
-          onClick={() => update(configFields(agent.config))}
-        >
+        <Button variant="ghost" size="sm" disabled={!dirty || save.isPending} onClick={() => update(saved)}>
           Reset
         </Button>
         <Button
@@ -593,7 +616,7 @@ const SETTINGS_SECTIONS = [
     id: "rule",
     label: "Spike rule",
     icon: SlidersHorizontalIcon,
-    description: "When a pool's volume counts as a spike worth an alert.",
+    description: "Which pools to watch, and when a pool's volume counts as a spike worth an alert.",
   },
   { id: "telegram", label: "Telegram", icon: SendIcon, description: "Where alerts are sent." },
   {
