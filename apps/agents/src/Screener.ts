@@ -1,5 +1,5 @@
 import { parseAgentConfig } from "@vexis/db/agents";
-import { alertable, SCREENER_BASELINE, type ScreenRule, screenRule } from "@vexis/db/screen";
+import { alertable, type ScreenRule, screenRule } from "@vexis/db/screen";
 import { Clock, Effect, Option } from "effect";
 import { AppConfig } from "./AppConfig.ts";
 import { Db, type ScreenerAgent } from "./Db.ts";
@@ -46,9 +46,14 @@ export const screenerCycle = Effect.fn("screenerCycle")(function* () {
     agents,
     (agent) =>
       ruleOf(agent).pipe(
-        Effect.flatMap(({ rule, cooldownMs }) =>
-          notifyScreener(agent, cooldownMs, spikes(readings, history, rule, now), now),
-        ),
+        Effect.flatMap(({ rule, cooldownMs }) => {
+          const matched = readings.filter((r) => alertable(r, rule.filter));
+          const warm = matched.filter((r) => validMinutes(history, r.address) > rule.baseline).length;
+          const hits = spikes(matched, history, rule, now);
+          return Effect.logInfo(
+            `screener agent ${agent.agentId}: ${readings.length} pools, ${matched.length} match, ${warm} warmed up, ${hits.length} spiking`,
+          ).pipe(Effect.andThen(notifyScreener(agent, rule, cooldownMs, hits, now)));
+        }),
         Effect.catchTag("BadAgentConfig", (error) =>
           Effect.logWarning(`skipping agent ${error.agentId}: bad config`, error.cause),
         ),
@@ -60,9 +65,12 @@ export const screenerCycle = Effect.fn("screenerCycle")(function* () {
   );
 });
 
-const spikes = (readings: ReadonlyArray<ScreenerReading>, history: History, rule: ScreenRule, now: number) =>
-  readings.flatMap((reading): Hit[] => {
-    if (!alertable(reading, rule.filter)) return [];
+/** Known per-minute volumes of a pool, the newest included; `evaluateSpike` needs `baseline` of them before the newest. */
+const validMinutes = (history: History, address: string) =>
+  history.get(address)?.minutes.filter((m) => m.volume !== null).length ?? 0;
+
+const spikes = (matched: ReadonlyArray<ScreenerReading>, history: History, rule: ScreenRule, now: number) =>
+  matched.flatMap((reading): Hit[] => {
     const spike = evaluateSpike(history.get(reading.address)?.minutes ?? [], rule, now);
     return spike ? [{ reading, spike }] : [];
   });
@@ -73,6 +81,7 @@ const spikes = (readings: ReadonlyArray<ScreenerReading>, history: History, rule
  */
 const notifyScreener = Effect.fn("notifyScreener")(function* (
   agent: ScreenerAgent,
+  rule: ScreenRule,
   cooldownMs: number,
   hits: ReadonlyArray<Hit>,
   now: number,
@@ -102,7 +111,7 @@ const notifyScreener = Effect.fn("notifyScreener")(function* (
       name: reading.name,
       binStep: reading.binStep,
       poolAddress: reading.address,
-      baselineMin: SCREENER_BASELINE,
+      baselineMin: rule.baseline,
       spike,
     }),
   );

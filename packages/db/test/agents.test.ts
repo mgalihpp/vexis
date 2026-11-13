@@ -21,6 +21,9 @@ describe("volume-watch config", () => {
     expect(() => parseAgentConfig("volume-watch", { mult: 0 })).toThrow();
     expect(() => parseAgentConfig("volume-watch", { baseline: 1.5 })).toThrow();
     expect(() => parseAgentConfig("volume-watch", { source: "screener", preset: "custom" })).toThrow();
+    expect(parseAgentConfig("volume-watch", { source: "screener", baseline: 60 }).baseline).toBe(60);
+    expect(() => parseAgentConfig("volume-watch", { source: "screener", baseline: 61 })).toThrow();
+    expect(parseAgentConfig("volume-watch", { baseline: 180 }).baseline).toBe(180);
   });
 });
 
