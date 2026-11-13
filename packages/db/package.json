@@ -5,6 +5,7 @@
   "exports": {
     "./schema": "./src/schema.ts",
     "./agents": "./src/agents.ts",
+    "./screen": "./src/screen.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",
     "./secret": "./src/secret.ts",

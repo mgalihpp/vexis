@@ -9,6 +9,9 @@ describe("volume-watch config", () => {
       minUsd: 5000,
       intervalSec: 60,
       cooldownSec: 300,
+      source: "pools",
+      preset: "blue-chip",
+      custom: null,
     });
   });
 
@@ -17,6 +20,7 @@ describe("volume-watch config", () => {
     expect(parseAgentConfig("volume-watch", { mult: 5 }).baseline).toBe(30);
     expect(() => parseAgentConfig("volume-watch", { mult: 0 })).toThrow();
     expect(() => parseAgentConfig("volume-watch", { baseline: 1.5 })).toThrow();
+    expect(() => parseAgentConfig("volume-watch", { source: "screener", preset: "custom" })).toThrow();
   });
 });
 
