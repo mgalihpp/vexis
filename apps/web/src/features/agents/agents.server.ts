@@ -1,4 +1,10 @@
-import { AGENT_KINDS, type AgentKind, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
+import {
+  AGENT_KINDS,
+  type AgentKind,
+  AutoRebalanceConfig,
+  parseAgentConfig,
+  VolumeWatchConfig,
+} from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   addAgentPool,
@@ -24,6 +30,7 @@ import {
   type AgentView,
   type AlertsData,
   MAX_POOLS,
+  type PoolFilter,
   type PoolView,
   poolLimit,
   type RebalancesData,
@@ -213,7 +220,8 @@ export interface NewAgentInput {
 export async function createAgent(userId: string, input: NewAgentInput) {
   const { kind, pools } = input;
   const max = poolLimit(kind);
-  if (pools.length === 0 || pools.length > max) {
+  const screener = kind === "volume-watch" && parseAgentConfig(kind, input.config).source === "screener";
+  if ((pools.length === 0 && !screener) || pools.length > max) {
     throw new Error(max === 1 ? "An auto-rebalance agent manages exactly one pool" : `Pick between 1 and ${max} pools`);
   }
   if (kind === "auto-rebalance" && !(await getRebalanceWallet(scope(userId)))) {
@@ -235,6 +243,20 @@ export async function createAgent(userId: string, input: NewAgentInput) {
     for (const pool of pools) await addAgentPool(s, agent.id, pool.address, pool.label);
     return agent.id;
   });
+}
+
+/**
+ * Points the user's volume-watch agent at the screener with a custom filter, keeping its rule and its hand-picked
+ * pools (switching back to pools restores them). Returns the agent's id.
+ */
+export async function alertOnFilter(userId: string, custom: PoolFilter) {
+  const s = scope(userId);
+  const [agent] = await listAgents(s, "volume-watch");
+  if (!agent) throw new Error("Create a volume spike agent first");
+  const current = VolumeWatchConfig.safeParse(agent.config);
+  const config = { ...(current.success ? current.data : {}), source: "screener", preset: "custom", custom };
+  if (!(await updateAgent(s, agent.id, { config }))) throw new Error("Agent not found");
+  return agent.id;
 }
 
 /** Turning on or resuming clears the runner's pause reason; pausing by hand has none. */

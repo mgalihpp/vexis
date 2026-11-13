@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { AGENT_KINDS, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
+import { PoolFilter } from "@vexis/db/screen";
 import { z } from "zod";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { requireViewer } from "@/features/auth/auth.middleware";
 import { MAX_POOLS } from "./agents";
 import {
   addPool,
+  alertOnFilter,
   createAgent,
   loadAgents,
   loadAlerts,
@@ -90,8 +92,14 @@ export const disconnectTelegramLink = createServerFn({ method: "POST" })
 
 export const createAgentFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(KindConfig.and(z.object({ pools: z.array(PoolInput).min(1).max(MAX_POOLS) })))
+  .validator(KindConfig.and(z.object({ pools: z.array(PoolInput).max(MAX_POOLS) })))
   .handler(async ({ context, data }) => ({ id: await createAgent(context.viewer.id, data) }));
+
+/** The screener's "Alert on pools like these" for a user who already has a volume-watch agent. */
+export const alertOnFilterFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .validator(z.object({ custom: PoolFilter }))
+  .handler(async ({ context, data }) => ({ id: await alertOnFilter(context.viewer.id, data.custom) }));
 
 export const setAgentRunning = createServerFn({ method: "POST" })
   .middleware([requireViewer])

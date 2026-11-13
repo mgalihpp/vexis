@@ -23,13 +23,18 @@ import {
   defaultDraft,
   describeFees,
   describeWidth,
+  draftConfig,
   draftIssues,
+  editableFields,
   formatMinutes,
   managedPools,
-  parseConfigFields,
+  needsPools,
+  type PoolFilter,
   parseRebalanceFields,
   poolLimit,
+  presetLabel,
   solText,
+  spikeRule,
   WIZARD_STEPS,
   type WizardStep,
 } from "../agents";
@@ -37,6 +42,7 @@ import { createAgentFn } from "../agents.functions";
 import { agentsQuery, walletQuery } from "../agents.queries";
 import { ConfigForm, FormError, PoolPicker, TelegramPanel, useAgentMutation } from "./agent-ui";
 import { RebalanceConfigForm, WalletPanel } from "./rebalance-ui";
+import { PresetRule, SourcePicker } from "./screener-source";
 
 const STEP_META: Record<WizardStep, { title: string; sub: string; heading: string; next: string }> = {
   agent: { title: "Agent", sub: "What it does", heading: "Choose an agent", next: "Continue to pools" },
@@ -45,7 +51,8 @@ const STEP_META: Record<WizardStep, { title: string; sub: string; heading: strin
   review: { title: "Review", sub: "Telegram and launch", heading: "Review and launch", next: "Launch agent" },
 };
 
-export function AgentWizard({ step }: { step: WizardStep }) {
+/** `custom` is a filter handed over by the screener's "Alert on pools like these". */
+export function AgentWizard({ step, custom }: { step: WizardStep; custom: PoolFilter | null }) {
   const navigate = useNavigate();
   const create = useAgentMutation(createAgentFn);
   const { data: fleet } = useSuspenseQuery(agentsQuery);
@@ -54,13 +61,15 @@ export function AgentWizard({ step }: { step: WizardStep }) {
   const added = new Set<string>(fleet.agents.flatMap((a) => (a.kind === "volume-watch" ? [a.kind] : [])));
   const managed = managedPools(fleet.agents);
   const available = AGENT_TYPES.filter((t) => !added.has(t.kind));
-  const [draft, setDraft] = useState<Draft>(() => defaultDraft(available[0]?.kind));
+  const [draft, setDraft] = useState<Draft>(() => defaultDraft(available[0]?.kind, custom));
 
+  // Search params other than `step` (the screener's filter) are only read once, into the draft.
   const go = (to: WizardStep) => navigate({ to: "/agents/new", search: { step: to } });
   const index = WIZARD_STEPS.indexOf(step);
   const issues = draftIssues(draft, { wallet: wallet.publicKey, rpcHost: wallet.rpcHost, managed });
   const rebalance = draft.kind === "auto-rebalance";
-  const rulesOk = rebalance ? parseRebalanceFields(draft.rebalanceFields).ok : parseConfigFields(draft.fields).ok;
+  const rulesOk = rebalance ? parseRebalanceFields(draft.rebalanceFields).ok : draftConfig(draft).ok;
+  const sourceOk = !(draft.source.source === "screener" && draft.source.preset === "custom" && !draft.source.custom);
 
   const launch = async () => {
     let created: { id: string };
@@ -71,7 +80,7 @@ export function AgentWizard({ step }: { step: WizardStep }) {
         data: { kind: "auto-rebalance", pools: draft.pools, config: parsed.config },
       });
     } else {
-      const parsed = parseConfigFields(draft.fields);
+      const parsed = draftConfig(draft);
       if (!parsed.ok) return;
       created = await create.mutateAsync({ data: { kind: "volume-watch", pools: draft.pools, config: parsed.config } });
     }
@@ -82,7 +91,9 @@ export function AgentWizard({ step }: { step: WizardStep }) {
     step === "agent"
       ? !added.has(draft.kind)
       : step === "pools"
-        ? draft.pools.length > 0 && !draft.pools.some((p) => rebalance && managed.has(p.address))
+        ? needsPools(draft)
+          ? draft.pools.length > 0 && !draft.pools.some((p) => rebalance && managed.has(p.address))
+          : sourceOk
         : step === "rules"
           ? rulesOk
           : issues.length === 0;
@@ -131,14 +142,20 @@ export function AgentWizard({ step }: { step: WizardStep }) {
               />
             )}
             {step === "rules" && !rebalance && (
-              <ConfigForm
-                fields={draft.fields}
-                errors={(() => {
-                  const r = parseConfigFields(draft.fields);
-                  return r.ok ? {} : r.errors;
-                })()}
-                onChange={(key, value) => setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }))}
-              />
+              <>
+                {draft.source.source === "screener" && draft.source.preset !== "custom" && (
+                  <PresetRule config={draft.source} />
+                )}
+                <ConfigForm
+                  fields={draft.fields}
+                  editable={editableFields(draft.source)}
+                  errors={(() => {
+                    const r = draftConfig(draft);
+                    return r.ok ? {} : r.errors;
+                  })()}
+                  onChange={(key, value) => setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }))}
+                />
+              </>
             )}
             {step === "review" && <ReviewStep draft={draft} issues={issues} onGo={go} />}
             <FormError error={create.error} />
@@ -313,14 +330,19 @@ function PoolsStep({
           agent already manages are left out.
         </p>
       )}
-      <PoolPicker
-        taken={draft.pools.map((p) => p.address)}
-        hidden={max === 1 ? [...managed] : []}
-        count={draft.pools.length}
-        max={max}
-        onPick={(pool) => setDraft((d) => ({ ...d, pools: max === 1 ? [pool] : [...d.pools, pool] }))}
-        onRemove={(address) => setDraft((d) => ({ ...d, pools: d.pools.filter((x) => x.address !== address) }))}
-      />
+      {draft.kind === "volume-watch" && (
+        <SourcePicker value={draft.source} onChange={(source) => setDraft((d) => ({ ...d, source }))} />
+      )}
+      {needsPools(draft) && (
+        <PoolPicker
+          taken={draft.pools.map((p) => p.address)}
+          hidden={max === 1 ? [...managed] : []}
+          count={draft.pools.length}
+          max={max}
+          onPick={(pool) => setDraft((d) => ({ ...d, pools: max === 1 ? [pool] : [...d.pools, pool] }))}
+          onRemove={(address) => setDraft((d) => ({ ...d, pools: d.pools.filter((x) => x.address !== address) }))}
+        />
+      )}
     </>
   );
 }
@@ -339,20 +361,22 @@ function ruleRows(draft: Draft): { label: string; value: string }[] {
       { label: "SOL reserve", value: c ? solText(c.solReserve) : dash },
     ];
   }
-  const parsed = parseConfigFields(draft.fields);
+  const parsed = draftConfig(draft);
   const c = parsed.ok ? parsed.config : null;
+  const r = c && spikeRule(c);
   return [
-    { label: "Spike", value: c ? `\u2265 ${c.mult}\u00d7 the median` : dash },
-    { label: "Baseline", value: c ? formatMinutes(c.baseline * 60) : dash },
-    { label: "Minimum volume", value: c ? `${compactUsd(c.minUsd)} / min` : dash },
+    { label: "Spike", value: r ? `\u2265 ${r.mult}\u00d7 the median` : dash },
+    { label: "Baseline", value: r ? formatMinutes(r.baseline * 60) : dash },
+    { label: "Minimum volume", value: r ? `${compactUsd(r.minUsd)} / min` : dash },
     { label: "Cooldown", value: c ? `${formatMinutes(c.cooldownSec)} per pool` : dash },
   ];
 }
 
 function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; onGo: (s: WizardStep) => void }) {
   const names = draft.pools.map((p) => p.label);
-  const pools =
-    names.length === 0
+  const pools = !needsPools(draft)
+    ? `${presetLabel(draft.source.preset)} screener pools`
+    : names.length === 0
       ? "None"
       : names.length <= 2
         ? names.join(", ")

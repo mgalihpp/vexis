@@ -17,15 +17,28 @@ import {
   VolumeWatchConfig,
   WALLET_UNREADABLE,
 } from "@vexis/db/agents";
+import {
+  alertable,
+  type PoolFilter,
+  PRESET_IDS,
+  type PresetChoice,
+  SCREENER_BASELINE,
+  SCREENER_PRESETS,
+  screenRule,
+} from "@vexis/db/screen";
+import { type AlertPool, asFilterPool } from "@/features/screener/screener";
 import { shortAddr } from "@/lib/format";
 
-export type { AgentKind, AutoRebalanceConfig, FeeMode, VolumeWatchConfig };
+export type { AgentKind, AutoRebalanceConfig, FeeMode, PoolFilter, PresetChoice, VolumeWatchConfig };
 export {
   FEE_MODES,
   LOW_SOL,
+  PRESET_IDS,
   REBALANCE_FAILING,
   REBALANCE_FAILURE_LIMIT,
   REBALANCE_STRATEGIES,
+  SCREENER_BASELINE,
+  SCREENER_PRESETS,
   TELEGRAM_NOT_LINKED,
   TELEGRAM_RELINK,
   WALLET_UNREADABLE,
@@ -232,9 +245,78 @@ export function formatMinutes(seconds: number) {
   return `${Number.isInteger(m) ? m : m.toFixed(1)} min`;
 }
 
+// --- screener source ---------------------------------------------------------------------------
+
+type SourceConfig = Pick<VolumeWatchConfig, "source" | "preset" | "custom" | "mult" | "minUsd" | "baseline">;
+
+export const sourceOf = ({ source, preset, custom }: Pick<VolumeWatchConfig, "source" | "preset" | "custom">) => ({
+  source,
+  preset,
+  custom,
+});
+
+/** The preset of a volume-watch agent on the screener; null for hand-picked pools and other kinds. */
+export const screenerPreset = (a: AgentView): PresetChoice | null =>
+  a.kind === "volume-watch" && a.config.source === "screener" ? a.config.preset : null;
+
+export const presetLabel = (preset: PresetChoice) => (preset === "custom" ? "Custom" : SCREENER_PRESETS[preset].label);
+
+/** The spike rule the runner applies: the preset's in screener mode, else the agent's own. */
+export function spikeRule(c: SourceConfig): Pick<VolumeWatchConfig, "mult" | "minUsd" | "baseline"> {
+  if (c.source === "pools") return c;
+  return screenRule(c) ?? { mult: c.mult, minUsd: c.minUsd, baseline: SCREENER_BASELINE };
+}
+
+/** The screener pools a screener-source agent watches right now; null for an agent on hand-picked pools. */
+export function screenerMatches<P extends AlertPool>(c: SourceConfig, pools: P[]): P[] | null {
+  if (c.source === "pools") return null;
+  const rule = screenRule(c);
+  return rule ? pools.filter((p) => alertable(asFilterPool(p), rule.filter)) : [];
+}
+
+/** The rule fields a user sets: a preset sets the spike rule, and screener mode always has a 30 minute baseline. */
+export function editableFields(c: Pick<VolumeWatchConfig, "source" | "preset">): (keyof ConfigFields)[] {
+  if (c.source === "pools") return ["mult", "baseline", "minUsd", "cooldownMin"];
+  return c.preset === "custom" ? ["mult", "minUsd", "cooldownMin"] : ["cooldownMin"];
+}
+
+const compactBound = (v: number) => compactUsd(v).replace(".0", "");
+
+/** A custom filter in one line, for the source picker. */
+export function describeFilter(f: PoolFilter) {
+  const cap =
+    f.minMcap && f.maxMcap
+      ? `mcap ${compactBound(f.minMcap)} to ${compactBound(f.maxMcap)}`
+      : f.minMcap
+        ? `mcap over ${compactBound(f.minMcap)}`
+        : f.maxMcap
+          ? `mcap under ${compactBound(f.maxMcap)}`
+          : null;
+  const step =
+    f.maxStep === null
+      ? f.minStep > 0
+        ? `bin step ${f.minStep}+`
+        : null
+      : f.minStep > 0
+        ? `bin step ${f.minStep} to ${f.maxStep}`
+        : `bin step up to ${f.maxStep}`;
+  return [
+    `TVL over ${compactBound(f.minTvl)}`,
+    `24h volume over ${compactBound(f.minVolume)}`,
+    cap,
+    step,
+    f.verified ? "verified" : null,
+    f.minOrganic > 0 ? `organic ${f.minOrganic}+` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** One line for cards: when an alert fires. */
-export function describeRule(c: Pick<VolumeWatchConfig, "mult" | "baseline" | "minUsd" | "cooldownSec">) {
-  return `≥ ${c.mult}× the median of the last ${c.baseline} minutes, at least ${usd(c.minUsd)} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
+export function describeRule(c: SourceConfig & Pick<VolumeWatchConfig, "cooldownSec">) {
+  const r = spikeRule(c);
+  const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${usd(r.minUsd)} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
+  return c.source === "pools" ? rule : `${presetLabel(c.preset)} screener pools: ${rule}`;
 }
 
 export const ratioText = (ratio: number) => (ratio >= 1_000_000 ? "from zero" : `${ratio.toFixed(1)}×`);
@@ -323,14 +405,25 @@ export interface Draft {
   pools: DraftPool[];
   fields: ConfigFields;
   rebalanceFields: RebalanceFields;
+  /** Volume-watch only: hand-picked pools, or every screener pool that passes `preset`. */
+  source: Pick<VolumeWatchConfig, "source" | "preset" | "custom">;
 }
 
-export const defaultDraft = (kind: AgentKind = "volume-watch"): Draft => ({
+/** `custom` comes from the screener's "Alert on pools like these" and starts the draft on that filter. */
+export const defaultDraft = (kind: AgentKind = "volume-watch", custom: PoolFilter | null = null): Draft => ({
   kind,
   pools: [],
   fields: configFields(DEFAULT_CONFIG),
   rebalanceFields: rebalanceFields(DEFAULT_REBALANCE_CONFIG),
+  source: custom ? { source: "screener", preset: "custom", custom } : { source: "pools", preset: "blue-chip", custom },
 });
+
+/** The draft's volume-watch config: the rule fields over its source. */
+export const draftConfig = (d: Draft) => parseConfigFields(d.fields, { ...DEFAULT_CONFIG, ...d.source });
+
+/** A volume-watch agent on the screener picks no pools. */
+export const needsPools = (d: Pick<Draft, "kind" | "source">) =>
+  d.kind === "auto-rebalance" || d.source.source === "pools";
 
 /** Pools the user's auto-rebalance agents already manage; a second agent on one would act on the same position. */
 export const managedPools = (agents: AgentView[]) =>
@@ -346,11 +439,16 @@ export function draftIssues(
 ): string[] {
   const issues: string[] = [];
   const max = poolLimit(d.kind);
-  if (d.pools.length === 0) issues.push(max === 1 ? "Pick the pool to manage" : "Pick at least one pool to watch");
-  if (d.pools.length > max) {
+  if (needsPools(d) && d.pools.length === 0) {
+    issues.push(max === 1 ? "Pick the pool to manage" : "Pick at least one pool to watch");
+  }
+  if (needsPools(d) && d.pools.length > max) {
     issues.push(max === 1 ? "An auto-rebalance agent manages one pool" : `Watch at most ${max} pools`);
   }
-  const config = d.kind === "auto-rebalance" ? parseRebalanceFields(d.rebalanceFields) : parseConfigFields(d.fields);
+  if (d.kind === "volume-watch" && d.source.source === "screener" && d.source.preset === "custom" && !d.source.custom) {
+    issues.push("Set a custom filter on the screener with “Alert on pools like these”");
+  }
+  const config = d.kind === "auto-rebalance" ? parseRebalanceFields(d.rebalanceFields) : draftConfig(d);
   if (!config.ok) issues.push(...Object.values(config.errors));
   if (d.kind === "auto-rebalance") {
     if (d.pools.some((p) => setup.managed?.has(p.address))) {
@@ -452,10 +550,11 @@ export function ruleSummary(a: AgentView): [string, string][] {
       ["Fees", { keep: "Keep", compound: "Compound", sweep: "Sweep" }[a.config.feeMode]],
     ];
   }
+  const r = spikeRule(a.config);
   return [
-    ["Spike", `≥ ${a.config.mult}×`],
-    ["Baseline", formatMinutes(a.config.baseline * 60)],
-    ["Min volume", `${compactUsd(a.config.minUsd)}/min`],
+    a.config.source === "pools" ? ["Spike", `≥ ${r.mult}×`] : ["Screener", presetLabel(a.config.preset)],
+    a.config.source === "pools" ? ["Baseline", formatMinutes(r.baseline * 60)] : ["Spike", `≥ ${r.mult}×`],
+    ["Min volume", `${compactUsd(r.minUsd)}/min`],
   ];
 }
 
@@ -467,13 +566,17 @@ export interface FleetSummary {
   alerts24h: number;
 }
 
-export function summarizeFleet(agents: AgentView[]): FleetSummary {
+/** The pools an agent watches: its own, or the screener pools its preset matches (none until the list loads). */
+export const watchedCount = (a: AgentView, screener: AlertPool[] = []) =>
+  (a.kind === "volume-watch" ? screenerMatches(a.config, screener)?.length : undefined) ?? a.pools.length;
+
+export function summarizeFleet(agents: AgentView[], screener: AlertPool[] = []): FleetSummary {
   const statuses = agents.map(agentStatus);
   return {
     total: agents.length,
     live: statuses.filter((s) => s === "live").length,
     attention: statuses.filter((s) => s === "attention").length,
-    pools: agents.reduce((n, a) => n + a.pools.length, 0),
+    pools: agents.reduce((n, a) => n + watchedCount(a, screener), 0),
     alerts24h: agents.reduce((n, a) => n + a.alerts24h, 0),
   };
 }

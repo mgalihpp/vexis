@@ -8,8 +8,11 @@ import {
   DEFAULT_REBALANCE_CONFIG,
   defaultDraft,
   describeFees,
+  describeFilter,
   describeRule,
+  draftConfig,
   draftIssues,
+  editableFields,
   LOW_SOL,
   MAX_POOLS,
   type PoolView,
@@ -19,6 +22,8 @@ import {
   ratioText,
   rebalanceFields,
   ruleSummary,
+  SCREENER_PRESETS,
+  screenerMatches,
   statusHint,
   summarizeFleet,
   TELEGRAM_NOT_LINKED,
@@ -111,6 +116,18 @@ describe("config form", () => {
     expect(describeRule(DEFAULT_CONFIG)).toBe(
       "≥ 3× the median of the last 30 minutes, at least $5,000 in a minute, then quiet for 5 min",
     );
+    expect(describeRule({ ...DEFAULT_CONFIG, source: "screener", preset: "degen", baseline: 60 })).toBe(
+      "Degen screener pools: ≥ 5× the median of the last 30 minutes, at least $2,000 in a minute, then quiet for 5 min",
+    );
+  });
+
+  test("a preset sets the spike rule; custom keeps it editable; screener mode never edits the baseline", () => {
+    expect(editableFields(DEFAULT_CONFIG)).toEqual(["mult", "baseline", "minUsd", "cooldownMin"]);
+    expect(editableFields({ source: "screener", preset: "mid-cap" })).toEqual(["cooldownMin"]);
+    expect(editableFields({ source: "screener", preset: "custom" })).toEqual(["mult", "minUsd", "cooldownMin"]);
+    expect(describeFilter(SCREENER_PRESETS["mid-cap"].filter)).toBe(
+      "TVL over $25k, 24h volume over $50k, mcap $1M to $100M, bin step 25 to 80, verified, organic 50+",
+    );
   });
 });
 
@@ -155,6 +172,11 @@ describe("rebalance form", () => {
 
   test("the fleet summary names each kind's rule", () => {
     expect(ruleSummary(agent()).map(([label]) => label)).toEqual(["Spike", "Baseline", "Min volume"]);
+    expect(ruleSummary(agent({ config: { ...DEFAULT_CONFIG, source: "screener" } }))).toEqual([
+      ["Screener", "Blue chip"],
+      ["Spike", "≥ 3×"],
+      ["Min volume", "$25.0k/min"],
+    ]);
     const rb = {
       ...agent(),
       kind: "auto-rebalance" as const,
@@ -197,6 +219,22 @@ describe("wizard draft", () => {
     expect(draftIssues({ ...withPool, fields: { ...withPool.fields, baseline: "1" } })).toHaveLength(1);
   });
 
+  test("on the screener it needs no pools, and custom needs a filter", () => {
+    const preset = {
+      ...defaultDraft(),
+      source: { source: "screener" as const, preset: "degen" as const, custom: null },
+    };
+    expect(draftIssues(preset)).toEqual([]);
+    const custom = { ...preset, source: { ...preset.source, preset: "custom" as const } };
+    expect(draftIssues(custom)).toEqual(["Set a custom filter on the screener with “Alert on pools like these”"]);
+    const fromScreener = defaultDraft("volume-watch", SCREENER_PRESETS.degen.filter);
+    expect(draftIssues(fromScreener)).toEqual([]);
+    expect(draftConfig(fromScreener)).toMatchObject({
+      ok: true,
+      config: { source: "screener", preset: "custom", custom: SCREENER_PRESETS.degen.filter },
+    });
+  });
+
   test("auto-rebalance needs one unmanaged pool, a valid rule, a saved wallet and its RPC", () => {
     const draft = { ...defaultDraft("auto-rebalance"), pools: [{ address: "P1", label: "SOL-USDC" }] };
     const ready = { wallet: "Pubkey111", rpcHost: "rpc.test" };
@@ -227,6 +265,26 @@ describe("fleet", () => {
     ]);
     expect(s).toEqual({ total: 2, live: 1, attention: 1, pools: 1, alerts24h: 4 });
     expect(summarizeFleet([])).toEqual({ total: 0, live: 0, attention: 0, pools: 0, alerts24h: 0 });
+  });
+
+  test("a screener agent watches the screener pools its preset matches, not its kept hand-picked pools", () => {
+    const kept = [{ id: "1", address: "A", label: null, lastAlertAt: null, tokens: null }];
+    const screener = agent({ pools: kept, config: { ...DEFAULT_CONFIG, source: "screener", preset: "degen" } });
+    const sol = { mint: "So11111111111111111111111111111111111111112", verified: true, freezable: false };
+    const pool = (address: string, binStep: number, blacklisted = false) => ({
+      address,
+      tvl: 50_000,
+      volume: { "24h": 100_000 },
+      binStep,
+      blacklisted,
+      tokenX: { mint: "BONK", verified: false, freezable: false, marketCap: 2_000_000, organic: null },
+      tokenY: { ...sol, marketCap: null, organic: null },
+    });
+    const list = [pool("deep", 100), pool("tight", 10), pool("banned", 100, true)];
+    expect(screenerMatches(screener.config, list)?.map((p) => p.address)).toEqual(["deep"]);
+    expect(screenerMatches(DEFAULT_CONFIG, list)).toBeNull();
+    expect(summarizeFleet([screener], list).pools).toBe(1);
+    expect(summarizeFleet([agent({ pools: kept })], list).pools).toBe(1);
   });
 
   test("formats volume and ratios", () => {
