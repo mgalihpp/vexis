@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PoolFilter, PRESETS } from "./screen.ts";
+import { PoolFilter, PRESETS, SCREENER_MAX_BASELINE } from "./screen.ts";
 
 // Agent kinds and their config schemas. `agents.config` is jsonb; every write goes through
 // `parseAgentConfig`, and the runner parses again on read so a bad row is skipped, not run.
@@ -31,6 +31,10 @@ export const VolumeWatchConfig = z
   .refine((c) => c.preset !== "custom" || c.custom !== null, {
     path: ["custom"],
     message: "A custom screener alert needs a filter",
+  })
+  .refine((c) => c.source !== "screener" || c.baseline <= SCREENER_MAX_BASELINE, {
+    path: ["baseline"],
+    message: `Up to ${SCREENER_MAX_BASELINE} minutes when watching the screener`,
   });
 export type VolumeWatchConfig = z.infer<typeof VolumeWatchConfig>;
 

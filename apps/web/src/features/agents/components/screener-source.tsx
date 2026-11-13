@@ -24,9 +24,7 @@ import {
   presetLabel,
   SCREENER_PRESETS,
   screenerMatches,
-  spikeRule,
   type VolumeAgentView,
-  type VolumeWatchConfig,
 } from "../agents";
 import { PoolCell } from "./agent-layout";
 
@@ -120,30 +118,6 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
   );
 }
 
-/** A preset's spike rule, which the user reads but does not set. */
-export function PresetRule({ config }: { config: Pick<VolumeWatchConfig, "source" | "preset" | "custom"> }) {
-  const r = spikeRule({ ...DEFAULT_CONFIG, ...config });
-  return (
-    <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-xs">
-      <p className="mb-2 text-muted-foreground">
-        The {presetLabel(config.preset)} preset sets the spike rule, so tuning it reaches every agent on it.
-      </p>
-      <dl className="space-y-1.5">
-        {[
-          ["Spike", `≥ ${r.mult}× the median`],
-          ["Baseline", formatMinutes(r.baseline * 60)],
-          ["Minimum volume", `${compactUsd(r.minUsd)} / min`],
-        ].map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-medium tabular-nums">{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
 const solFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 
 /** USD with SOL under it at the footer's SOL price; a dash when that price is missing. */
@@ -167,8 +141,8 @@ export function ScreenerMatches({ agent }: { agent: VolumeAgentView }) {
     <div className="flex flex-col gap-2">
       <p className="px-1 text-xs leading-relaxed text-muted-foreground">
         This agent watches every screener pool the {presetLabel(agent.config.preset)} filter passes, judged on a{" "}
-        {formatMinutes(spikeRule(agent.config).baseline * 60)} baseline. Pools join and leave as they move in and out of
-        the filter.
+        {formatMinutes(agent.config.baseline * 60)} baseline. Pools join and leave as they move in and out of the
+        filter.
         {agent.pools.length > 0 &&
           ` Your ${agent.pools.length} hand-picked pools are kept for when you switch back in Settings.`}
       </p>

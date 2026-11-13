@@ -6,7 +6,6 @@ import {
   filterPool,
   type PoolFilter,
   type PresetId,
-  SCREENER_BASELINE,
   SCREENER_PRESETS,
   screenRule,
 } from "./screen.ts";
@@ -93,21 +92,14 @@ describe("alertable", () => {
 });
 
 describe("screenRule", () => {
-  test("a preset reads the table, custom reads the config, both on the fixed baseline", () => {
-    const own = { mult: 7, minUsd: 123 };
+  test("the preset or custom filter, always with the agent's own spike rule", () => {
+    const own = { mult: 7, minUsd: 123, baseline: 45 };
     const filter = { ...SCREENER_PRESETS.degen.filter, minTvl: 42 };
     expect(screenRule({ ...own, preset: "blue-chip", custom: filter })).toEqual({
       filter: SCREENER_PRESETS["blue-chip"].filter,
-      mult: 3,
-      minUsd: 25_000,
-      baseline: SCREENER_BASELINE,
+      ...own,
     });
-    expect(screenRule({ ...own, preset: "custom", custom: filter })).toEqual({
-      filter,
-      mult: 7,
-      minUsd: 123,
-      baseline: SCREENER_BASELINE,
-    });
+    expect(screenRule({ ...own, preset: "custom", custom: filter })).toEqual({ filter, ...own });
     expect(screenRule({ ...own, preset: "custom", custom: null })).toBeNull();
   });
 });

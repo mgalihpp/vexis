@@ -25,16 +25,15 @@ import {
   describeWidth,
   draftConfig,
   draftIssues,
-  editableFields,
   formatMinutes,
   managedPools,
   needsPools,
   type PoolFilter,
   parseRebalanceFields,
+  pickSource,
   poolLimit,
   presetLabel,
   solText,
-  spikeRule,
   WIZARD_STEPS,
   type WizardStep,
 } from "../agents";
@@ -42,7 +41,7 @@ import { createAgentFn } from "../agents.functions";
 import { agentsQuery, walletQuery } from "../agents.queries";
 import { ConfigForm, FormError, PoolPicker, TelegramPanel, useAgentMutation } from "./agent-ui";
 import { RebalanceConfigForm, WalletPanel } from "./rebalance-ui";
-import { PresetRule, SourcePicker } from "./screener-source";
+import { SourcePicker } from "./screener-source";
 
 const STEP_META: Record<WizardStep, { title: string; sub: string; heading: string; next: string }> = {
   agent: { title: "Agent", sub: "What it does", heading: "Choose an agent", next: "Continue to pools" },
@@ -142,20 +141,14 @@ export function AgentWizard({ step, custom }: { step: WizardStep; custom: PoolFi
               />
             )}
             {step === "rules" && !rebalance && (
-              <>
-                {draft.source.source === "screener" && draft.source.preset !== "custom" && (
-                  <PresetRule config={draft.source} />
-                )}
-                <ConfigForm
-                  fields={draft.fields}
-                  editable={editableFields(draft.source)}
-                  errors={(() => {
-                    const r = draftConfig(draft);
-                    return r.ok ? {} : r.errors;
-                  })()}
-                  onChange={(key, value) => setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }))}
-                />
-              </>
+              <ConfigForm
+                fields={draft.fields}
+                errors={(() => {
+                  const r = draftConfig(draft);
+                  return r.ok ? {} : r.errors;
+                })()}
+                onChange={(key, value) => setDraft((d) => ({ ...d, fields: { ...d.fields, [key]: value } }))}
+              />
             )}
             {step === "review" && <ReviewStep draft={draft} issues={issues} onGo={go} />}
             <FormError error={create.error} />
@@ -331,7 +324,7 @@ function PoolsStep({
         </p>
       )}
       {draft.kind === "volume-watch" && (
-        <SourcePicker value={draft.source} onChange={(source) => setDraft((d) => ({ ...d, source }))} />
+        <SourcePicker value={draft.source} onChange={(source) => setDraft((d) => pickSource(d, source))} />
       )}
       {needsPools(draft) && (
         <PoolPicker
@@ -363,7 +356,7 @@ function ruleRows(draft: Draft): { label: string; value: string }[] {
   }
   const parsed = draftConfig(draft);
   const c = parsed.ok ? parsed.config : null;
-  const r = c && spikeRule(c);
+  const r = c;
   return [
     { label: "Spike", value: r ? `\u2265 ${r.mult}\u00d7 the median` : dash },
     { label: "Baseline", value: r ? formatMinutes(r.baseline * 60) : dash },
