@@ -99,7 +99,7 @@ export interface ScreenerPreset {
   label: string;
   sub: string;
   filter: PoolFilter;
-  /** Spike rule: at least `mult` × the median and `minUsd` in a minute. */
+  /** The spike rule a pick of this preset fills in; the agent's own rule is what the runner applies. */
   mult: number;
   minUsd: number;
 }
@@ -109,7 +109,7 @@ export type PresetId = (typeof PRESET_IDS)[number];
 export const PRESETS = [...PRESET_IDS, "custom"] as const;
 export type PresetChoice = (typeof PRESETS)[number];
 
-/** Tuning a row here reaches every agent on that preset: configs store the id, never the numbers. */
+/** Tuning a filter here reaches every agent on that preset: configs store the id, never the filter. */
 export const SCREENER_PRESETS: Record<PresetId, ScreenerPreset> = {
   "blue-chip": {
     label: "Blue chip",
@@ -161,8 +161,10 @@ export const SCREENER_PRESETS: Record<PresetId, ScreenerPreset> = {
   },
 };
 
-/** Minutes in a screener-mode baseline. The runner keeps them in memory, so it is fixed, not per agent. */
+/** The baseline a preset pick fills in. */
 export const SCREENER_BASELINE = 30;
+/** Longest screener-mode baseline: the runner keeps every screener pool's minutes in memory, sized for this. */
+export const SCREENER_MAX_BASELINE = 60;
 
 export interface ScreenRule {
   filter: PoolFilter;
@@ -171,16 +173,14 @@ export interface ScreenRule {
   baseline: number;
 }
 
-/** A preset's filter and spike rule, or a custom filter with the user's own rule. Null for custom with no filter. */
+/** The preset's (or custom) filter with the agent's own spike rule. Null for custom with no filter. */
 export function screenRule(c: {
   preset: PresetChoice;
   custom: PoolFilter | null;
   mult: number;
   minUsd: number;
+  baseline: number;
 }): ScreenRule | null {
-  if (c.preset !== "custom") {
-    const { filter, mult, minUsd } = SCREENER_PRESETS[c.preset];
-    return { filter, mult, minUsd, baseline: SCREENER_BASELINE };
-  }
-  return c.custom ? { filter: c.custom, mult: c.mult, minUsd: c.minUsd, baseline: SCREENER_BASELINE } : null;
+  const filter = c.preset === "custom" ? c.custom : SCREENER_PRESETS[c.preset].filter;
+  return filter && { filter, mult: c.mult, minUsd: c.minUsd, baseline: c.baseline };
 }

@@ -12,18 +12,19 @@ import {
   describeRule,
   draftConfig,
   draftIssues,
-  editableFields,
   LOW_SOL,
   MAX_POOLS,
   type PoolView,
   parseConfigFields,
   parseRebalanceFields,
+  pickSource,
   REBALANCE_FAILING,
   ratioText,
   rebalanceFields,
   ruleSummary,
   SCREENER_PRESETS,
   screenerMatches,
+  sourceOf,
   statusHint,
   summarizeFleet,
   TELEGRAM_NOT_LINKED,
@@ -117,14 +118,21 @@ describe("config form", () => {
       "≥ 3× the median of the last 30 minutes, at least $5,000 in a minute, then quiet for 5 min",
     );
     expect(describeRule({ ...DEFAULT_CONFIG, source: "screener", preset: "degen", baseline: 60 })).toBe(
-      "Degen screener pools: ≥ 5× the median of the last 30 minutes, at least $2,000 in a minute, then quiet for 5 min",
+      "Degen screener pools: ≥ 3× the median of the last 60 minutes, at least $5,000 in a minute, then quiet for 5 min",
     );
   });
 
-  test("a preset sets the spike rule; custom keeps it editable; screener mode never edits the baseline", () => {
-    expect(editableFields(DEFAULT_CONFIG)).toEqual(["mult", "baseline", "minUsd", "cooldownMin"]);
-    expect(editableFields({ source: "screener", preset: "mid-cap" })).toEqual(["cooldownMin"]);
-    expect(editableFields({ source: "screener", preset: "custom" })).toEqual(["mult", "minUsd", "cooldownMin"]);
+  test("picking another preset fills in its suggested rule; the user's own edits survive anything else", () => {
+    const own = {
+      fields: { ...configFields(DEFAULT_CONFIG), mult: "7", baseline: "15" },
+      source: sourceOf(DEFAULT_CONFIG),
+    };
+    const degen = pickSource(own, { ...own.source, source: "screener", preset: "degen" });
+    expect(degen.fields).toEqual({ mult: "5", baseline: "30", minUsd: "2000", cooldownMin: "5" });
+    const edited = { ...degen, fields: { ...degen.fields, mult: "2" } };
+    expect(pickSource(edited, edited.source).fields.mult).toBe("2");
+    expect(pickSource(edited, { ...edited.source, source: "pools" }).fields.mult).toBe("2");
+    expect(pickSource(own, { ...own.source, source: "screener", preset: "custom" }).fields).toEqual(own.fields);
     expect(describeFilter(SCREENER_PRESETS["mid-cap"].filter)).toBe(
       "TVL over $25k, 24h volume over $50k, mcap $1M to $100M, bin step 25 to 80, verified, organic 50+",
     );
@@ -175,7 +183,7 @@ describe("rebalance form", () => {
     expect(ruleSummary(agent({ config: { ...DEFAULT_CONFIG, source: "screener" } }))).toEqual([
       ["Screener", "Blue chip"],
       ["Spike", "≥ 3×"],
-      ["Min volume", "$25.0k/min"],
+      ["Min volume", "$5.0k/min"],
     ]);
     const rb = {
       ...agent(),

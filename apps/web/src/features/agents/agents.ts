@@ -261,12 +261,6 @@ export const screenerPreset = (a: AgentView): PresetChoice | null =>
 
 export const presetLabel = (preset: PresetChoice) => (preset === "custom" ? "Custom" : SCREENER_PRESETS[preset].label);
 
-/** The spike rule the runner applies: the preset's in screener mode, else the agent's own. */
-export function spikeRule(c: SourceConfig): Pick<VolumeWatchConfig, "mult" | "minUsd" | "baseline"> {
-  if (c.source === "pools") return c;
-  return screenRule(c) ?? { mult: c.mult, minUsd: c.minUsd, baseline: SCREENER_BASELINE };
-}
-
 /** The screener pools a screener-source agent watches right now; null for an agent on hand-picked pools. */
 export function screenerMatches<P extends AlertPool>(c: SourceConfig, pools: P[]): P[] | null {
   if (c.source === "pools") return null;
@@ -274,10 +268,20 @@ export function screenerMatches<P extends AlertPool>(c: SourceConfig, pools: P[]
   return rule ? pools.filter((p) => alertable(asFilterPool(p), rule.filter)) : [];
 }
 
-/** The rule fields a user sets: a preset sets the spike rule, and screener mode always has a 30 minute baseline. */
-export function editableFields(c: Pick<VolumeWatchConfig, "source" | "preset">): (keyof ConfigFields)[] {
-  if (c.source === "pools") return ["mult", "baseline", "minUsd", "cooldownMin"];
-  return c.preset === "custom" ? ["mult", "minUsd", "cooldownMin"] : ["cooldownMin"];
+type Source = Pick<VolumeWatchConfig, "source" | "preset" | "custom">;
+
+/** A new source for the rule form. Picking a different preset fills in its suggested spike rule for the user to adjust. */
+export function pickSource<T extends { fields: ConfigFields; source: Source }>(form: T, source: Source): T {
+  if (source.source === "pools" || source.preset === "custom") return { ...form, source };
+  if (form.source.source === "screener" && form.source.preset === source.preset) return { ...form, source };
+  const p = SCREENER_PRESETS[source.preset];
+  const fields = {
+    ...form.fields,
+    mult: String(p.mult),
+    minUsd: String(p.minUsd),
+    baseline: String(SCREENER_BASELINE),
+  };
+  return { ...form, source, fields };
 }
 
 const compactBound = (v: number) => compactUsd(v).replace(".0", "");
@@ -314,7 +318,7 @@ export function describeFilter(f: PoolFilter) {
 
 /** One line for cards: when an alert fires. */
 export function describeRule(c: SourceConfig & Pick<VolumeWatchConfig, "cooldownSec">) {
-  const r = spikeRule(c);
+  const r = c;
   const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${usd(r.minUsd)} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
   return c.source === "pools" ? rule : `${presetLabel(c.preset)} screener pools: ${rule}`;
 }
@@ -550,7 +554,7 @@ export function ruleSummary(a: AgentView): [string, string][] {
       ["Fees", { keep: "Keep", compound: "Compound", sweep: "Sweep" }[a.config.feeMode]],
     ];
   }
-  const r = spikeRule(a.config);
+  const r = a.config;
   return [
     a.config.source === "pools" ? ["Spike", `≥ ${r.mult}×`] : ["Screener", presetLabel(a.config.preset)],
     a.config.source === "pools" ? ["Baseline", formatMinutes(r.baseline * 60)] : ["Spike", `≥ ${r.mult}×`],

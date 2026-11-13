@@ -44,13 +44,12 @@ import {
   agentStatus,
   compactUsd,
   configFields,
-  editableFields,
   formatMinutes,
   parseConfigFields,
+  pickSource,
   presetLabel,
   STATUS_LABEL,
   sourceOf,
-  spikeRule,
   statusHint,
   type VolumeAgentView,
   watchedCount,
@@ -84,7 +83,7 @@ import {
   useAgentMutation,
 } from "./agent-ui";
 import { RebalanceHistory, RebalanceOverview, RebalanceRuleSection, WalletPanel } from "./rebalance-ui";
-import { PresetRule, ScreenerMatches, SourcePicker } from "./screener-source";
+import { ScreenerMatches, SourcePicker } from "./screener-source";
 
 export const DETAIL_TABS = ["overview", "pools", "alerts", "settings"] as const;
 export type DetailTab = (typeof DETAIL_TABS)[number];
@@ -226,7 +225,7 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
     </Link>
   );
   const c = agent.config;
-  const r = spikeRule(c);
+  const r = c;
   const { data: screener } = useQuery({ ...screenerQuery, enabled: c.source === "screener" });
   return (
     <div className="flex flex-col gap-2">
@@ -570,12 +569,10 @@ function VolumeRuleSection({
           <p className="text-xs text-muted-foreground">
             Switching to the screener keeps your hand-picked pools, so switching back restores them.
           </p>
-          <SourcePicker value={source} onChange={(next) => update({ ...form, source: next })} />
+          <SourcePicker value={source} onChange={(next) => update(pickSource(form, next))} />
         </section>
-        {source.source === "screener" && source.preset !== "custom" && <PresetRule config={source} />}
         <ConfigForm
           fields={form.fields}
-          editable={editableFields(source)}
           errors={result.ok ? {} : result.errors}
           onChange={(key, value) => update({ ...form, fields: { ...form.fields, [key]: value } })}
         />
