@@ -38,6 +38,7 @@ import { Segmented } from "@/features/portfolio/components/segmented";
 import { PoolFilter } from "@/features/portfolio/components/table-controls";
 import { compactUsd, tone } from "@/features/portfolio/money";
 import {
+  alertFilter,
   apr,
   baseToken,
   CONCENTRATED_PCT,
@@ -64,6 +65,7 @@ import {
   WINDOWS,
   warnings,
 } from "../screener";
+import { AlertButton } from "./alert-button";
 
 export interface ScreenerView {
   sort: SortKey;
@@ -224,7 +226,10 @@ export function ScreenerPage({
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 p-2 pb-6 md:p-4">
       <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <h1 className="font-brand text-xl font-bold tracking-tight md:text-2xl">Pool screener</h1>
-        <Updated at={data.at} />
+        <div className="flex items-center gap-3">
+          <Updated at={data.at} />
+          <AlertButton filter={alertFilter(filters)} />
+        </div>
       </header>
 
       <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border bg-border sm:grid-cols-3 xl:grid-cols-6">
