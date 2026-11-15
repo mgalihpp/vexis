@@ -37,6 +37,8 @@ Alerts come in two flavors. The browser watches your favorite wallets and pools 
 
 **Alerts.** Two separate things. In the browser, notifications for your favorite wallets and pools: opened, closed, out of range, volume spike. In Telegram, a saved `volume-watch` agent per user: the runner stores one minute of volume per pool, compares it to the median of the previous 30 minutes, and sends a message when the newest minute is both above your USD threshold and above your multiplier (both configurable). Cooldowns stop it from spamming you.
 
+**Office.** A team of AI agents that works the DLMM loop for you, drawn as a pixel-art office floor. Scout picks candidate pools from the screener, Strategist drafts a position, Risk Manager runs the guardrails in code (and can add an LLM veto, never lift one), and Manager writes the summary you approve or reject. The rule is "LLM proposes, code guards, runner executes". For now every proposal is a simulation: nothing is signed. An admin enables the office per user.
+
 A few things are deliberately honest instead of convenient. A token with no Jupiter price shows a dash and is left out of totals rather than counted at zero. A field nobody can source, like limit order bonus, is a dash. Incomplete data says so instead of pretending to be complete.
 
 ## Running it locally
@@ -61,16 +63,20 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 
 | Variable                 | Used by     | Default                              | What it does                                              |
 | ------------------------ | ----------- | ------------------------------------ | --------------------------------------------------------- |
-| `DATABASE_URL`           | web, runner | none                                 | Supabase Postgres, transaction pooler on port 6543        |
+| `DATABASE_URL`           | all         | none                                 | Supabase Postgres, transaction pooler on port 6543        |
 | `DATABASE_MIGRATE_URL`   | drizzle-kit | falls back to `DATABASE_URL`         | Session pooler on port 5432, for migrations               |
 | `BETTER_AUTH_SECRET`     | web         | none                                 | Long random string used to sign sessions                  |
 | `BETTER_AUTH_URL`        | web         | none                                 | Public origin; requests from another origin are rejected  |
-| `TOKEN_ENC_KEY`          | web, runner | none                                 | 32 random bytes, base64; encrypts the Telegram bot tokens |
-| `WALLET_ENC_KEY`         | web, runner | none                                 | 32 random bytes, base64; encrypts auto-rebalance wallets  |
+| `TOKEN_ENC_KEY`          | all         | none                                 | 32 random bytes, base64; encrypts bot tokens and LLM keys |
+| `WALLET_ENC_KEY`         | all         | none                                 | 32 random bytes, base64; encrypts agent wallets and RPCs  |
+| `ANTHROPIC_API_KEY`      | office      | none, Claude unavailable on Vexis    | Vexis-paid key for offices on the Vexis key source        |
+| `OPENAI_API_KEY`         | office      | none, OpenAI unavailable on Vexis    | Same, for OpenAI                                          |
+| `DEEPSEEK_API_KEY`       | office      | none, DeepSeek unavailable on Vexis  | Same, for DeepSeek                                        |
+| `META_API_KEY`           | office      | none, Meta unavailable on Vexis      | Same, for the Meta Model API                              |
 | `SOLANA_RPC_URL`         | web         | public mainnet endpoint              | RPC for the analytics page's on-chain bin and fee reads   |
 | `JUPITER_API_KEY`        | web, runner | none, uses `lite-api.jup.ag`         | Switches Jupiter calls (prices, balances, zap swaps)      |
 | `SOLANA_TRACKER_API_KEY` | web         | none, recent trades only             | Solana Tracker key for whale, smart money and KOL lists   |
-| `METEORA_DATAPI_URL`     | web, runner | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
+| `METEORA_DATAPI_URL`     | all         | `https://dlmm.datapi.meteora.ag`     | Meteora data API base URL                                 |
 | `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo | Where closed positions and transaction history are cached |
 | `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`      | Origin used in alert links                                |
 | `RESEND_API_KEY`         | web, script | none                                 | Resend key for invite mail (`db:invite --send`, notices)  |
@@ -87,6 +93,8 @@ There is no shared Telegram bot. Each user links their own BotFather bot per age
 | `bun run dev:web`      | Dev server on port 3000                    |
 | `bun run dev:agents`   | The alert runner, watching for changes     |
 | `bun run start:agents` | The alert runner without file watching     |
+| `bun run dev:office`   | The office runtime, watching for changes   |
+| `bun run start:office` | The office runtime without file watching   |
 | `bun test`             | All tests in every workspace               |
 | `bun run typecheck`    | `tsc --noEmit` in every workspace          |
 | `bun run lint`         | Biome check (`lint:fix` applies fixes)     |
@@ -97,6 +105,7 @@ There is no shared Telegram bot. Each user links their own BotFather bot per age
 | `bun run db:studio`    | Open Drizzle Studio                        |
 | `bun run db:isolation` | Check that scoped queries keep users apart |
 | `bun run db:invite`    | Create an invite; `--send`, `--requests`   |
+| `bun run db:office`    | Enable, disable, list or stop offices      |
 
 CI runs lint, typecheck, test and build on every PR, so the same four locally is a good sanity check.
 
@@ -109,6 +118,7 @@ apps/
     src/features/       domain code: portfolio, analytics, screener, auth, agents, notifications, settings, theme
     src/components/ui/  shadcn/ui, generated by the CLI
   agents/               volume-spike runner (Effect 4, its own Bun process)
+  office/               the office's LLM agents (Effect 4, its own Bun process)
 packages/
   db/                   Drizzle schema, queries and migrations for Supabase Postgres
 docs/                   offline reference docs, generated by scripts/fetch-docs.ts
@@ -128,6 +138,7 @@ Routes stay thin. Domain code lives in `src/features/<feature>/`, and inside a f
 | `/analytics`         | Pool analytics; `?pool=` picks the pool                                 |
 | `/screener`          | Pool screener: every pool above $1K TVL and volume, sorted and filtered |
 | `/agents`            | Agents; `/agents/new` and `/agents/$agentId` for the wizard and detail  |
+| `/office`            | The agent office: floor, approvals, feed, summary and settings          |
 | `/login`             | Sign in, or join with an invite                                         |
 | `/terms`, `/privacy` | Public pages, readable without an account                               |
 
@@ -144,6 +155,18 @@ pm2 start "bun apps/agents/src/main.ts" --name vexis-agents
 ```
 
 It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, the same values the web app uses, and refuses to start without a valid `WALLET_ENC_KEY`. It has no RPC of its own: every auto-rebalance read and send goes through the RPC URL each user saved with their agent wallet. Users should give a Helius URL, since live sends take their priority fee from Helius `getPriorityFeeEstimate` and another RPC sends with no priority fee.
+
+## The office
+
+`apps/office` is a third process. Every minute it walks each enabled office: Scout every 15 minutes (or early after a volume alert), then Strategist, Risk Manager and Manager on whatever is waiting, then expiry and the simulated executor. One screener request every 15 minutes serves every office, so more users never cost more datapi requests. There is no default model: the user picks a provider and model per agent in `/office` settings, on Vexis's keys under the admin's daily cap, or on their own keys under their own cap. An agent with no model does not run.
+
+An admin turns an office on with `bun run db:office --enable you@example.com --vexis-usd 1`. `--stop-all` is the global kill switch and `--resume-all` lifts it. Under pm2:
+
+```bash
+pm2 start "bun apps/office/src/main.ts" --name vexis-office
+```
+
+It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, plus whichever provider keys Vexis pays for.
 
 ## Deploy
 

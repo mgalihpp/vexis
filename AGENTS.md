@@ -2,7 +2,7 @@
 
 Vexis is a portfolio tracker and pool analytics app for Meteora DLMM on Solana. Paste a wallet and it reconstructs every closed and active position, with PnL in SOL and USD; pick a pool and it shows the price, volume, TVL, fees and the liquidity in each bin around the active bin. A separate runner watches pools for volume spikes and sends Telegram alerts.
 
-A [Bun](https://bun.sh) workspaces monorepo: `apps/web` is the TanStack Start product, `apps/agents` is the alert runner, `packages/db` is the shared Drizzle schema and queries for Supabase Postgres.
+A [Bun](https://bun.sh) workspaces monorepo: `apps/web` is the TanStack Start product, `apps/agents` is the alert runner, `apps/office` runs the office's LLM agents, `packages/db` is the shared Drizzle schema and queries for Supabase Postgres.
 
 ## What makes Vexis special
 
@@ -16,9 +16,9 @@ A trader reading a PnL number decides with it. Every amount is shown in parallel
 
 Meteora's data API allows 300 requests per window per IP, and that budget is shared by every process on the machine. This is why closed positions load in the background, why pools are cached on disk, why a pool is refetched only when its `lastClosedAt` changes, and why `get()` in `portfolio/meteora.server.ts` is the one place that talks to the datapi. A feature that adds a request path without thinking about that budget is a defect, even when it works on a small wallet.
 
-### 3. Two runtimes, one product
+### 3. Three runtimes, one product
 
-The web app serves pages; the runner runs one tick a minute. They share the schema, the zod configs, the encrypted bot tokens and the encrypted agent wallets, and they both point at the same database. A change to `agents.config`, `pool_minutes`, `agent_alerts`, `agent_rebalances` or `rebalance_wallets` is a change to both.
+The web app serves pages; the runner runs one tick a minute; the office runtime runs the office's LLM agents, also once a minute. They share the schema, the zod configs, the encrypted bot tokens, LLM keys and agent wallets, and they all point at the same database. A change to `agents.config`, `pool_minutes`, `agent_alerts`, `agent_rebalances` or `rebalance_wallets` is a change to the web app and the runner; a change to `office_*` or `@vexis/db/office` is a change to the web app and the office runtime (and, from V1, the runner).
 
 ## A note from the maintainer
 
@@ -39,6 +39,8 @@ The rest of this file helps you navigate the codebase. Treat it as good defaults
 - **closed job** and **history job** are the two per-wallet background jobs (closed positions, transaction history).
 - **agent** means a user's saved `volume-watch` or `auto-rebalance` configuration, not you.
 - **runner** means `apps/agents`, the process that evaluates agents every minute.
+- **office** means a user's virtual office (`office_config` row): four LLM agents (Scout, Strategist, Risk Manager, Manager) and three code desks (Monitor, Executor, Bookkeeper). **office runtime** means `apps/office`.
+- **proposal** means one `office_proposals` row: an on-chain action an office agent proposes, which moves only through `transition()` in `@vexis/db/office`.
 - **datapi** means the Meteora DLMM data API behind `METEORA_DATAPI_URL`.
 
 ## The three ways to hurt yourself
@@ -52,7 +54,7 @@ The rest of this file helps you navigate the codebase. Treat it as good defaults
 The most common defect here is a change that works in the tab you tested and is missing everywhere else. Before calling work done, walk this list and say which entries applied:
 
 - **Entry points.** `/portfolio/$wallet` has Overview, Active, Closed, Balances and Transactions; `/analytics` shares pools and prices with them, and every `/screener` row opens its pool there. A currency or range fix usually belongs in the URL/search schema, not in one tab.
-- **Runtimes.** A schema or config change reaches the web app and the runner. A runner-only change still has to render in the Agents pages.
+- **Runtimes.** A schema or config change reaches the web app and the runner, and an office change reaches the web app and the office runtime. A runner-only change still has to render in the Agents pages, an office-runtime change on `/office`.
 - **Data sources.** The datapi, the discovery API, Jupiter, and the on-chain DLMM SDK fail differently. Every one of them is zod-parsed or guarded at the boundary and degrades to `—` or a message, never to a crash or a fake zero.
 - **Currencies.** Every amount carries `sol` and `usd`. A new field that only has one is half a field.
 - **Cache shape.** The on-disk cache is versioned (`{ version: 1, ... }`). Changing the shape means bumping the version; a mismatch starts empty on purpose.
@@ -67,6 +69,7 @@ Bun workspaces monorepo, Windows dev box; Bun is the package manager, test runne
 bun install
 bun run dev:web        # TanStack Start dev server, http://localhost:3000
 bun run dev:agents     # the alert runner (needs DATABASE_URL and TOKEN_ENC_KEY)
+bun run dev:office     # the office runtime (needs DATABASE_URL, TOKEN_ENC_KEY, WALLET_ENC_KEY)
 bun test               # all tests (bun:test), across every workspace
 bun test apps/web/src/features/portfolio/portfolio.test.ts   # one file
 bun test -t "month calendar"                                  # by test name
@@ -78,6 +81,7 @@ bun run db:generate    # drizzle-kit: schema.ts -> packages/db/migrations
 bun run db:migrate     # apply migrations to DATABASE_URL (Supabase)
 bun run db:isolation   # live check that scoped queries keep users apart
 bun run db:invite      # create an invite and print its join link (--email, --days, --uses; --send mails it to --email; --requests lists pending requests; --admin <email> promotes)
+bun run db:office      # --enable <email> [--vexis-usd N], --disable <email>, --list, --stop-all, --resume-all
 ```
 
 Add shadcn components from `apps/web`: `bunx shadcn@latest add <name>`. The generated files in `src/components/ui`, `src/hooks/use-mobile.ts`, `src/hooks/use-highlighted-code.ts` and `src/lib/highlighter.tsx` are excluded from Biome on purpose so the CLI can overwrite them. Editing them is fine (the tooltip was restyled), but expect `shadcn add --overwrite` to revert your edits.
@@ -133,7 +137,7 @@ Build target is a flag, not code: `NITRO_PRESET=node-server bun run build`. Prod
 
 In this Start version the validator method is `.validator(zodSchema)`, not `inputValidator`.
 
-**Feature folders**: domain code lives in `apps/web/src/features/<feature>/` (portfolio, analytics, screener, auth, agents, notifications, settings, theme, legal, timezone, landing). Routes in `src/routes` stay thin (search schema, loader, SSR mode, layout). Import with `@/`, no barrel `index.ts` files.
+**Feature folders**: domain code lives in `apps/web/src/features/<feature>/` (portfolio, analytics, screener, auth, agents, office, notifications, settings, theme, legal, timezone, landing). Routes in `src/routes` stay thin (search schema, loader, SSR mode, layout). Import with `@/`, no barrel `index.ts` files.
 
 **Portfolio** (`features/portfolio`):
 
@@ -169,6 +173,17 @@ In this Start version the validator method is `.validator(zodSchema)`, not `inpu
 
 **Agents pages** (`features/agents`, routes `/agents`, `/agents/new`, `/agents/$agentId`): one volume-watch agent per user, watching up to 20 hand-picked pools or a screener preset, and any number of auto-rebalance agents, one pool each, read and written through `agents.server.ts` (user-scoped `forUser` helpers) behind `agents.functions.ts` (`requireViewer`) and `agents.queries.ts`. `AgentView` is a union on `kind`; every write addresses an agent by id, and an auto-rebalance agent is named by its pool pair (`agentName`). Fleet, wizard, detail (overview, pools, alerts or rebalance history, settings) and the empty state all read Postgres; config edits go through the kind's zod schema and `parseAgentConfig`. The wizard offers volume-watch only while the user has none. Its volume-watch pools step picks the source (`SourcePicker`): pools picked by hand, or a preset (Blue chip, Mid cap, Degen, or Custom once the screener handed over a filter, also through `/agents/new?custom=`), each with its current match count from the screener query, which shares the screener page's cached list and costs no extra datapi request. The user sets the whole spike rule in every mode; picking a different preset fills in its suggested multiplier and minimum volume with a 30-minute baseline (`pickSource`), which the user can then change. Settings switches source and preset and keeps the hand-picked `agent_pools` rows, so switching back restores them; on the screener the Pools tab lists what matches now and the fleet names the preset. Alert history labels each alert's pool from its own pair lookup, so screener pools outside `agent_pools` keep their names and logos. The auto-rebalance pool step is single-select and leaves out pools another auto-rebalance agent manages. An auto-rebalance agent's pool is fixed at creation, so the way out is Delete in its settings (confirmed; cascades to its pools and history). Telegram is linked per agent kind: the user pastes a BotFather token in that agent's wizard or settings, sends /start to the bot and presses Check (`telegram.server.ts`); linking unpauses every agent of that kind with a Telegram pause. `telegramQuery` returns one view per kind and `TelegramPanel` takes the `kind`. Auto-rebalance needs an agent wallet and an RPC URL (`wallet.server.ts`): the user pastes a base58 secret key and an https mainnet RPC URL once (checked with `getGenesisHash`, 10 s timeout), both encrypted with `WALLET_ENC_KEY` and never returned; only the public key and the RPC's host are read back, and the RPC URL can be replaced on its own. Without a wallet or an RPC URL the agent shows "attention" and the runner skips it; saving the wallet again clears a `wallet_unreadable` pause on every auto-rebalance agent. Settings has a Preview/Live switch (`dryRun`) that asks for confirmation before going live, plus the fee mode, the in-range claim threshold and the SOL reserve; the reserve field and the wallet panel say what the wallet must hold (about 0.1 to 0.2 SOL beyond the position, and one funded position the user opened first). The history shows a Solscan link, Preview, Failed (error on hover) or Sending per row, and claim rows as "Fees claimed" with the fee in SOL. `agents.ts` is the pure, tested part (status, config form parsing, draft checks, source and preset helpers).
 
+**Office** (`features/office`, route `/office`; runtime `apps/office`; shared contract `packages/db/src/office.ts` and `office.server.ts`). The MVP of the PRD: every proposal is simulated and nothing is signed. An admin enables an office per user with `db:office --enable` (it inserts the `office_config` row and sets `vexis_daily_usd`); without the row the page shows an empty state.
+
+- Lifecycle: draft → risk_checked → awaiting_approval → approved → executing → done, plus rejected, failed and expired. `transition()` is the only table of legal moves, and `moveProposal` updates only while the row is still at the old status, so two writers never both win. A risk veto is draft → rejected with `decided_by` risk. A partial unique index keeps one unfinished proposal per pool; a duplicate draft is dropped.
+- `apps/office` ticks once a minute over every office (`tick.ts`, `desks.ts`): Scout every 15 minutes or early after one of the user's `agent_alerts`, Strategist on the candidates, Risk Manager (`guardrails.ts`, pure and tested; code verdict always wins, the Risk LLM may add a veto with a note and never lift one), Manager's summary and the move to awaiting_approval with `expires_at`, expiry, and the simulated executor (approved → executing → done, plus a simulated `office_journal` row with null PnL).
+- API budget: one screener `/pools?page_size=1000` request per 15-minute window serves every office's Scout and Risk Manager (`Screener` in `services/meteora.ts`; a failed request counts, so it is never retried inside the window). Bin data is read on-chain over the user's RPC.
+- LLMs: one `Llm` service over four providers (`providers/`: Claude, OpenAI, DeepSeek, Meta Model API), plain HTTP, JSON parsed with zod in `decision.ts`; invalid output is dropped and logged. There is no default model: `office_config.models` names a provider and model per LLM agent, only models listed in `MODEL_PRICES` (so every run has a known cost), and an agent with null does not run. Key source `vexis` uses `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `META_API_KEY` under `vexis_daily_usd`; `own` uses the user's keys (`llm_keys`, encrypted with `TOKEN_ENC_KEY`, never sent back) under `guardrails.dailyLlmUsd`. Each call writes an `office_runs` row (tokens, `runCost`, duration, error). Prompts never carry a secret key, RPC URL or bot token. All agent text (feed, prompts, logs) is English.
+- Wallet: `wallet_source` `user` reads the auto-rebalance agent wallet, `office` an office wallet stored in `office_config` (secret and RPC encrypted with `WALLET_ENC_KEY`). The MVP decrypts only the RPC URL, never a secret key. Pools an auto-rebalance agent manages are vetoed, so two agents never touch one position.
+- Pauses: the kill switch (web) pauses the office and rejects every proposal not yet executing; Resume lifts it. Daily loss pauses until the next UTC midnight and clears itself. `db:office --stop-all` is the admin's global kill switch (`admin_stop`, no Resume in the web), lifted by `--resume-all`.
+- `/office`: the pixel floor (canvas drawing in plain modules under `components/`, React owns mounting, data and the overlay; desk status, bubbles and walks derive from runs, messages and proposals), the approval panel (countdown to `expires_at`; the server refuses an approve past it), the feed (agent and pool filters in the URL), the summary (open simulated positions with a manual close, PnL today and total with null PnL excluded, LLM spend per provider against the right cap, kill switch) and settings (models, key source, own keys, wallet, guardrails; autopilot shows as V2). `office.ts` is the pure, tested view logic.
+- Not yet (V1 and later in the PRD): Telegram approval (`telegram_links` kind `office`), the runner's Executor, Monitor and Bookkeeper with real `Zap` open and close, autopilot, the daily briefing.
+
 **Runner** (`apps/agents`, `bun run dev:agents` / `start:agents`, needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY` (checked at start); optional `VEXIS_WEB_URL`, `METEORA_DATAPI_URL`, `JUPITER_API_KEY`; the Solana RPC comes from each user's agent wallet, not the environment):
 
 - Effect 4 services with Layers: `Db` (domain operations over `@vexis/db`, drizzle client in `acquireRelease`), `Meteora` (HttpClient + `Schema`), `ScreenerHistory` (a `Ref` of screener volumes), `Telegram` (live, or a console stand-in when no token), `Chain` (DLMM SDK reads), `Zap` (signs and sends a rebalance; the only service that moves funds), `AppConfig`. Errors are `Schema.TaggedError`s in the error channel. The only `runMain` is `main.ts`; tests use fake layers plus `TestClock` (`test/fakes.ts`).
@@ -195,9 +210,10 @@ In this Start version the validator method is `.validator(zodSchema)`, not `inpu
 ## Where code lives
 
 - `apps/web/src/routes` — thin route files: search schema, loader, SSR mode, layout.
-- `apps/web/src/features` — domain code: portfolio, analytics, screener, auth, agents, notifications, settings, theme, legal, timezone, landing.
+- `apps/web/src/features` — domain code: portfolio, analytics, screener, auth, agents, office, notifications, settings, theme, legal, timezone, landing.
 - `apps/web/src/components/ui` — shadcn/ui, generated by the CLI.
 - `apps/agents` — the volume-spike runner (Effect 4, separate Bun process, pm2 on the VPS).
+- `apps/office` — the office runtime: LLM agents, guardrails, simulated executor (Effect 4, separate Bun process).
 - `packages/db` — Drizzle schema, postgres-js client, user-scoped query helpers and migrations.
 - `docs/` — offline reference docs, generated by `scripts/fetch-docs.ts`; never hand-edit, excluded from Biome.
 - `scripts/fetch-docs.ts` — the only thing that writes `docs/`.
