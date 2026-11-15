@@ -1,0 +1,220 @@
+import { z } from "zod";
+import { REBALANCE_STRATEGIES } from "./agents.ts";
+
+// The virtual office: four LLM agents propose, guardrails in code check, the owner approves. Shared by the web app,
+// `apps/office` and (from V1) the runner. Every jsonb column here is parsed with these schemas on write and on read.
+
+/** The agents that call an LLM. They only write text and proposals. */
+export const LLM_AGENTS = ["scout", "strategist", "risk", "manager"] as const;
+export type LlmAgent = (typeof LLM_AGENTS)[number];
+
+/** Every desk on the floor. Monitor, Executor and Bookkeeper are plain code in the runner (V1). */
+export const OFFICE_AGENTS = [...LLM_AGENTS, "monitor", "executor", "bookkeeper"] as const;
+export type OfficeAgent = (typeof OFFICE_AGENTS)[number];
+
+export const LLM_PROVIDERS = ["claude", "openai", "deepseek", "meta"] as const;
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
+
+export const PROVIDER_LABEL: Record<LlmProvider, string> = {
+  claude: "Claude",
+  openai: "OpenAI",
+  deepseek: "DeepSeek",
+  meta: "Meta",
+};
+
+/** USD per million tokens. A model missing here cannot be picked, so every run has a known cost. */
+export type ModelPrice = { readonly input: number; readonly output: number };
+
+// Checked 2026-11-15 against each provider's pricing page. DeepSeek bills double during its peak hours; the peak
+// rate is kept so the daily budget never undercounts. Haiku 5.5's rate is for prompts up to 100k tokens.
+export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
+  claude: {
+    "claude-haiku-5-5": { input: 0.1, output: 0.5 },
+    "claude-sonnet-5-5": { input: 2, output: 10 },
+    "claude-opus-5-5": { input: 4, output: 20 },
+  },
+  openai: {
+    "gpt-6-luna": { input: 0.1, output: 0.5 },
+    "gpt-6.1-terra": { input: 1, output: 5 },
+    "gpt-6.1-sol": { input: 2, output: 10 },
+  },
+  deepseek: {
+    "deepseek-flash": { input: 0.3, output: 1.2 },
+    "deepseek-v4-pro": { input: 1.32, output: 3.96 },
+  },
+  meta: {},
+};
+
+export const modelsOf = (provider: LlmProvider) => Object.keys(MODEL_PRICES[provider]);
+
+/** Cost of one call in USD, or null for a model with no listed price. */
+export function runCost(provider: LlmProvider, model: string, inputTokens: number, outputTokens: number) {
+  const price = MODEL_PRICES[provider][model];
+  if (!price) return null;
+  return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
+}
+
+export const AgentModel = z
+  .object({ provider: z.enum(LLM_PROVIDERS), model: z.string().min(1).max(100) })
+  .refine((m) => MODEL_PRICES[m.provider][m.model] !== undefined, {
+    path: ["model"],
+    message: "Pick a model from the list",
+  });
+export type AgentModel = z.infer<typeof AgentModel>;
+
+/** The model each LLM agent runs on. There is no default: an agent with null does not run. */
+export const OfficeModels = z.object({
+  scout: AgentModel.nullable().default(null),
+  strategist: AgentModel.nullable().default(null),
+  risk: AgentModel.nullable().default(null),
+  manager: AgentModel.nullable().default(null),
+});
+export type OfficeModels = z.infer<typeof OfficeModels>;
+
+/** `vexis` bills Vexis's own keys under the admin's daily cap; `own` uses the keys the user saved. */
+export const KEY_SOURCES = ["vexis", "own"] as const;
+export type KeySource = (typeof KEY_SOURCES)[number];
+
+/** `autopilot` (V2) approves proposals under a nominal limit on its own. */
+export const OFFICE_MODES = ["approval", "autopilot"] as const;
+export type OfficeMode = (typeof OFFICE_MODES)[number];
+
+/** `user` is the agent wallet saved for auto-rebalance; `office` is a wallet kept for the office alone. */
+export const WALLET_SOURCES = ["user", "office"] as const;
+export type WalletSource = (typeof WALLET_SOURCES)[number];
+
+/** Hard rules, checked in code by `guardrails.ts`. Only the owner changes them, from the web. */
+export const Guardrails = z.object({
+  /** Largest share of the wallet's SOL one position may take, in percent. */
+  maxPositionPct: z.number().gt(0).max(100).default(25),
+  maxActivePositions: z.number().int().min(1).max(20).default(3),
+  /** Loss against the UTC day's starting balance, in percent, that pauses the office until tomorrow. */
+  maxDailyLossPct: z.number().gt(0).max(100).default(5),
+  /** SOL that always stays in the wallet. */
+  solReserve: z.number().min(0).max(100).default(0.1),
+  /** Quiet time per pool after an execution, in seconds. */
+  cooldownSec: z.number().int().min(0).max(86_400).default(300),
+  /** Failed executions in a row that pause the office. */
+  maxConsecutiveFailures: z.number().int().min(1).max(20).default(3),
+  /** How long a proposal waits for approval before it expires, in seconds. */
+  approvalTtlSec: z.number().int().min(60).max(86_400).default(900),
+  /** USD a day the office may spend on LLM calls with the user's own keys. The admin sets the Vexis-key cap. */
+  dailyLlmUsd: z.number().min(0).max(1000).default(1),
+});
+export type Guardrails = z.infer<typeof Guardrails>;
+
+export const parseGuardrails = (raw: unknown) => Guardrails.parse(raw ?? {});
+export const parseModels = (raw: unknown) => OfficeModels.parse(raw ?? {});
+
+// --- proposals -------------------------------------------------------------------------------
+
+export const PROPOSAL_KINDS = ["open", "rebalance", "claim", "close"] as const;
+export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
+
+export const PROPOSAL_STATUSES = [
+  "draft",
+  "risk_checked",
+  "awaiting_approval",
+  "approved",
+  "executing",
+  "done",
+  "rejected",
+  "failed",
+  "expired",
+] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+/**
+ * The only legal moves. A risk veto is draft → rejected (`decided_by` risk); the kill switch rejects anything not
+ * yet executing.
+ */
+const TRANSITIONS: Record<ProposalStatus, readonly ProposalStatus[]> = {
+  draft: ["risk_checked", "rejected"],
+  risk_checked: ["awaiting_approval", "rejected", "expired"],
+  awaiting_approval: ["approved", "rejected", "expired"],
+  approved: ["executing", "rejected"],
+  executing: ["done", "failed"],
+  done: [],
+  rejected: [],
+  failed: [],
+  expired: [],
+};
+
+export const FINAL_STATUSES = PROPOSAL_STATUSES.filter((s) => TRANSITIONS[s].length === 0);
+export const OPEN_STATUSES = PROPOSAL_STATUSES.filter((s) => TRANSITIONS[s].length > 0);
+
+export const canTransition = (from: ProposalStatus, to: ProposalStatus) => TRANSITIONS[from].includes(to);
+
+/** Returns `to`, or throws for a move the lifecycle does not allow. */
+export function transition(from: ProposalStatus, to: ProposalStatus): ProposalStatus {
+  if (!canTransition(from, to)) throw new Error(`Illegal proposal transition ${from} → ${to}`);
+  return to;
+}
+
+/** Who decided a proposal's fate. */
+export const DECIDERS = ["owner", "autopilot", "risk", "kill_switch", "system"] as const;
+export type Decider = (typeof DECIDERS)[number];
+
+export const PROPOSERS = ["strategist", "monitor"] as const;
+export type Proposer = (typeof PROPOSERS)[number];
+
+const Strategy = z.enum(REBALANCE_STRATEGIES);
+const Bin = z.number().int();
+
+const BinRange = z
+  .object({ lowerBin: Bin, upperBin: Bin })
+  .refine((r) => r.lowerBin <= r.upperBin, { path: ["upperBin"], message: "upperBin is below lowerBin" });
+
+/** `params` per kind. The active bin and SOL price are what the proposer saw, so the card shows the same numbers. */
+export const PROPOSAL_PARAMS = {
+  open: z
+    .object({
+      strategy: Strategy,
+      activeBin: Bin,
+      lowerBin: Bin,
+      upperBin: Bin,
+      amountSol: z.number().positive(),
+      solUsd: z.number().positive().nullable(),
+    })
+    .refine((p) => p.lowerBin <= p.activeBin && p.activeBin <= p.upperBin, {
+      path: ["activeBin"],
+      message: "The range must hold the active bin",
+    }),
+  rebalance: BinRange.and(z.object({ strategy: Strategy, activeBin: Bin })),
+  claim: z.object({ feeSol: z.number().nonnegative().nullable() }),
+  close: z.object({ reason: z.enum(["take_profit", "stop_loss", "out_of_range", "manual"]) }),
+} as const satisfies Record<ProposalKind, z.ZodType>;
+
+export type ProposalParams<K extends ProposalKind> = z.infer<(typeof PROPOSAL_PARAMS)[K]>;
+
+export function parseProposalParams<K extends ProposalKind>(kind: K, raw: unknown): ProposalParams<K> {
+  return PROPOSAL_PARAMS[kind].parse(raw) as ProposalParams<K>;
+}
+
+/** One guardrail's verdict, shown on the approval card. */
+export const GuardrailCheck = z.object({ rule: z.string(), ok: z.boolean(), value: z.string() });
+export type GuardrailCheck = z.infer<typeof GuardrailCheck>;
+
+/** `risk_notes`: every code check, then the Risk agent's own note. The LLM may add a veto, never lift one. */
+export const RiskNotes = z.object({
+  checks: z.array(GuardrailCheck),
+  llm: z.object({ veto: z.boolean(), note: z.string() }).nullable(),
+});
+export type RiskNotes = z.infer<typeof RiskNotes>;
+
+// --- pauses ----------------------------------------------------------------------------------
+
+/** `office_config.paused_reason`. A reason with `paused_until` clears itself when that time passes. */
+export const KILL_SWITCH = "kill_switch";
+export const DAILY_LOSS = "daily_loss";
+export const EXECUTION_FAILING = "execution_failing";
+export const ADMIN_STOP = "admin_stop";
+
+/** Start of the UTC day holding `at`, so the server, the runner and the browser agree on "today". */
+export function utcDayStart(at: Date | number) {
+  const d = new Date(at);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+export const MESSAGE_TONES = ["info", "good", "warn", "bad"] as const;
+export type MessageTone = (typeof MESSAGE_TONES)[number];

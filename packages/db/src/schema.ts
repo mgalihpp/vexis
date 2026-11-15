@@ -17,6 +17,29 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { AGENT_KINDS, type AgentKind, REBALANCE_ACTIONS, type RebalanceAction } from "./agents.ts";
+import {
+  type Decider,
+  KEY_SOURCES,
+  type KeySource,
+  LLM_AGENTS,
+  LLM_PROVIDERS,
+  type LlmAgent,
+  type LlmProvider,
+  type MessageTone,
+  OFFICE_AGENTS,
+  OFFICE_MODES,
+  type OfficeAgent,
+  type OfficeMode,
+  OPEN_STATUSES,
+  PROPOSAL_KINDS,
+  PROPOSAL_STATUSES,
+  PROPOSERS,
+  type ProposalKind,
+  type ProposalStatus,
+  type Proposer,
+  WALLET_SOURCES,
+  type WalletSource,
+} from "./office.ts";
 
 // Two kinds of tables live here:
 //
@@ -386,4 +409,164 @@ export const poolMinutes = pgTable(
     tvl: doublePrecision("tvl"),
   },
   (t) => [primaryKey({ columns: [t.poolAddress, t.minute] })],
+).enableRLS();
+
+// ---------------------------------------------------------------------------------------------
+// The virtual office (`apps/office`, `/office`). One office per user, enabled by an admin (`db:office`).
+// ---------------------------------------------------------------------------------------------
+
+const enumCheck = (name: string, column: string, values: readonly string[]) =>
+  check(name, sql.raw(`${column} in (${values.map((v) => `'${v}'`).join(", ")})`));
+
+const openStatus = sql.raw(`status in (${OPEN_STATUSES.map((s) => `'${s}'`).join(", ")})`);
+
+/**
+ * The office's one row; having it is what turns the office on. `guardrails` and `models` are jsonb parsed with
+ * `Guardrails` and `OfficeModels`. `llm_keys` maps a provider to the user's own API key, encrypted with
+ * `TOKEN_ENC_KEY`. `wallet_source` `user` reads `rebalance_wallets`; `office` reads the office's own wallet below,
+ * encrypted with `WALLET_ENC_KEY`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
+ */
+export const officeConfig = pgTable(
+  "office_config",
+  {
+    userId: text("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mode: text("mode").$type<OfficeMode>().notNull().default("approval"),
+    paused: boolean("paused").notNull().default(false),
+    pausedReason: text("paused_reason"),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    guardrails: jsonb("guardrails").$type<Record<string, unknown>>().notNull().default({}),
+    models: jsonb("models").$type<Record<string, unknown>>().notNull().default({}),
+    keySource: text("key_source").$type<KeySource>().notNull().default("vexis"),
+    llmKeys: jsonb("llm_keys").$type<Partial<Record<LlmProvider, string>>>().notNull().default({}),
+    vexisDailyUsd: doublePrecision("vexis_daily_usd").notNull().default(0),
+    walletSource: text("wallet_source").$type<WalletSource>().notNull().default("user"),
+    officePublicKey: text("office_public_key"),
+    officeSecretKey: text("office_secret_key"),
+    officeRpcUrl: text("office_rpc_url"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  () => [
+    enumCheck("office_config_mode_check", "mode", OFFICE_MODES),
+    enumCheck("office_config_key_source_check", "key_source", KEY_SOURCES),
+    enumCheck("office_config_wallet_source_check", "wallet_source", WALLET_SOURCES),
+  ],
+).enableRLS();
+
+/**
+ * One proposed on-chain action. `status` moves only through `transition()` in `office.ts`, with the update
+ * conditioned on the old status. `params` is parsed with `PROPOSAL_PARAMS[kind]`, `risk_notes` with `RiskNotes`.
+ * The partial unique index keeps one unfinished proposal per pool. `simulated` rows never reach the chain (MVP).
+ */
+export const officeProposals = pgTable(
+  "office_proposals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userId(),
+    kind: text("kind").$type<ProposalKind>().notNull(),
+    status: text("status").$type<ProposalStatus>().notNull().default("draft"),
+    poolAddress: text("pool_address").notNull(),
+    poolName: text("pool_name"),
+    positionAddress: text("position_address"),
+    params: jsonb("params").$type<Record<string, unknown>>().notNull(),
+    rationale: text("rationale").notNull(),
+    riskNotes: jsonb("risk_notes").$type<Record<string, unknown>>(),
+    /** The Manager's one-paragraph summary for the approval card. */
+    summary: text("summary"),
+    proposedBy: text("proposed_by").$type<Proposer>().notNull(),
+    runId: uuid("run_id"),
+    decidedBy: text("decided_by").$type<Decider>(),
+    simulated: boolean("simulated").notNull().default(true),
+    signature: text("signature"),
+    txError: text("tx_error"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("office_proposals_user_created_idx").on(t.userId, t.createdAt.desc()),
+    uniqueIndex("office_proposals_user_pool_open_unique").on(t.userId, t.poolAddress).where(openStatus),
+    index("office_proposals_open_idx").on(t.status).where(openStatus),
+    enumCheck("office_proposals_kind_check", "kind", PROPOSAL_KINDS),
+    enumCheck("office_proposals_status_check", "status", PROPOSAL_STATUSES),
+    enumCheck("office_proposals_proposed_by_check", "proposed_by", PROPOSERS),
+  ],
+).enableRLS();
+
+/** The activity feed: who said what, about which pool or proposal. */
+export const officeMessages = pgTable(
+  "office_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userId(),
+    agent: text("agent").$type<OfficeAgent>().notNull(),
+    text: text("text").notNull(),
+    tone: text("tone").$type<MessageTone>(),
+    poolAddress: text("pool_address"),
+    proposalId: uuid("proposal_id").references(() => officeProposals.id, { onDelete: "set null" }),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("office_messages_user_at_idx").on(t.userId, t.at.desc()),
+    enumCheck("office_messages_agent_check", "agent", OFFICE_AGENTS),
+  ],
+).enableRLS();
+
+/** One LLM call: what it ran on, what it cost and how long it took. Never holds a prompt or a key. */
+export const officeRuns = pgTable(
+  "office_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userId(),
+    agent: text("agent").$type<LlmAgent>().notNull(),
+    provider: text("provider").$type<LlmProvider>().notNull(),
+    model: text("model").notNull(),
+    keySource: text("key_source").$type<KeySource>().notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    /** Null when the call failed before the provider reported usage. */
+    costUsd: doublePrecision("cost_usd"),
+    durationMs: integer("duration_ms").notNull(),
+    error: text("error"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("office_runs_user_at_idx").on(t.userId, t.at.desc()),
+    enumCheck("office_runs_agent_check", "agent", LLM_AGENTS),
+    enumCheck("office_runs_provider_check", "provider", LLM_PROVIDERS),
+    enumCheck("office_runs_key_source_check", "key_source", KEY_SOURCES),
+  ],
+).enableRLS();
+
+/**
+ * One row per position the office opened: why it opened, why it closed and what it made. PnL is null until the
+ * position closes, and stays null for a simulated position nobody priced.
+ */
+export const officeJournal = pgTable(
+  "office_journal",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userId(),
+    openProposalId: uuid("open_proposal_id").references(() => officeProposals.id, { onDelete: "set null" }),
+    closeProposalId: uuid("close_proposal_id").references(() => officeProposals.id, { onDelete: "set null" }),
+    poolAddress: text("pool_address").notNull(),
+    poolName: text("pool_name"),
+    positionAddress: text("position_address"),
+    simulated: boolean("simulated").notNull(),
+    amountSol: doublePrecision("amount_sol").notNull(),
+    amountUsd: doublePrecision("amount_usd"),
+    openReason: text("open_reason").notNull(),
+    openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
+    closeReason: text("close_reason"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    pnlSol: doublePrecision("pnl_sol"),
+    pnlUsd: doublePrecision("pnl_usd"),
+  },
+  (t) => [
+    index("office_journal_user_opened_idx").on(t.userId, t.openedAt.desc()),
+    index("office_journal_user_open_idx").on(t.userId).where(sql`${t.closedAt} is null`),
+  ],
 ).enableRLS();
