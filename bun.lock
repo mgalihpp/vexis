@@ -29,6 +29,22 @@
         "typescript": "^7.0.2",
       },
     },
+    "apps/office": {
+      "name": "@vexis/office",
+      "dependencies": {
+        "@effect/platform-bun": "4.1.1",
+        "@meteora-ag/dlmm": "^1.9.14",
+        "@solana/web3.js": "^1.98.4",
+        "@vexis/db": "workspace:*",
+        "drizzle-orm": "^0.45.4",
+        "effect": "^4.1.1",
+        "zod": "^4.6.7",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+        "typescript": "^7.0.2",
+      },
+    },
     "apps/web": {
       "name": "@vexis/web",
       "dependencies": {
@@ -706,6 +722,8 @@
     "@vexis/agents": ["@vexis/agents@workspace:apps/agents"],
 
     "@vexis/db": ["@vexis/db@workspace:packages/db"],
+
+    "@vexis/office": ["@vexis/office@workspace:apps/office"],
 
     "@vexis/web": ["@vexis/web@workspace:apps/web"],
 
