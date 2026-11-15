@@ -28,13 +28,14 @@ const DATA_SOURCES = [
   { name: "Jupiter", href: "https://jup.ag", icon: "https://static.jup.ag/jup/icon.png" },
 ];
 
-type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents";
+type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents" | "/office";
 
 const MOBILE_LINKS: { to: NavTarget; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
   { to: "/analytics", label: "Analytics" },
   { to: "/screener", label: "Screener" },
   { to: "/agents", label: "Agents" },
+  { to: "/office", label: "Office" },
 ];
 
 const THEMES: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
@@ -104,6 +105,7 @@ function AppHeader() {
           <NavItem to="/analytics">Analytics</NavItem>
           <NavItem to="/screener">Screener</NavItem>
           <NavItem to="/agents">Agents</NavItem>
+          <NavItem to="/office">Office</NavItem>
         </nav>
         <HeaderActions />
       </div>

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as OfficeRouteImport } from './routes/office'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ScreenerRouteImport } from './routes/screener'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -40,6 +41,11 @@ const AnalyticsRoute = AnalyticsRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfficeRoute = OfficeRouteImport.update({
+  id: '/office',
+  path: '/office',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
+  '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
+  '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
+  '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/login'
+    | '/office'
     | '/privacy'
     | '/screener'
     | '/terms'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/login'
+    | '/office'
     | '/privacy'
     | '/screener'
     | '/terms'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/'
     | '/analytics'
     | '/login'
+    | '/office'
     | '/privacy'
     | '/screener'
     | '/terms'
@@ -234,6 +246,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnalyticsRoute: typeof AnalyticsRoute
   LoginRoute: typeof LoginRoute
+  OfficeRoute: typeof OfficeRoute
   PrivacyRoute: typeof PrivacyRoute
   ScreenerRoute: typeof ScreenerRoute
   TermsRoute: typeof TermsRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/office': {
+      id: '/office'
+      path: '/office'
+      fullPath: '/office'
+      preLoaderRoute: typeof OfficeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -393,6 +413,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnalyticsRoute: AnalyticsRoute,
   LoginRoute: LoginRoute,
+  OfficeRoute: OfficeRoute,
   PrivacyRoute: PrivacyRoute,
   ScreenerRoute: ScreenerRoute,
   TermsRoute: TermsRoute,
