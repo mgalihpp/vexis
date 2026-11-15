@@ -26,7 +26,8 @@ export const PROVIDER_LABEL: Record<LlmProvider, string> = {
 export type ModelPrice = { readonly input: number; readonly output: number };
 
 // Checked 2026-11-15 against each provider's pricing page. DeepSeek bills double during its peak hours; the peak
-// rate is kept so the daily budget never undercounts. Haiku 5.5's rate is for prompts up to 100k tokens.
+// rate is kept so the daily budget never undercounts. Haiku 5.5's rate is for prompts up to 100k tokens, Muse Ember's
+// up to 200k. Meta is the Meta Model API (dev.meta.ai) in Standard mode; Contributor mode trains on what we send.
 export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
   claude: {
     "claude-haiku-5-5": { input: 0.1, output: 0.5 },
@@ -42,7 +43,11 @@ export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
     "deepseek-flash": { input: 0.3, output: 1.2 },
     "deepseek-v4-pro": { input: 1.32, output: 3.96 },
   },
-  meta: {},
+  meta: {
+    "muse-ember-1.0": { input: 0.1, output: 0.5 },
+    "muse-spark-1.3": { input: 1.25, output: 4.25 },
+    "muse-wonder-1.0": { input: 4, output: 20 },
+  },
 };
 
 export const modelsOf = (provider: LlmProvider) => Object.keys(MODEL_PRICES[provider]);
