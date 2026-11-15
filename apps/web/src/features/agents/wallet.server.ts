@@ -30,7 +30,7 @@ const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 const GenesisReply = z.object({ result: z.string() });
 
 /** Asks the RPC for its genesis hash, so a devnet URL or a typo is caught before the runner relies on it. */
-async function checkRpcUrl(url: string) {
+export async function checkRpcUrl(url: string) {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -50,7 +50,7 @@ async function checkRpcUrl(url: string) {
   if (parsed.data.result !== MAINNET_GENESIS) throw new Error("That RPC is not on Solana mainnet");
 }
 
-function keypairOf(secret: string) {
+export function keypairOf(secret: string) {
   let bytes: Uint8Array;
   try {
     bytes = bs58.decode(secret);
