@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type OnChainPosition, outOfRange, pickPosition, targetRange } from "../src/range.ts";
+import { type OnChainPosition, outOfRange, pickPosition, targetRange } from "../src/rebalance/range.ts";
 
 const pos = (address: string, funded = true): OnChainPosition => ({
   address,

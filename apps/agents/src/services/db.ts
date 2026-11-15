@@ -22,8 +22,8 @@ import {
 import { decryptSecret } from "@vexis/db/secret";
 import { and, desc, eq, gt, inArray, isNull, lt, type SQL, sql } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
-import { DbError } from "./errors.ts";
-import { walletSigner } from "./wallet.ts";
+import { DbError } from "../errors.ts";
+import { walletSigner } from "../rebalance/wallet.ts";
 
 /** One (agent, pool) pair of a runnable volume-watch agent. `config` is raw jsonb. */
 export type Watch = {

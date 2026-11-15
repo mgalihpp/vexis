@@ -1,5 +1,5 @@
 import type { FeeMode } from "@vexis/db/agents";
-import type { Spike } from "./spike.ts";
+import type { Spike } from "./volume/spike.ts";
 
 const oneDecimal = (n: number) => n.toFixed(1);
 

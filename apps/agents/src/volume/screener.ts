@@ -1,16 +1,16 @@
 import { parseAgentConfig } from "@vexis/db/agents";
 import { alertable, type ScreenRule, screenRule } from "@vexis/db/screen";
 import { Clock, Effect, Option } from "effect";
-import { AppConfig } from "./AppConfig.ts";
-import { Db, type ScreenerAgent } from "./Db.ts";
-import { volumeTarget } from "./Evaluate.ts";
-import { BadAgentConfig } from "./errors.ts";
-import { formatMessage, linkButtons, type SpikeLine } from "./format.ts";
-import { Meteora, type ScreenerReading } from "./Meteora.ts";
-import { ScreenerHistory } from "./ScreenerHistory.ts";
+import { AppConfig } from "../config.ts";
+import { BadAgentConfig } from "../errors.ts";
+import { formatMessage, linkButtons, type SpikeLine } from "../format.ts";
+import { Db, type ScreenerAgent } from "../services/db.ts";
+import { Meteora, type ScreenerReading } from "../services/meteora.ts";
+import { ScreenerHistory } from "../services/screener-history-store.ts";
+import { Telegram } from "../services/telegram.ts";
+import { volumeTarget } from "./evaluate.ts";
 import type { History } from "./screener-history.ts";
 import { evaluateSpike, type Spike } from "./spike.ts";
-import { Telegram } from "./Telegram.ts";
 
 /** Pools per Telegram message; the minute's other spikes are counted in one closing line. */
 export const MAX_SCREENER_ALERTS = 5;

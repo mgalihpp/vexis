@@ -1,7 +1,7 @@
 import { Effect } from "effect";
-import { Db } from "./Db.ts";
-import { evaluate } from "./Evaluate.ts";
-import { ingest } from "./Ingest.ts";
+import { Db } from "../services/db.ts";
+import { evaluate } from "./evaluate.ts";
+import { ingest } from "./ingest.ts";
 
 /**
  * One tick: collect the pools of every runnable agent, read each once, then judge every

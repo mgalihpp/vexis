@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { evaluateSpike, MAX_GAP_MS, type MinuteVolume, median, volumeDelta } from "../src/spike.ts";
+import { evaluateSpike, MAX_GAP_MS, type MinuteVolume, median, volumeDelta } from "../src/volume/spike.ts";
 
 const MIN = 60_000;
 const T0 = Date.UTC(2026, 0, 1);

@@ -1,7 +1,7 @@
 import { Context, Effect, Layer } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
-import { TelegramError } from "./errors.ts";
-import type { LinkButton } from "./format.ts";
+import { TelegramError } from "../errors.ts";
+import type { LinkButton } from "../format.ts";
 
 /**
  * Sends a message through a user's own Telegram bot. There is no shared bot: every user brings a token

@@ -1,6 +1,6 @@
 import type { Keypair } from "@solana/web3.js";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
-import { ZapError } from "./errors.ts";
+import { ZapError } from "../errors.ts";
 import {
   type ClaimRequest,
   type CompoundRequest,
@@ -8,10 +8,10 @@ import {
   executeCompoundTopUp,
   executeSweepToSol,
   type SweepRequest,
-} from "./fee-execute.ts";
-import { connections, redactRpc } from "./rpc.ts";
-import { DEFAULT_PRIORITY_LEVEL, type SendLog } from "./send.ts";
-import { executeZapRebalance, type ZapContext, type ZapRequest } from "./zap-execute.ts";
+} from "../rebalance/fee-execute.ts";
+import { connections, redactRpc } from "../rebalance/rpc.ts";
+import { DEFAULT_PRIORITY_LEVEL, type SendLog } from "../rebalance/send.ts";
+import { executeZapRebalance, type ZapContext, type ZapRequest } from "../rebalance/zap-execute.ts";
 
 export type { ClaimRequest, CompoundRequest, SweepRequest, ZapRequest };
 

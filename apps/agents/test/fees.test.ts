@@ -8,7 +8,7 @@ import {
   type SweepLeg,
   solToLamports,
   WSOL_MINT,
-} from "../src/fees.ts";
+} from "../src/rebalance/fees.ts";
 
 const JUP = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
 const USDC = "EPjFWvd5wAvEdJ3uNnzTPdixyBUS2h5vYodx2M4vKn1v";

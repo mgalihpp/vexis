@@ -1,9 +1,9 @@
 import DLMM from "@meteora-ag/dlmm";
 import { PublicKey } from "@solana/web3.js";
 import { Context, Effect, Layer } from "effect";
-import { ChainError } from "./errors.ts";
-import type { OnChainPosition } from "./range.ts";
-import { connections, redactRpc } from "./rpc.ts";
+import { ChainError } from "../errors.ts";
+import type { OnChainPosition } from "../rebalance/range.ts";
+import { connections, redactRpc } from "../rebalance/rpc.ts";
 
 /** A position with its unclaimed fees, in raw token units. */
 export type ChainPosition = OnChainPosition & { readonly feeX: bigint; readonly feeY: bigint };

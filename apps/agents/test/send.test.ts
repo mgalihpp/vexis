@@ -4,7 +4,6 @@ import { type DlmmDirectRebalanceEstimate, DlmmSwapType } from "@meteora-ag/zap-
 import { Keypair, PublicKey } from "@solana/web3.js";
 import BN from "bn.js";
 import bs58 from "bs58";
-import { leadingFailures } from "../src/Db.ts";
 import {
   anchorErrorContext,
   buildComputeBudgetInstructions,
@@ -16,9 +15,10 @@ import {
   resolveCuLimit,
   SendFailure,
   SWAP_CU_MIN_LIMIT,
-} from "../src/send.ts";
-import { walletSigner } from "../src/wallet.ts";
-import { describeZapSwap, toStrategyType } from "../src/zap-execute.ts";
+} from "../src/rebalance/send.ts";
+import { walletSigner } from "../src/rebalance/wallet.ts";
+import { describeZapSwap, toStrategyType } from "../src/rebalance/zap-execute.ts";
+import { leadingFailures } from "../src/services/db.ts";
 
 // Ported from auto-rebalance-dlmm-bot `test/send.test.ts` and `test/zap-preview.test.ts`; offline only.
 
