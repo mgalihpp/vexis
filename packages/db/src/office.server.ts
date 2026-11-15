@@ -287,6 +287,27 @@ export async function insertJournal(
   return row;
 }
 
+/**
+ * Realized PnL of closed positions, all time and since `since`. A sum is null when no row in it has a PnL, so an
+ * unpriced simulated close never reads as zero.
+ */
+export async function journalPnl({ db, userId }: UserScope, since: Date) {
+  const today = sql`${officeJournal.closedAt} >= ${since.toISOString()}::timestamptz`;
+  const [row] = await db
+    .select({
+      totalSol: sql<number | null>`sum(${officeJournal.pnlSol})::float8`,
+      totalUsd: sql<number | null>`sum(${officeJournal.pnlUsd})::float8`,
+      todaySol: sql<number | null>`(sum(${officeJournal.pnlSol}) filter (where ${today}))::float8`,
+      todayUsd: sql<number | null>`(sum(${officeJournal.pnlUsd}) filter (where ${today}))::float8`,
+    })
+    .from(officeJournal)
+    .where(and(eq(officeJournal.userId, userId), sql`${officeJournal.closedAt} is not null`));
+  return {
+    today: { sol: row?.todaySol ?? null, usd: row?.todayUsd ?? null },
+    total: { sol: row?.totalSol ?? null, usd: row?.totalUsd ?? null },
+  };
+}
+
 /** Closes an open position. Undefined when it is not the user's or already closed. */
 export async function closeJournal(
   { db, userId }: UserScope,
