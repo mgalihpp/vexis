@@ -1,12 +1,12 @@
 import { type AgentConfig, parseAgentConfig } from "@vexis/db/agents";
 import { Array as Arr, Clock, Effect, Option } from "effect";
-import { AppConfig } from "./AppConfig.ts";
-import { Db, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, type Watch } from "./Db.ts";
-import { BadAgentConfig } from "./errors.ts";
-import { formatMessage, linkButtons, type SpikeLine } from "./format.ts";
-import type { PoolReading } from "./Meteora.ts";
+import { AppConfig } from "../config.ts";
+import { BadAgentConfig } from "../errors.ts";
+import { formatMessage, linkButtons, type SpikeLine } from "../format.ts";
+import { Db, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, type Watch } from "../services/db.ts";
+import type { PoolReading } from "../services/meteora.ts";
+import { Telegram } from "../services/telegram.ts";
 import { evaluateSpike, type Spike } from "./spike.ts";
-import { Telegram } from "./Telegram.ts";
 
 type Config = AgentConfig<"volume-watch">;
 type Candidate = { readonly watch: Watch; readonly config: Config };

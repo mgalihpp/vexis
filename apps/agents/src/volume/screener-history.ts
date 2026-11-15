@@ -1,5 +1,5 @@
 import { SCREENER_MAX_BASELINE } from "@vexis/db/screen";
-import type { StoredReading } from "./Db.ts";
+import type { StoredReading } from "../services/db.ts";
 import { type MinuteVolume, volumeDelta } from "./spike.ts";
 
 /** One screener pool's last cumulative reading and its newest per-minute volumes, oldest first. */

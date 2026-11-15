@@ -1,6 +1,6 @@
 import { Array as Arr, Clock, Effect } from "effect";
-import { Db, type NewMinute } from "./Db.ts";
-import { Meteora, type PoolReading } from "./Meteora.ts";
+import { Db, type NewMinute } from "../services/db.ts";
+import { Meteora, type PoolReading } from "../services/meteora.ts";
 import { volumeDelta } from "./spike.ts";
 
 const MINUTE_MS = 60_000;

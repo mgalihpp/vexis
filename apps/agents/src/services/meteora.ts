@@ -1,7 +1,7 @@
 import { type FilterPool, filterPool } from "@vexis/db/screen";
 import { Config, Context, Effect, flow, Layer, Option, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
-import { MeteoraError } from "./errors.ts";
+import { MeteoraError } from "../errors.ts";
 
 export type PoolReading = {
   readonly address: string;

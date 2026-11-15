@@ -2,8 +2,11 @@ import { Keypair } from "@solana/web3.js";
 import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
 import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
-import { AppConfig } from "../src/AppConfig.ts";
-import { Chain, type ChainPosition, type PoolState } from "../src/Chain.ts";
+import { AppConfig } from "../src/config.ts";
+import { ChainError, MeteoraError, TelegramError, ZapError } from "../src/errors.ts";
+import type { LinkButton } from "../src/format.ts";
+import { WSOL_MINT } from "../src/rebalance/fees.ts";
+import { Chain, type ChainPosition, type PoolState } from "../src/services/chain.ts";
 import {
   Db,
   leadingFailures,
@@ -14,15 +17,18 @@ import {
   type ScreenerAgent,
   type WalletSigner,
   type Watch,
-} from "../src/Db.ts";
-import { ChainError, MeteoraError, TelegramError, ZapError } from "../src/errors.ts";
-import { WSOL_MINT } from "../src/fees.ts";
-import type { LinkButton } from "../src/format.ts";
-import { Meteora, type PoolReading, type ScreenerReading } from "../src/Meteora.ts";
-import { ScreenerHistory } from "../src/ScreenerHistory.ts";
-import type { History } from "../src/screener-history.ts";
-import { Telegram } from "../src/Telegram.ts";
-import { type ClaimRequest, type CompoundRequest, type SweepRequest, Zap, type ZapRequest } from "../src/Zap.ts";
+} from "../src/services/db.ts";
+import { Meteora, type PoolReading, type ScreenerReading } from "../src/services/meteora.ts";
+import { ScreenerHistory } from "../src/services/screener-history-store.ts";
+import { Telegram } from "../src/services/telegram.ts";
+import {
+  type ClaimRequest,
+  type CompoundRequest,
+  type SweepRequest,
+  Zap,
+  type ZapRequest,
+} from "../src/services/zap.ts";
+import type { History } from "../src/volume/screener-history.ts";
 
 export const MINUTE = 60_000;
 /** A whole minute, so test readings land on a minute boundary. */

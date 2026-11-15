@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { HISTORY_MINUTES, type History, recordMinute } from "../src/screener-history.ts";
+import { HISTORY_MINUTES, type History, recordMinute } from "../src/volume/screener-history.ts";
 import { MINUTE, T0 } from "./fakes.ts";
 
 /** Records `minutes` (offsets from T0) with the given cumulative totals per pool. */

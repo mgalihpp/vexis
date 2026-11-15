@@ -1,8 +1,19 @@
 import type { Keypair } from "@solana/web3.js";
 import { type AgentConfig, parseAgentConfig } from "@vexis/db/agents";
 import { Clock, Effect, Option } from "effect";
-import { AppConfig } from "./AppConfig.ts";
-import { Chain, type ChainPosition, type PoolState } from "./Chain.ts";
+import { AppConfig } from "../config.ts";
+import { BadAgentConfig } from "../errors.ts";
+import {
+  type FeeStep,
+  formatFeesClaimed,
+  formatLowSol,
+  formatRebalanceFailed,
+  formatRebalancePreview,
+  formatRebalanceSent,
+  linkButtons,
+  type RebalanceLine,
+} from "../format.ts";
+import { Chain, type ChainPosition, type PoolState } from "../services/chain.ts";
 import {
   Db,
   LOW_SOL,
@@ -14,22 +25,11 @@ import {
   type TelegramTarget,
   type TxOutcome,
   WALLET_UNREADABLE,
-} from "./Db.ts";
-import { BadAgentConfig } from "./errors.ts";
+} from "../services/db.ts";
+import { Telegram } from "../services/telegram.ts";
+import { Zap } from "../services/zap.ts";
 import { feeValueInLamports, lamportsToSol, solToLamports } from "./fees.ts";
-import {
-  type FeeStep,
-  formatFeesClaimed,
-  formatLowSol,
-  formatRebalanceFailed,
-  formatRebalancePreview,
-  formatRebalanceSent,
-  linkButtons,
-  type RebalanceLine,
-} from "./format.ts";
 import { halfWidthFor, outOfRange, pickPosition, targetRange } from "./range.ts";
-import { Telegram } from "./Telegram.ts";
-import { Zap } from "./Zap.ts";
 
 type Config = AgentConfig<"auto-rebalance">;
 

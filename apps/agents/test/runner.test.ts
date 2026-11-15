@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { Effect, Layer } from "effect";
-import type { AppConfig } from "../src/AppConfig.ts";
-import { cycle } from "../src/Cycle.ts";
-import type { Db, RebalanceWatch } from "../src/Db.ts";
+import type { AppConfig } from "../src/config.ts";
 import { formatMessage, formatUsd, linkButtons, type SpikeLine } from "../src/format.ts";
-import { prune, RETENTION_MS } from "../src/Ingest.ts";
-import type { Meteora } from "../src/Meteora.ts";
-import { rebalanceCycle } from "../src/Rebalance.ts";
-import { screenerCycle } from "../src/Screener.ts";
-import type { Telegram } from "../src/Telegram.ts";
+import { rebalanceCycle } from "../src/rebalance/rebalance.ts";
+import type { Db, RebalanceWatch } from "../src/services/db.ts";
+import type { Meteora } from "../src/services/meteora.ts";
+import type { Telegram } from "../src/services/telegram.ts";
+import { cycle } from "../src/volume/cycle.ts";
+import { prune, RETENTION_MS } from "../src/volume/ingest.ts";
+import { screenerCycle } from "../src/volume/screener.ts";
 import {
   chainPosition,
   fakeChain,
