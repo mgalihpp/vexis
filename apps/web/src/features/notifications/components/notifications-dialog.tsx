@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { BellIcon, CircleCheckIcon, CircleXIcon, SettingsIcon, TrendingUpIcon, TriangleAlertIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { PairIcons as TokenPair } from "@/components/pair-icons";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
@@ -181,34 +182,12 @@ function PairIcons({ pair, tokenIcons }: { pair: string | null; tokenIcons: Map<
   return (
     <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center">
       {tokens.length ? (
-        <span className="flex -space-x-2">
-          {tokens.map((token, index) => (
-            <TokenMark key={token} token={token} logo={tokenIcons.get(token)} front={index === 0} />
-          ))}
-        </span>
+        <TokenPair tokens={tokens.map((token) => ({ symbol: token, logo: tokenIcons.get(token) }))} />
       ) : (
         <span className="flex size-7 items-center justify-center rounded-lg bg-foreground/[0.08] text-foreground [&>svg]:size-3.5">
           {ICON["volume-spike"]}
         </span>
       )}
-    </span>
-  );
-}
-
-function TokenMark({ token, logo, front }: { token: string; logo?: string; front: boolean }) {
-  const layer = front ? "relative z-10" : "relative";
-  return logo ? (
-    <img
-      src={logo}
-      alt={token}
-      className={`${layer} size-6 rounded-full border-2 border-background bg-background object-cover`}
-    />
-  ) : (
-    <span
-      aria-hidden="true"
-      className={`${layer} flex size-6 items-center justify-center rounded-full border-2 border-background bg-muted text-[0.6rem] font-bold text-foreground`}
-    >
-      {token.slice(0, 1)}
     </span>
   );
 }

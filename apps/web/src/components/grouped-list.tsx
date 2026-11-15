@@ -23,9 +23,7 @@ export function Group({
         {children}
       </div>
       {footer && (
-        <p className={`px-3 text-[0.65rem] leading-relaxed ${error ? "text-loss" : "text-muted-foreground"}`}>
-          {footer}
-        </p>
+        <p className={`px-3 text-xs leading-relaxed ${error ? "text-loss" : "text-muted-foreground"}`}>{footer}</p>
       )}
     </section>
   );
@@ -49,13 +47,13 @@ export function Row({
     <>
       {icon}
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-xs font-medium">{label}</span>
-        {description && <span className="text-[0.65rem] text-muted-foreground">{description}</span>}
+        <span className="truncate text-sm font-medium">{label}</span>
+        {description && <span className="text-xs text-muted-foreground">{description}</span>}
       </span>
       {children}
     </>
   );
-  const className = "flex min-h-11 w-full items-center gap-3 px-3 py-2";
+  const className = "flex min-h-12 w-full items-center gap-3 px-3 py-2";
   return onClick ? (
     <button type="button" onClick={onClick} className={`${className} text-left active:bg-foreground/[0.06]`}>
       {content}
@@ -68,7 +66,7 @@ export function Row({
 /** A rounded square icon tile, like the ones beside iOS settings rows. */
 export function RowIcon({ children }: { children: ReactNode }) {
   return (
-    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-foreground/[0.08] text-foreground [&>svg]:size-3.5">
+    <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-foreground/[0.08] text-foreground [&>svg]:size-4">
       {children}
     </span>
   );
@@ -97,7 +95,7 @@ export function SegmentedControl<T extends string | number>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.value)}
-            className={`inline-flex items-center justify-center gap-1 rounded-md px-2.5 py-1 font-medium ${fill ? "flex-1 text-xs" : "text-[0.65rem]"} transition-all [&>svg]:size-3 ${
+            className={`inline-flex items-center justify-center gap-1 rounded-md px-2.5 py-1.5 font-medium ${fill ? "flex-1 text-xs" : "text-xs"} transition-all [&>svg]:size-3.5 ${
               active
                 ? "bg-background text-foreground shadow-sm ring-1 ring-foreground/10"
                 : "text-muted-foreground hover:text-foreground"
