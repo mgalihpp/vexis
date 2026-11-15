@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./client.server.ts";
 import {
   type Decider,
@@ -40,6 +40,26 @@ export async function updateOfficeConfig({ db, userId }: UserScope, patch: Confi
     .update(officeConfig)
     .set(patch)
     .where(eq(officeConfig.userId, userId))
+    .returning({ userId: officeConfig.userId });
+  return rows.length > 0;
+}
+
+/**
+ * Lifts a pause only while `reason` is still the reason and its `paused_until`, if any, has passed, so an admin
+ * stop set in between stays. False when nothing was lifted.
+ */
+export async function clearPause({ db, userId }: UserScope, reason: string, now: Date) {
+  const rows = await db
+    .update(officeConfig)
+    .set({ paused: false, pausedReason: null, pausedUntil: null })
+    .where(
+      and(
+        eq(officeConfig.userId, userId),
+        eq(officeConfig.paused, true),
+        eq(officeConfig.pausedReason, reason),
+        or(isNull(officeConfig.pausedUntil), lte(officeConfig.pausedUntil, now)),
+      ),
+    )
     .returning({ userId: officeConfig.userId });
   return rows.length > 0;
 }
@@ -132,6 +152,15 @@ export async function moveProposal(
     )
     .returning();
   return row;
+}
+
+/** How many proposals reached each status since `since` (by their last update). */
+export function proposalCountsSince({ db, userId }: UserScope, since: Date) {
+  return db
+    .select({ status: officeProposals.status, count: sql<number>`count(*)::int` })
+    .from(officeProposals)
+    .where(and(eq(officeProposals.userId, userId), gte(officeProposals.updatedAt, since)))
+    .groupBy(officeProposals.status);
 }
 
 /** The kill switch: every proposal not yet executing is rejected. Returns how many. */
