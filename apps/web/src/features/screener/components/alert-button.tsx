@@ -39,9 +39,15 @@ export function AlertButton({ filter }: { filter: PoolFilter }) {
 
   return (
     <>
-      <Button variant="outline" size="sm" disabled={!data || save.isPending} onClick={start}>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        disabled={!data || save.isPending}
+        onClick={start}
+        aria-label="Alert on pools like these"
+        title="Alert on pools like these"
+      >
         {save.isPending ? <Spinner /> : <BellIcon />}
-        Alert on pools like these
       </Button>
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>

@@ -224,15 +224,15 @@ export function ScreenerPage({
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3 p-2 pb-6 md:p-4">
-      <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 className="font-brand text-xl font-bold tracking-tight md:text-2xl">Pool screener</h1>
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="truncate font-brand text-xl font-bold tracking-tight md:text-2xl">Pool screener</h1>
+        <div className="flex shrink-0 items-center gap-3">
           <Updated at={data.at} />
           <AlertButton filter={alertFilter(filters)} />
         </div>
       </header>
 
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border bg-border sm:grid-cols-3 xl:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <Total
           label="Pools"
           value={<Num value={rows.length} format={(v) => String(Math.round(v))} />}
@@ -413,17 +413,19 @@ function Total({
   className?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 bg-card p-3">
-      <dt className="text-[11px] text-muted-foreground">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-1.5">
-        <span className={`num truncate text-base font-semibold ${className}`}>{value}</span>
+    <div className="flex min-w-0 flex-col justify-center rounded-lg bg-card px-3.25 py-4">
+      <dt className="flex min-w-0 items-center justify-between gap-1.5 text-xs text-muted-foreground">
+        <span className="truncate">{label}</span>
         {badge && (
-          <span className="num shrink-0 rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-medium text-brand">
+          <span className="num shrink-0 rounded bg-brand/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-brand">
             {badge}
           </span>
         )}
+      </dt>
+      <dd className={`num mt-2.5 truncate text-[1.375rem] leading-none font-bold md:text-[1.5rem] ${className}`}>
+        {value}
       </dd>
-      <dd className="num truncate text-[11px] text-muted-foreground">{sub}</dd>
+      <dd className="num mt-1.5 truncate text-[11px] text-muted-foreground">{sub}</dd>
     </div>
   );
 }
@@ -892,14 +894,9 @@ function PoolCard({ pool, rank, top, now, solPrice, win }: Omit<RowProps, "open"
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <Pair pool={pool} size="size-8 text-xs" />
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-1.5">
-              <span className="truncate text-sm font-semibold">{pool.name}</span>
-              <span className="num shrink-0 text-[11px] text-muted-foreground">#{rank}</span>
-            </div>
-            <div className="mt-1">
-              <PoolChips pool={pool} now={now} />
-            </div>
+          <div className="flex min-w-0 items-baseline gap-1.5">
+            <span className="truncate text-sm font-semibold">{pool.name}</span>
+            <span className="num shrink-0 text-[11px] text-muted-foreground">#{rank}</span>
           </div>
         </div>
         <div className="flex shrink-0 flex-col items-end">
@@ -908,19 +905,22 @@ function PoolCard({ pool, rank, top, now, solPrice, win }: Omit<RowProps, "open"
         </div>
       </div>
 
-      <div className="flex items-start gap-2">
-        <ul className="flex flex-wrap gap-1">
-          {flags.map((w) => {
-            const { Icon, tone } = WARNING_ICON[w.kind];
-            return (
-              <li key={w.label} className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${tone}`}>
-                <Icon className="size-3" />
-                {w.label}
-              </li>
-            );
-          })}
-        </ul>
-        <span className="ml-auto pt-0.5">
+      <div className="flex flex-wrap items-center gap-1">
+        <PoolChips pool={pool} now={now} />
+        {flags.map((w) => {
+          const { Icon, tone } = WARNING_ICON[w.kind];
+          return (
+            <span
+              key={w.label}
+              className={`flex h-5.5 items-center gap-1 rounded border px-1.5 text-[10px] ${tone}`}
+              title={w.detail}
+            >
+              <Icon className="size-3" />
+              {w.label}
+            </span>
+          );
+        })}
+        <span className="ml-auto pl-1">
           <TradeIcons pool={pool} />
         </span>
       </div>
@@ -941,7 +941,7 @@ function PoolCard({ pool, rank, top, now, solPrice, win }: Omit<RowProps, "open"
           </span>
         </CardStat>
         <CardStat label="Price 24h">
-          <PriceTrend pool={pool} />
+          <PriceTrend pool={pool} className="flex flex-col-reverse gap-1" />
         </CardStat>
         <CardStat label="Net flow">
           <Flow pool={pool} solPrice={solPrice} />
