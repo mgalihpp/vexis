@@ -15,12 +15,12 @@ import {
   BotIcon,
   BrainIcon,
   CoinsIcon,
-  DropletsIcon,
   GlobeIcon,
   KeyRoundIcon,
   type LucideIcon,
   ShieldCheckIcon,
   WalletIcon,
+  WavesIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ function Save({ disabled, pending, children }: { disabled: boolean; pending: boo
 
 const SECTIONS = [
   { value: "models", label: "Models", Icon: BrainIcon, Page: ModelsPage },
-  { value: "pools", label: "Pools", Icon: DropletsIcon, Page: PoolsPage },
+  { value: "pools", label: "Pools", Icon: WavesIcon, Page: PoolsPage },
   { value: "keys", label: "API keys", Icon: KeyRoundIcon, Page: KeysPage },
   { value: "wallet", label: "Wallet", Icon: WalletIcon, Page: WalletPage },
   { value: "guardrails", label: "Guardrails", Icon: ShieldCheckIcon, Page: GuardrailsPage },
