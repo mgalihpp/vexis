@@ -231,7 +231,7 @@ export function OfficeFloor({
           <DialogContent
             aria-describedby={undefined}
             showCloseButton={false}
-            className="flex max-h-[min(40rem,90dvh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-md"
+            className="flex max-h-[min(40rem,90dvh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
           >
             {card}
           </DialogContent>
