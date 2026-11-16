@@ -54,6 +54,7 @@ describe("models and cost", () => {
   it("prices a call from the table", () => {
     expect(runCost("claude", "claude-sonnet-5-5", 1_000_000, 100_000)).toBeCloseTo(3);
     expect(runCost("deepseek", "deepseek-flash", 10_000, 2_000)).toBeCloseTo(0.0054);
+    expect(runCost("openrouter", "deepseek/deepseek-v4.1-flash", 1_000_000, 1_000_000)).toBeCloseTo(0.56);
   });
 
   it("an unlisted model has no cost and cannot be picked", () => {

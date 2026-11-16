@@ -8,6 +8,7 @@ export const VEXIS_KEY_ENV: Record<LlmProvider, string> = {
   openai: "OPENAI_API_KEY",
   deepseek: "DEEPSEEK_API_KEY",
   meta: "META_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
 };
 
 const key32 = (name: string) =>

@@ -1,0 +1,2 @@
+ALTER TABLE "office_runs" DROP CONSTRAINT "office_runs_provider_check";--> statement-breakpoint
+ALTER TABLE "office_runs" ADD CONSTRAINT "office_runs_provider_check" CHECK (provider in ('claude', 'openai', 'deepseek', 'meta', 'openrouter'));
