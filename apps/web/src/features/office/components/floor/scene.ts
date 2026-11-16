@@ -1,7 +1,23 @@
 import type { OfficeAgent } from "@vexis/db/office";
 import type { DeskStatus } from "../../office";
 import { type Expr, type Pose, SPRITE_H, SPRITE_W, sprite } from "./sprites";
-import { alpha, type Ctx, canvas, DESKS, HALF_WALLS, mix, pixelText, rect, rng, shade, T, W, WH, WW } from "./world";
+import {
+  alpha,
+  type Ctx,
+  canvas,
+  DESKS,
+  HALF_WALLS,
+  LOUNGE,
+  mix,
+  pixelText,
+  rect,
+  rng,
+  shade,
+  T,
+  W,
+  WH,
+  WW,
+} from "./world";
 
 // Draws one frame of the floor into the world canvas: the painted rooms (once), the sky in the windows by the
 // UTC hour, the wall screens and desks fed from real data, then props and agents sorted by depth.
@@ -57,7 +73,9 @@ export const ROOMS = [
   { label: "RESEARCH", x: 5, y: 8.35 },
   { label: "RISK ROOM", x: 14.6, y: 8.35 },
   { label: "ENGINE ROOM", x: 25, y: 8.6 },
-  { label: "LOUNGE", x: 10, y: 17.45 },
+  { label: "PANTRY", x: 2.5, y: 17.45 },
+  { label: "LOUNGE", x: 11, y: 17.45 },
+  { label: "ARCADE", x: 27, y: 17.45 },
 ];
 
 // Sky colors across the UTC day: hour, top, bottom, night amount.
@@ -131,7 +149,8 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
   let RT = 0;
   let data: SceneData;
   let actors: Actor[] = [];
-  let selected: OfficeAgent = "manager";
+  let selected: OfficeAgent | null = null;
+  let hovered: OfficeAgent | null = null;
   const statusOf = (id: OfficeAgent): DeskStatus => data.statuses[id];
   const sittingOf = (id: OfficeAgent) => actors.find((a) => a.id === id)?.sitting ?? true;
 
@@ -379,16 +398,18 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
   for (const d of DESKS) prop((d.ty + 1) * T - 1, () => desk(d));
   for (const d of DESKS) prop((d.ty + 1.6) * T + 1, () => chair(d));
   prop(4 * T - 1, () => {
-    r(1, 14, 30, 50, "#4a3324");
-    r(1, 14, 30, 2, "#6a4a34");
-    r(1, 62, 30, 2, "#2e2016");
+    r(5, 14, 28, 50, "#4a3324");
+    r(5, 14, 28, 2, "#6a4a34");
+    r(32, 16, 1, 48, "#2e2016");
+    r(5, 62, 28, 2, "#2e2016");
+    r(5, 64, 28, 2, "rgba(0,0,0,.3)");
     const cols = ["#d97757", "#3fa7d6", "#baf448", "#8b7cf6", "#f5c451", "#2fa37f", "#e5484d"];
     [18, 30, 42, 54].forEach((yy, row) => {
-      r(3, yy + 8, 26, 2, "#35251a");
-      for (let k = 0; k < 7; k++) {
+      r(7, yy + 8, 24, 2, "#35251a");
+      for (let k = 0; k < 6; k++) {
         const tall = (k + row) % 3 === 0;
-        r(3 + k * 4, yy + (tall ? 0 : 2), 3, tall ? 8 : 6, cols[(k + row * 2) % 7] ?? "#fff");
-        r(3 + k * 4, yy + (tall ? 1 : 3), 3, 1, "rgba(255,255,255,.25)");
+        r(7 + k * 4, yy + (tall ? 0 : 2), 3, tall ? 8 : 6, cols[(k + row * 2) % 7] ?? "#fff");
+        r(7 + k * 4, yy + (tall ? 1 : 3), 3, 1, "rgba(255,255,255,.25)");
       }
     });
   });
@@ -421,7 +442,7 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
   });
   prop(5 * T - 1, () => {
     for (let i = 0; i < 2; i++) {
-      const x = 28 * T + i * 16 + 1;
+      const x = 28 * T + i * 14 - 2;
       r(x, 14, 14, 66, "#121820");
       r(x, 14, 14, 2, "#2a3340");
       r(x + 13, 16, 1, 64, "#0a0d12");
@@ -441,9 +462,9 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
         r(x + 11, 21 + k * 6, 1, 1, data.stopped ? "#ff6b6b" : on > 0.8 ? "#5fd4ff" : "#1d2a2a");
       }
     }
-    r(28 * T + 2, 70, 3, 10, "#f5c451");
-    r(28 * T + 2, 72, 3, 1, "#1a1f26");
-    r(28 * T + 2, 75, 3, 1, "#1a1f26");
+    r(28 * T - 1, 70, 3, 10, "#f5c451");
+    r(28 * T - 1, 72, 3, 1, "#1a1f26");
+    r(28 * T - 1, 75, 3, 1, "#1a1f26");
   });
   prop(9 * T - 1, () => {
     const x = 19 * T;
@@ -456,16 +477,17 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
     for (let k = 0; k < 4; k++) r(x + 4 + k * 2, y + 9 + (k % 2), 1, 3, "#e8e6dd");
   });
   prop(10 * T - 1, () => {
-    const x = 29 * T;
+    const x = 29 * T - 4;
     const y = 8 * T;
-    r(x + 1, y - 8, 14, 39, "#56606f");
+    r(x + 1, y - 8, 14, 23, "#56606f");
     r(x + 1, y - 8, 14, 2, "#737d8f");
-    r(x + 14, y - 6, 1, 37, "#3c4552");
-    for (let k = 0; k < 3; k++) {
-      const yy = y - 4 + k * 11;
-      r(x + 2, yy, 12, 9, "#4b5566");
-      r(x + 6, yy + 4, 4, 1, "#a7b2c4");
+    r(x + 14, y - 6, 1, 21, "#3c4552");
+    for (let k = 0; k < 2; k++) {
+      const yy = y - 4 + k * 9;
+      r(x + 2, yy, 12, 8, "#4b5566");
+      r(x + 6, yy + 3, 4, 1, "#a7b2c4");
     }
+    r(x + 1, y + 15, 14, 1, "rgba(0,0,0,.35)");
   });
   for (const [a0, a1] of HALF_WALLS)
     prop(10 * T - 2, () => {
@@ -487,27 +509,30 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
         }
       }
     });
+  // --- lounge: pantry on the left, sofa and TV in the middle, arcade corner on the right ---
+  const at = ([tx, ty]: readonly [number, number]) => [tx * T, ty * T] as const;
   prop(12 * T - 1, () => {
-    const y = 11 * T;
-    r(0, y - 4, 48, 6, "#8a6a4a");
-    r(0, y - 4, 48, 1, "#a88866");
-    r(0, y + 2, 48, 13, "#5a3e2b");
-    r(15, y + 3, 1, 12, "#3e2a1d");
-    r(31, y + 3, 1, 12, "#3e2a1d");
-    r(18, y - 18, 14, 15, "#3a3f4b");
-    r(18, y - 18, 14, 2, "#4f5566");
-    r(20, y - 14, 10, 4, "#1b1f27");
-    r(28, y - 13, 1, 1, "#4ad69b");
-    r(22, y - 9, 6, 3, "#1b1f27");
-    r(23, y - 6, 4, 3, "#e5e7eb");
-    r(4, y - 9, 4, 5, "#e5e7eb");
-    r(9, y - 8, 4, 4, "#3fa7d6");
-    r(36, y - 10, 8, 6, "#c9a066");
-    r(37, y - 11, 6, 1, "#e8c890");
+    const [x, y0] = at(LOUNGE.counter);
+    const y = y0 + T;
+    r(x, y - 4, 48, 6, "#8a6a4a");
+    r(x, y - 4, 48, 1, "#a88866");
+    r(x, y + 2, 48, 13, "#5a3e2b");
+    r(x + 15, y + 3, 1, 12, "#3e2a1d");
+    r(x + 31, y + 3, 1, 12, "#3e2a1d");
+    r(x + 18, y - 18, 14, 15, "#3a3f4b");
+    r(x + 18, y - 18, 14, 2, "#4f5566");
+    r(x + 20, y - 14, 10, 4, "#1b1f27");
+    r(x + 28, y - 13, 1, 1, "#4ad69b");
+    r(x + 22, y - 9, 6, 3, "#1b1f27");
+    r(x + 23, y - 6, 4, 3, "#e5e7eb");
+    r(x + 6, y - 9, 4, 5, "#e5e7eb");
+    r(x + 11, y - 8, 4, 4, "#3fa7d6");
+    r(x + 36, y - 10, 8, 6, "#c9a066");
+    r(x + 37, y - 11, 6, 1, "#e8c890");
   });
   prop(12 * T - 1, () => {
-    const x = 5 * T;
-    const y = 11 * T;
+    const [x, y0] = at(LOUNGE.cooler);
+    const y = y0 + T;
     r(x + 3, y - 14, 10, 9, "#5fa8ff");
     r(x + 4, y - 13, 3, 6, "#a8d0ff");
     r(x + 5, y - 15, 6, 1, "#3d7fd0");
@@ -518,10 +543,96 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
     r(x + 9, y + 1, 1, 1, "#5fa8ff");
     r(x + 13, y - 4, 1, 18, "#a7b0c0");
   });
+  prop(15 * T - 1, () => {
+    const [x, y] = at(LOUNGE.table);
+    r(x, y + 3, 32, 4, "#7a573c");
+    r(x, y + 3, 32, 1, "#a07a55");
+    r(x + 1, y + 7, 30, 3, "#5a3e2b");
+    r(x + 2, y + 10, 2, 4, "#3e2a1d");
+    r(x + 28, y + 10, 2, 4, "#3e2a1d");
+    r(x + 4, y + 1, 8, 3, "#3fa7d6");
+    r(x + 5, y + 2, 5, 1, "#baf448");
+    r(x + 20, y + 1, 4, 3, "#e5e7eb");
+    for (const sx of [x - 4, x + 30]) {
+      r(sx + 1, y + 6, 5, 3, "#8b5a3c");
+      r(sx + 1, y + 6, 5, 1, "#a8714d");
+      r(sx + 2, y + 9, 1, 5, "#3e2a1d");
+      r(sx + 4, y + 9, 1, 5, "#3e2a1d");
+    }
+  });
+  prop(12 * T - 1, () => {
+    const [x, y] = at(LOUNGE.tv);
+    r(x + 1, y + 21, 30, 10, "#4d3524");
+    r(x + 1, y + 21, 30, 1, "#7a573c");
+    r(x + 15, y + 23, 1, 7, "#2e2016");
+    r(x + 6, y + 25, 4, 1, "#a07a55");
+    r(x + 22, y + 25, 4, 1, "#a07a55");
+    r(x + 14, y + 18, 4, 3, "#1a1c25");
+    r(x + 2, y + 2, 28, 17, "#14161d");
+    r(x + 2, y + 2, 28, 1, "#2e3240");
+    screen(x + 3, y + 3, 26, 14, "#0a1022", () => {
+      // A screensaver: the Vexis mark bouncing off the edges.
+      const t = reduced ? 0 : RT * 9;
+      const bx = x + 3 + Math.round(Math.abs((t % 42) - 21));
+      const by = y + 3 + Math.round(Math.abs(((t * 0.6) % 18) - 9));
+      for (let i = 0; i < 3; i++) {
+        r(bx + i, by + i, 1, 1, "#baf448");
+        r(bx + 4 - i, by + i, 1, 1, "#baf448");
+      }
+      r(bx + 2, by + 3, 1, 2, "#baf448");
+    });
+  });
+  prop(17 * T - 1, () => {
+    const [x, y] = at(LOUNGE.sofa);
+    r(x + 1, y - 3, 62, 7, "#7a4462");
+    r(x + 2, y - 3, 29, 1, "#94567a");
+    r(x + 33, y - 3, 29, 1, "#94567a");
+    r(x + 31, y - 3, 2, 7, "#5a3045");
+    r(x, y + 3, 64, 11, "#5a3045");
+    r(x, y + 3, 64, 1, "#6e3a52");
+    r(x, y + 13, 64, 1, "#3e2230");
+    r(x - 2, y - 4, 5, 18, "#4a2a3a");
+    r(x - 2, y - 4, 5, 1, "#6e3a52");
+    r(x + 61, y - 4, 5, 18, "#4a2a3a");
+    r(x + 61, y - 4, 5, 1, "#6e3a52");
+    r(x + 1, y + 14, 62, 1, "rgba(0,0,0,.35)");
+  });
+  prop(12 * T - 1, () => {
+    const [x, y0] = at(LOUNGE.vending);
+    const y = y0 + T;
+    r(x + 1, y - 22, 30, 37, "#8a2c36");
+    r(x + 1, y - 22, 30, 2, "#b23a46");
+    r(x + 30, y - 20, 1, 35, "#4a1820");
+    r(x + 3, y - 18, 20, 26, "#1a1f2a");
+    const cols = ["#baf448", "#5fd4ff", "#f5c451", "#ff6b6b", "#8b7cf6"];
+    for (let rw = 0; rw < 4; rw++)
+      for (let k = 0; k < 4; k++) {
+        r(x + 4 + k * 5, y - 16 + rw * 6, 3, 4, cols[(rw + k) % 5] ?? "#fff");
+        r(x + 4 + k * 5, y - 12 + rw * 6, 4, 1, "#3a4150");
+      }
+    r(x + 25, y - 18, 4, 8, "#2a2d38");
+    r(x + 26, y - 16, 2, 1, data.stopped ? "#3a1212" : "#4ad69b");
+    r(x + 5, y + 10, 16, 3, "#0d0f18");
+  });
+  prop(15 * T - 1, () => {
+    const [x, y] = at(LOUNGE.pingPong);
+    r(x, y + 2, 64, 22, "#1f5a46");
+    r(x, y + 2, 64, 1, "#2f8a6a");
+    r(x, y + 24, 64, 4, "#143a2e");
+    r(x + 31, y, 2, 26, "#e8e6dd");
+    r(x + 1, y + 13, 62, 1, "#e8e6dd");
+    r(x + 2, y + 28, 2, 4, "#0d1a14");
+    r(x + 60, y + 28, 2, 4, "#0d1a14");
+    if (!reduced && !data.stopped)
+      r(x + 8 + Math.abs(((RT * 30) % 96) - 48), y + 8 + Math.abs(Math.sin(RT * 6)) * -4, 2, 2, "#ffffff");
+    r(x + 4, y + 10, 4, 5, "#e5484d");
+    r(x + 56, y + 10, 4, 5, "#3fa7d6");
+  });
   prop(12 * T - 1, () => {
     for (let i = 0; i < 2; i++) {
-      const x = (13 + i) * T;
-      const y = 11 * T;
+      const [x0, y0] = at(LOUNGE.arcade);
+      const x = x0 + i * T;
+      const y = y0 + T;
       r(x + 1, y - 20, 14, 35, i ? "#3b2a5a" : "#1f3a5a");
       r(x + 1, y - 20, 14, 2, i ? "#5a4580" : "#2f5a8a");
       r(x + 14, y - 18, 1, 33, "#0d0f18");
@@ -543,97 +654,37 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
       r(x + 2, y + 3, 12, 12, i ? "#2e2148" : "#18304a");
     }
   });
-  prop(12 * T - 1, () => {
-    const x = 24 * T;
-    const y = 11 * T;
-    r(x + 1, y - 22, 30, 37, "#8a2c36");
-    r(x + 1, y - 22, 30, 2, "#b23a46");
-    r(x + 30, y - 20, 1, 35, "#4a1820");
-    r(x + 3, y - 18, 20, 26, "#1a1f2a");
-    const cols = ["#baf448", "#5fd4ff", "#f5c451", "#ff6b6b", "#8b7cf6"];
-    for (let rw = 0; rw < 4; rw++)
-      for (let k = 0; k < 4; k++) {
-        r(x + 4 + k * 5, y - 16 + rw * 6, 3, 4, cols[(rw + k) % 5] ?? "#fff");
-        r(x + 4 + k * 5, y - 12 + rw * 6, 4, 1, "#3a4150");
-      }
-    r(x + 25, y - 18, 4, 8, "#2a2d38");
-    r(x + 26, y - 16, 2, 1, data.stopped ? "#3a1212" : "#4ad69b");
-    r(x + 5, y + 10, 16, 3, "#0d0f18");
-  });
-  prop(12 * T - 1, () => {
-    const x = 29 * T;
-    const y = 11 * T;
-    r(x + 4, y + 8, 8, 7, "#b06a45");
-    r(x + 2, y - 4, 12, 13, "#2f7d4a");
-    r(x + 5, y - 9, 6, 7, "#3c9a5c");
-    r(x + 1, y, 3, 4, "#3c9a5c");
-  });
-  prop(15 * T - 1, () => {
-    const x = 2 * T;
-    const y = 14 * T;
-    r(x, y + 3, 32, 4, "#7a573c");
-    r(x, y + 3, 32, 1, "#a07a55");
-    r(x + 1, y + 7, 30, 3, "#5a3e2b");
-    r(x + 2, y + 10, 2, 4, "#3e2a1d");
-    r(x + 28, y + 10, 2, 4, "#3e2a1d");
-    r(x + 4, y + 1, 8, 3, "#3fa7d6");
-    r(x + 5, y + 2, 5, 1, "#baf448");
-    r(x + 20, y + 1, 4, 3, "#e5e7eb");
-  });
-  prop(16 * T - 1, () => {
-    const x = 17 * T;
-    const y = 14 * T;
-    r(x, y + 2, 64, 22, "#1f5a46");
-    r(x, y + 2, 64, 1, "#2f8a6a");
-    r(x, y + 24, 64, 4, "#143a2e");
-    r(x + 31, y, 2, 26, "#e8e6dd");
-    r(x + 1, y + 13, 62, 1, "#e8e6dd");
-    r(x + 2, y + 28, 2, 4, "#0d1a14");
-    r(x + 60, y + 28, 2, 4, "#0d1a14");
-    if (!reduced && !data.stopped)
-      r(x + 8 + Math.abs(((RT * 30) % 96) - 48), y + 8 + Math.abs(Math.sin(RT * 6)) * -4, 2, 2, "#ffffff");
-    r(x + 4, y + 10, 4, 5, "#e5484d");
-    r(x + 56, y + 10, 4, 5, "#3fa7d6");
-  });
-  prop(16 * T, () => {
-    for (const [tx, ty, cc] of [
-      [23, 15, "#5a3fa0"],
-      [25, 16, "#c0602a"],
-    ] as const) {
+  for (const [tx, ty] of LOUNGE.beanbags)
+    prop((ty + 1) * T, () => {
+      const cc = tx < 27 ? "#5a3fa0" : "#c0602a";
       const x = tx * T;
       const y = ty * T;
       r(x + 1, y + 4, 14, 11, cc);
       r(x + 2, y + 2, 12, 4, shade(cc, 0.2));
       r(x + 1, y + 13, 14, 2, shade(cc, -0.3));
       r(x + 4, y + 4, 4, 2, shade(cc, 0.35));
-    }
-  });
-  prop(17 * T - 1, () => {
-    const x = T;
-    const y = 16 * T;
-    r(x, y - 4, 64, 8, "#4a2a3a");
-    r(x + 2, y - 3, 60, 2, "#6e3a52");
-    r(x, y + 4, 64, 10, "#5a3045");
-    r(x + 2, y + 4, 28, 4, "#7a4462");
-    r(x + 34, y + 4, 28, 4, "#7a4462");
-    r(x - 2, y - 2, 4, 16, "#3e2230");
-    r(x + 62, y - 2, 4, 16, "#3e2230");
-    r(x + 6, y - 6, 8, 5, "#baf448");
-    r(x + 48, y - 6, 8, 5, "#5fd4ff");
-  });
-  prop(17 * T, () => {
-    for (const [tx, ty] of [
-      [0, 16],
-      [29, 16],
-    ] as const) {
+    });
+  for (const [tx, ty] of LOUNGE.lamps)
+    prop((ty + 1) * T - 1, () => {
+      const x = tx * T + 8;
+      const y = ty * T;
+      r(x - 4, y + 13, 8, 2, "#1a1c25");
+      r(x, y - 2, 1, 15, "#3a3f4b");
+      r(x - 4, y - 8, 9, 6, "#e8c890");
+      r(x - 4, y - 8, 9, 1, "#fff3d0");
+      r(x - 5, y - 3, 11, 1, "#c9a066");
+    });
+  for (const [tx, ty] of LOUNGE.plants)
+    prop((ty + 1) * T, () => {
       const x = tx * T;
       const y = ty * T;
       r(x + 4, y + 8, 8, 7, "#9a5b3a");
+      r(x + 4, y + 8, 8, 1, "#b06a45");
       r(x + 2, y - 2, 12, 11, "#2f7d4a");
       r(x + 5, y - 7, 6, 7, "#3c9a5c");
       r(x + 12, y + 1, 3, 4, "#256b3e");
-    }
-  });
+      r(x + 6, y - 6, 2, 2, "#5ccf7d");
+    });
 
   function poseOf(a: Actor): { pose: Pose; f: number } {
     const st = statusOf(a.id);
@@ -650,7 +701,8 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
     const bot = a.id === "monitor" || a.id === "executor" || a.id === "bookkeeper";
     const blink = !reduced && (RT + a.ph * 2) % 3.6 < 0.13;
     const frame = bot && pose !== "walk" && pose !== "type" && !reduced ? Math.floor(RT * 6) % 2 : f;
-    const s = sprite(a.id, a.dir, frame, pose, data.stopped ? "err" : EXPR[st], blink, a.id === selected);
+    const edge = a.id === selected ? "#baf448" : a.id === hovered ? "#f6f6ef" : undefined;
+    const s = sprite(a.id, a.dir, frame, pose, data.stopped ? "err" : EXPR[st], blink, edge);
     const px = Math.round(a.x * T);
     const py = Math.round(a.y * T);
     const hover = bot && !a.sitting && !reduced ? Math.round(Math.sin(RT * 3 + a.ph) * 1.2) - 2 : 0;
@@ -662,10 +714,15 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
       r(px - 4, py - 2, 8, 1, "#000");
       wg.globalAlpha = 1;
     }
-    if (a.id === selected && !a.sitting) {
+    if (a.id === selected) {
+      // A pulsing ring at the feet, the way a game marks the character you picked.
       const k = reduced ? 0 : Math.floor(RT * 4) % 2;
-      r(px - 7 - k, py - 1, 2, 1, "#baf448");
-      r(px + 5 + k, py - 1, 2, 1, "#baf448");
+      const fy = a.sitting ? py + 7 : py;
+      const w = 8 + k;
+      r(px - w, fy - 1, 2 * w, 1, "#baf448");
+      r(px - w, fy + 2, 2 * w, 1, "#baf448");
+      r(px - w - 1, fy, 1, 2, "#baf448");
+      r(px + w, fy, 1, 2, "#baf448");
     }
     wg.drawImage(s, dx, dy);
     if (a.carry) {
@@ -701,12 +758,19 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
 
   function render(
     now: number,
-    next: { data: SceneData; actors: Actor[]; selected: OfficeAgent; talking: Set<string> },
+    next: {
+      data: SceneData;
+      actors: Actor[];
+      selected: OfficeAgent | null;
+      hovered: OfficeAgent | null;
+      talking: Set<string>;
+    },
   ) {
     RT = now / 1000;
     data = next.data;
     actors = next.actors;
     selected = next.selected;
+    hovered = next.hovered;
     const d = new Date(now);
     const sk = sky(d.getUTCHours() + d.getUTCMinutes() / 60);
     wg.drawImage(bg, 0, 0);
@@ -747,8 +811,11 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
       wg.drawImage(glow("rgba(95,212,255,.5)", 20), 332, 2);
       wg.drawImage(glow(data.executing ? "rgba(186,244,72,.7)" : "rgba(95,212,255,.4)", 22), 394, -2);
       wg.drawImage(glow("rgba(186,244,72,.35)", 34), 54, -10);
-      wg.drawImage(glow("rgba(255,90,110,.5)", 26), 24 * T - 10, 11 * T - 32);
-      wg.drawImage(glow("rgba(95,180,255,.45)", 22), 13.5 * T - 22, 11 * T - 30);
+      wg.drawImage(glow("rgba(255,90,110,.5)", 26), 18 * T - 26, 11 * T - 32);
+      wg.drawImage(glow("rgba(139,124,246,.55)", 30), 28 * T - 30, 11 * T - 30);
+      wg.drawImage(glow("rgba(95,180,255,.35)", 22), 11 * T - 22, 10 * T - 12);
+      for (const [tx, ty] of LOUNGE.lamps)
+        wg.drawImage(glow("rgba(255,214,140,.45)", 20), tx * T + 8 - 20, ty * T - 25);
     }
     wg.globalAlpha = 1;
     wg.globalCompositeOperation = "source-over";
@@ -774,6 +841,12 @@ export function createScene(world: HTMLCanvasElement, reduced: boolean) {
         wg.globalCompositeOperation = "source-over";
       });
     }
+    r(0, 0, 4, WH, "#0d0f16");
+    r(3, 0, 1, WH, "#262b3a");
+    r(WW - 4, 0, 4, WH, "#0d0f16");
+    r(WW - 4, 0, 1, WH, "#262b3a");
+    r(0, WH - 3, WW, 3, "#0d0f16");
+    r(0, WH - 3, WW, 1, "#262b3a");
     wg.fillStyle = vignette;
     wg.fillRect(0, 0, WW, WH);
   }
@@ -850,10 +923,11 @@ function paintBackground() {
   R(pdx - 9, pdy - 4, 18, 1, "#3f5e22");
   R(pdx - 3, pdy - 1, 6, 2, "#3f5e22");
   // Lounge rug with the Vexis mark.
-  const rx = 7 * T;
-  const ry = 13 * T;
-  const rw = 6 * T;
-  const rh = 4 * T;
+  const [rgx, rgy, rgw, rgh] = LOUNGE.rug;
+  const rx = rgx * T;
+  const ry = rgy * T;
+  const rw = rgw * T;
+  const rh = rgh * T;
   R(rx, ry, rw, rh, "#2b3a14");
   R(rx + 3, ry + 3, rw - 6, rh - 6, "#1f2a0f");
   for (let k = 6; k < rw - 6; k += 6) {
@@ -871,6 +945,12 @@ function paintBackground() {
     R(vx + 10 - i, vy + i, 3, 2, "#baf448");
   }
   R(vx - 1, vy + 12, 2, 3, "#baf448");
+  const [ax, ay, aw, ah] = LOUNGE.arcadeRug;
+  for (let j = 0; j < ah * 2; j++)
+    for (let i = 0; i < aw * 2; i++) R(ax * T + i * 8, ay * T + j * 8, 8, 8, (i + j) % 2 ? "#1c1530" : "#251b3d");
+  R(ax * T, ay * T, aw * T, 1, "#8b7cf6");
+  R(ax * T, ay * T, 1, ah * T, "#8b7cf6");
+  R(ax * T, (ay + ah) * T - 1, aw * T, 1, "#8b7cf6");
   for (let x = 0; x < W; x++) {
     const c = roomOf(x);
     const px = x * T;
@@ -942,11 +1022,15 @@ function paintNightMask() {
     [80, 96, 70],
     [240, 96, 70],
     [400, 104, 70],
-    [120, 220, 80],
-    [360, 220, 80],
+    [176, 232, 70],
+    [40, 216, 56],
+    [336, 236, 56],
     [24, 172, 34],
-    [216, 172, 34],
-    [392, 172, 34],
+    [176, 176, 34],
+    [136, 156, 30],
+    [216, 156, 30],
+    [288, 168, 34],
+    [440, 216, 56],
     [416, 60, 30],
     ...DESKS.map((d): [number, number, number] => [d.tx * T + 16, d.ty * T + 2, 34]),
   ];

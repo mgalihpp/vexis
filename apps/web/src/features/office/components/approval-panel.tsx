@@ -1,5 +1,6 @@
-import { CheckIcon, XIcon } from "lucide-react";
+import { CheckIcon, InboxIcon, OctagonPauseIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { shortAddr } from "@/lib/format";
@@ -13,7 +14,7 @@ import {
   waitingProposals,
 } from "../office";
 import { decideProposalFn } from "../office.functions";
-import { Chip, Meter, Section, useOfficeMutation } from "./office-ui";
+import { Meter, PanelEmpty, Section, useOfficeMutation } from "./office-ui";
 
 const TODAY: { status: "approved" | "rejected" | "expired" | "failed" | "done"; label: string }[] = [
   { status: "approved", label: "approved" },
@@ -28,21 +29,27 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
   const waiting = waitingProposals(view.proposals, now);
   if (waiting.length === 0)
     return (
-      <Section title="Approval" action={<Chip>{stopped ? "stopped" : "nothing waiting"}</Chip>}>
-        <p className="text-xs text-muted-foreground">
-          {stopped
-            ? "The office is stopped. No proposal is being worked on."
-            : "No proposal is waiting. The agents are working on the floor."}
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {TODAY.map((t) => (
-            <Chip key={t.status}>
-              <b className="font-mono font-medium text-foreground">{view.today[t.status] ?? 0}</b>
-              {t.label} today
-            </Chip>
-          ))}
-        </div>
-      </Section>
+      <>
+        <Card size="sm">
+          <CardContent>
+            <PanelEmpty
+              icon={stopped ? <OctagonPauseIcon /> : <InboxIcon />}
+              title={stopped ? "Office stopped" : "Nothing to approve"}
+              hint={stopped ? undefined : "New proposals land here."}
+            />
+          </CardContent>
+        </Card>
+        <Section title="Today (UTC)">
+          <dl className="m-0 grid grid-cols-5 gap-1">
+            {TODAY.map((t) => (
+              <div key={t.status} className="flex flex-col-reverse items-center gap-0.5">
+                <dt className="text-[0.625rem] text-muted-foreground capitalize">{t.label}</dt>
+                <dd className="m-0 font-mono text-sm font-medium tabular-nums">{view.today[t.status] ?? 0}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      </>
     );
   return (
     <div className="flex flex-col gap-3">
@@ -134,9 +141,6 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
         </Button>
       </div>
       <FormError error={decide.error} />
-      <p className="text-center text-[0.6875rem] text-muted-foreground">
-        Simulation: approving records the decision and signs no transaction.
-      </p>
     </section>
   );
 }

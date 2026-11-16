@@ -1,10 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
+import { ScrollTextIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { shortAddr } from "@/lib/format";
 import { AGENT_INFO, knownPools, type OfficeView } from "../office";
 import { type FeedFilter, officeFeedQuery } from "../office.queries";
-import { Section, utcClock } from "./office-ui";
+import { PanelEmpty, Section, utcClock } from "./office-ui";
 
 const TONE: Record<string, string> = {
   good: "text-profit",
@@ -29,7 +32,16 @@ export function OfficeLog({
   const pools = knownPools(view);
 
   return (
-    <Section title="Office log" action={<span className="font-mono text-[0.6875rem] text-muted-foreground">UTC</span>}>
+    <Section
+      title="Activity"
+      action={
+        filtered && (
+          <Button variant="ghost" size="xs" onClick={() => onFilter({})}>
+            Clear
+          </Button>
+        )
+      }
+    >
       <div className="grid grid-cols-2 gap-1.5">
         <NativeSelect
           size="sm"
@@ -63,24 +75,32 @@ export function OfficeLog({
           ))}
         </NativeSelect>
       </div>
-      <ol className="m-0 flex max-h-[300px] list-none flex-col overflow-auto p-0 [scrollbar-width:thin]">
-        {filtered && feed.isPending && <li className="py-1 text-xs text-muted-foreground">Loading…</li>}
-        {!(filtered && feed.isPending) && rows.length === 0 && (
-          <li className="py-1 text-xs text-muted-foreground">
-            {filtered ? "Nothing matches these filters." : "No activity yet."}
-          </li>
-        )}
-        {rows.map((m) => (
-          <li
-            key={m.id}
-            className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-1.5 border-t py-1.5 text-xs first:border-t-0 sm:grid-cols-[3.25rem_5.25rem_minmax(0,1fr)]"
-          >
-            <time className="pt-px font-mono text-[0.65rem] text-muted-foreground tabular-nums">{utcClock(m.at)}</time>
-            <b className="font-medium">{AGENT_INFO[m.agent].name}</b>
-            <span className={`col-start-2 sm:col-start-auto ${TONE[m.tone ?? ""] ?? ""}`}>{m.text}</span>
-          </li>
-        ))}
-      </ol>
+      {filtered && feed.isPending ? (
+        <div className="flex flex-col gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-4 w-full" />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <PanelEmpty icon={<ScrollTextIcon />} title={filtered ? "No matches" : "No activity yet"} />
+      ) : (
+        <ol className="m-0 flex list-none flex-col p-0">
+          {rows.map((m) => (
+            <li
+              key={m.id}
+              className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2 border-t py-1.5 text-xs first:border-t-0 first:pt-0"
+            >
+              <time className="pt-px font-mono text-[0.65rem] text-muted-foreground tabular-nums">
+                {utcClock(m.at).slice(0, 5)}
+              </time>
+              <span className="min-w-0 [overflow-wrap:anywhere]">
+                <b className="mr-1.5 font-medium">{AGENT_INFO[m.agent].name}</b>
+                <span className={TONE[m.tone ?? ""] ?? "text-muted-foreground"}>{m.text}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </Section>
   );
 }

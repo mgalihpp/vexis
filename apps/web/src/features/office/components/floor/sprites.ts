@@ -272,7 +272,7 @@ export const SPRITE_H = 24;
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-/** One frame, outlined (lime when selected). `dir` 2 is the mirrored side view. */
+/** One frame, outlined in `edge` (lime when selected, white on hover). `dir` 2 is the mirrored side view. */
 export function sprite(
   agent: OfficeAgent,
   dir: number,
@@ -280,9 +280,9 @@ export function sprite(
   pose: Pose,
   expr: Expr,
   blink: boolean,
-  selected: boolean,
+  edge = "#100d16",
 ) {
-  const k = [agent, dir, f, pose, expr, blink ? 1 : 0, selected ? 1 : 0].join("|");
+  const k = [agent, dir, f, pose, expr, blink ? 1 : 0, edge].join("|");
   const hit = cache.get(k);
   if (hit) return hit;
   const look = LOOKS[agent];
@@ -308,7 +308,7 @@ export function sprite(
   if (!sc || !oc) return src;
   sc.drawImage(src, 0, 0);
   sc.globalCompositeOperation = "source-in";
-  sc.fillStyle = selected ? "#baf448" : "#100d16";
+  sc.fillStyle = edge;
   sc.fillRect(0, 0, SPRITE_W, SPRITE_H);
   for (const [dx, dy] of [
     [1, 0],

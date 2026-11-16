@@ -148,13 +148,41 @@ const block = (x: number, y: number, w = 1, h = 1) => {
   for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) blocked.add(key(x + i, y + j));
 };
 
-/** The wall between the work rooms and the lounge, with its doorways. */
+/** The wall between the work rooms and the lounge; the gaps are each room's doorway. */
 export const HALF_WALLS: readonly (readonly [number, number])[] = [
   [0, 3],
   [6, 13],
   [16, 23],
-  [26, 28],
+  [26, 29],
 ];
+
+/** The lounge's three corners, in tiles: pantry on the left, sofa and TV in the middle, arcade on the right. */
+export const LOUNGE = {
+  counter: [0, 10],
+  cooler: [3, 10],
+  table: [1, 14],
+  tv: [10, 10],
+  rug: [9, 12, 4, 4],
+  lamps: [
+    [8, 10],
+    [13, 10],
+  ],
+  sofa: [9, 16],
+  vending: [17, 10],
+  pingPong: [19, 13],
+  arcade: [27, 10],
+  arcadeRug: [26, 10, 4, 5],
+  beanbags: [
+    [26, 13],
+    [28, 13],
+  ],
+  plants: [
+    [0, 16],
+    [8, 16],
+    [13, 16],
+    [29, 16],
+  ],
+} as const;
 
 block(0, 0, W, 3);
 block(10, 3, 1, 6);
@@ -163,21 +191,20 @@ block(0, 3, 2, 1);
 block(9, 3);
 block(25, 3, 2, 1);
 block(28, 3, 2, 2);
-block(29, 8, 1, 2);
+block(29, 8);
 block(19, 8);
 for (const [a, b] of HALF_WALLS) block(a, 9, b - a + 1, 1);
-block(0, 11, 3, 1);
-block(5, 11);
-block(13, 11, 2, 1);
-block(24, 11, 2, 1);
-block(29, 11);
-block(1, 16, 4, 1);
-block(2, 14, 2, 1);
-block(17, 14, 4, 2);
-block(23, 15);
-block(25, 16);
-block(0, 16);
-block(29, 16);
+block(...LOUNGE.counter, 3, 2);
+block(...LOUNGE.cooler, 1, 2);
+block(...LOUNGE.table, 2, 1);
+block(...LOUNGE.tv, 2, 2);
+block(...LOUNGE.sofa, 4, 1);
+block(...LOUNGE.vending, 2, 2);
+block(...LOUNGE.pingPong, 4, 2);
+block(...LOUNGE.arcade, 2, 2);
+for (const [x, y] of LOUNGE.beanbags) block(x, y);
+for (const [x, y] of LOUNGE.plants) block(x, y);
+for (const [x, y] of LOUNGE.lamps) block(x, y);
 for (const d of DESKS) block(d.tx, d.ty, 2, 1);
 
 type Tile = [number, number];
