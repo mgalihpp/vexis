@@ -101,6 +101,9 @@ describe("config", () => {
       cooldownSec: 300,
       maxConsecutiveFailures: 3,
       approvalTtlSec: 900,
+      tpPct: 10,
+      slPct: 5,
+      claimFeePct: 1,
       dailyLlmUsd: 1,
     });
   });

@@ -1,9 +1,10 @@
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./client.server.ts";
 import {
   type Decider,
   type Decision,
   type DecisionRefusal,
+  FINAL_STATUSES,
   isPaused,
   KILL_SWITCH,
   type OfficeAgent,
@@ -137,7 +138,10 @@ export async function insertProposal({ db, userId }: UserScope, p: NewProposal) 
 }
 
 type ProposalPatch = Partial<
-  Pick<typeof officeProposals.$inferInsert, "riskNotes" | "summary" | "signature" | "txError" | "expiresAt">
+  Pick<
+    typeof officeProposals.$inferInsert,
+    "riskNotes" | "summary" | "signature" | "txError" | "expiresAt" | "positionAddress" | "simulated"
+  >
 > & { decidedBy?: Decider };
 
 /**
@@ -210,7 +214,10 @@ export async function setCardMessage({ db, userId }: UserScope, proposalId: stri
     .where(and(eq(officeProposals.id, proposalId), eq(officeProposals.userId, userId)));
 }
 
-/** Proposals whose card still shows buttons although they no longer wait: decided, expired or killed. */
+/**
+ * Proposals whose card still shows buttons although they reached a final status: done, failed, rejected or expired.
+ * An approved card keeps its buttons until the Executor finishes, so it is edited once, with the outcome.
+ */
 export function settledCards({ db, userId }: UserScope) {
   return db
     .select()
@@ -219,9 +226,34 @@ export function settledCards({ db, userId }: UserScope) {
       and(
         eq(officeProposals.userId, userId),
         isNotNull(officeProposals.telegramMessageId),
-        ne(officeProposals.status, "awaiting_approval"),
+        inArray(officeProposals.status, [...FINAL_STATUSES]),
       ),
     );
+}
+
+/** The newest live executions (done or failed), newest first, for the failure streak. */
+export function liveExecutions({ db, userId }: UserScope, limit: number) {
+  return db
+    .select({ status: officeProposals.status, txError: officeProposals.txError })
+    .from(officeProposals)
+    .where(
+      and(
+        eq(officeProposals.userId, userId),
+        eq(officeProposals.simulated, false),
+        inArray(officeProposals.status, ["done", "failed"]),
+      ),
+    )
+    .orderBy(desc(officeProposals.updatedAt))
+    .limit(limit);
+}
+
+/** When the pool last had a proposal of any kind, so the Monitor does not ask again every minute. */
+export async function lastProposalAt({ db, userId }: UserScope, poolAddress: string) {
+  const [row] = await db
+    .select({ at: sql<Date | null>`max(${officeProposals.createdAt})` })
+    .from(officeProposals)
+    .where(and(eq(officeProposals.userId, userId), eq(officeProposals.poolAddress, poolAddress)));
+  return row?.at ? new Date(row.at) : null;
 }
 
 /** How many proposals reached each status since `since` (by their last update). */
@@ -389,6 +421,27 @@ export async function journalPnl({ db, userId }: UserScope, since: Date) {
   };
 }
 
+/** The Monitor's latest on-chain value of an open position. */
+export async function setJournalValue({ db, userId }: UserScope, journalId: string, valueSol: number, at: Date) {
+  await db
+    .update(officeJournal)
+    .set({ valueSol, valuedAt: at })
+    .where(and(eq(officeJournal.id, journalId), eq(officeJournal.userId, userId), isNull(officeJournal.closedAt)));
+}
+
+/** Stores today's starting capital unless one was already taken on this UTC day. */
+export async function setDayCapital({ db, userId }: UserScope, capitalSol: number, now: Date) {
+  await db
+    .update(officeConfig)
+    .set({ dayCapitalSol: capitalSol, dayCapitalAt: now })
+    .where(
+      and(
+        eq(officeConfig.userId, userId),
+        or(isNull(officeConfig.dayCapitalAt), lt(officeConfig.dayCapitalAt, utcDayStart(now))),
+      ),
+    );
+}
+
 /** Closes an open position. Undefined when it is not the user's or already closed. */
 export async function closeJournal(
   { db, userId }: UserScope,
@@ -404,6 +457,24 @@ export async function closeJournal(
 }
 
 // --- cross-user (apps/office only) -----------------------------------------------------------
+
+/** Users with an approved proposal waiting for the Executor. */
+export async function usersWithApproved(db: Db) {
+  const rows = await db
+    .selectDistinct({ userId: officeProposals.userId })
+    .from(officeProposals)
+    .where(eq(officeProposals.status, "approved"));
+  return rows.map((r) => r.userId);
+}
+
+/** Every real (not simulated) open office position, with the strategy it was opened with, for the Monitor. */
+export function liveOpenPositions(db: Db) {
+  return db
+    .select({ journal: officeJournal, openParams: officeProposals.params })
+    .from(officeJournal)
+    .leftJoin(officeProposals, eq(officeProposals.id, officeJournal.openProposalId))
+    .where(and(isNull(officeJournal.closedAt), eq(officeJournal.simulated, false)));
+}
 
 /** Every office, paused or not; the caller decides what a paused office may still do (expire, say). */
 export function listOffices(db: Db) {

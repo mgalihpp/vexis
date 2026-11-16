@@ -77,10 +77,20 @@ export function cardText(p: ProposalRow) {
   if (open?.success) {
     const x = open.data;
     lines.push(
-      `Range: bins ${x.lowerBin} to ${x.upperBin} (active ${x.activeBin}), ${x.strategy}`,
+      `Range: bins ${x.lowerBin} to ${x.upperBin} (active ${x.activeBin}), ${x.strategy}${x.singleSidedSol ? ", SOL only" : ""}`,
       `Amount: ${x.amountSol} SOL / ${x.solUsd === null ? DASH : usd(x.amountSol * x.solUsd)}`,
     );
   }
+  if (p.positionAddress) lines.push(`Position ${p.positionAddress}`);
+  const rebalance = p.kind === "rebalance" ? PROPOSAL_PARAMS.rebalance.safeParse(p.params) : null;
+  if (rebalance?.success) {
+    const x = rebalance.data;
+    lines.push(`New range: bins ${x.lowerBin} to ${x.upperBin} (active ${x.activeBin}), ${x.strategy}`);
+  }
+  const claim = p.kind === "claim" ? PROPOSAL_PARAMS.claim.safeParse(p.params) : null;
+  if (claim?.success) lines.push(`Fees: ${claim.data.feeSol === null ? DASH : `${claim.data.feeSol.toFixed(4)} SOL`}`);
+  const close = p.kind === "close" ? PROPOSAL_PARAMS.close.safeParse(p.params) : null;
+  if (close?.success) lines.push(`Reason: ${close.data.reason.replaceAll("_", " ")}`);
   if (p.summary) lines.push("", p.summary);
   const risk = RiskNotes.safeParse(p.riskNotes);
   if (risk.success) {
@@ -97,7 +107,7 @@ export const cardButtons = (proposalId: string): Button[] => [
 ];
 
 /** How the card ends once the proposal stopped waiting; null while it still waits. */
-export function outcome(p: Pick<ProposalRow, "status" | "decidedBy">) {
+export function outcome(p: Pick<ProposalRow, "status" | "decidedBy" | "simulated" | "signature" | "txError">) {
   switch (p.status) {
     case "draft":
     case "risk_checked":
@@ -106,9 +116,16 @@ export function outcome(p: Pick<ProposalRow, "status" | "decidedBy">) {
     case "expired":
       return "⌛ Expired before anyone approved it.";
     case "rejected":
-      return p.decidedBy === "kill_switch" ? "🛑 Rejected by the kill switch." : "❌ Rejected.";
-    default:
+      if (p.decidedBy === "kill_switch") return "🛑 Rejected by the kill switch.";
+      return p.decidedBy === "risk" ? "❌ Stopped by the guardrails." : "❌ Rejected.";
+    case "approved":
+    case "executing":
       return "✅ Approved.";
+    case "done":
+      if (p.simulated) return "✅ Approved. Preview: simulated, nothing was signed.";
+      return p.signature ? `✅ Done: https://solscan.io/tx/${p.signature}` : "✅ Done.";
+    case "failed":
+      return `⚠️ Failed: ${p.txError ?? "unknown error"}`;
   }
 }
 

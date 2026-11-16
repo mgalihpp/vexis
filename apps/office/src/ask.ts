@@ -1,3 +1,4 @@
+import { budgetLeft, dailyCapUsd } from "@vexis/db/guardrails";
 import {
   type AgentModel,
   type Guardrails,
@@ -13,7 +14,6 @@ import type { PoolFilter } from "@vexis/db/screen";
 import { Clock, Effect, Option, Result } from "effect";
 import { AppConfig, llmKey } from "./config.ts";
 import { parseDecision } from "./decision.ts";
-import { budgetLeft, dailyCapUsd } from "./guardrails.ts";
 import type { Prompt } from "./prompts/prompts.ts";
 import { Db, type NewMessage } from "./services/db.ts";
 import { Llm } from "./services/llm.ts";

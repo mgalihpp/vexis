@@ -76,7 +76,7 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[0.625rem] tracking-[0.08em] text-brand uppercase">
-          Proposed by {AGENT_INFO[p.proposedBy].name}
+          Proposed by {p.proposedBy === "owner" ? "you" : AGENT_INFO[p.proposedBy].name}
         </span>
         <span className={`font-medium tabular-nums ${left.expired ? "text-loss" : "text-amber-500"}`}>
           {left.expired ? "Expired" : left.text}

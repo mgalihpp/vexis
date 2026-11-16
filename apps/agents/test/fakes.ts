@@ -128,7 +128,8 @@ export function fakeDb(
               .slice(0, REBALANCE_FAILURE_LIMIT),
           ),
         ),
-      walletSigner: (userId) => Effect.succeed(state.wallets.get(userId) ?? { _tag: "missing" }),
+      walletSigner: (userId, source = "user") =>
+        Effect.succeed(state.wallets.get(source === "user" ? userId : `${userId}/office`) ?? { _tag: "missing" }),
       latestReadings: (pools) =>
         Effect.succeed(
           new Map(
@@ -333,6 +334,8 @@ export const chainPosition = (overrides: Partial<ChainPosition> = {}): ChainPosi
   lowerBinId: 100,
   upperBinId: 120,
   funded: true,
+  amountX: 0n,
+  amountY: 0n,
   feeX: 0n,
   feeY: 0n,
   ...overrides,

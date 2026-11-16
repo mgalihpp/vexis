@@ -1,8 +1,8 @@
+import { dailyLossHit, dailyLossPct, dayPnlSol, officeCapital, storedDayCapital } from "@vexis/db/guardrails";
 import {
   activeModels,
   DAILY_LOSS,
   officeFilter,
-  PROPOSAL_PARAMS,
   parseGuardrails,
   parseModels,
   parseScreen,
@@ -13,10 +13,8 @@ import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
 import { type Floor, presentChecked, reviewDrafts, scoutAndDraft } from "./desks.ts";
 import { BadOfficeConfig } from "./errors.ts";
-import { dailyLossHit, dailyLossPct, dayPnlSol, officeCapital } from "./guardrails.ts";
 import { Chain } from "./services/chain.ts";
 import { Db } from "./services/db.ts";
-import { OfficeState } from "./services/state.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -68,8 +66,6 @@ const runOffice = Effect.fn("office.run")(function* (row: OfficeConfigRow) {
     yield* say(office, "manager", "The pause is over. Back to work.", "info");
   }
 
-  yield* execute(office);
-
   const floor = yield* readFloor(office);
   const loss = dailyLossPct(floor.dayStartCapital, dayPnlSol(floor.book, now));
   if (dailyLossHit(office.guardrails, loss)) {
@@ -99,8 +95,12 @@ const readFloor = (office: Office) =>
         Effect.logWarning(`office ${office.userId}: balance read failed: ${error.message}`).pipe(Effect.as(null)),
       ),
     );
-    const capital = walletSol === null ? null : officeCapital(walletSol, book.open);
-    const dayStartCapital = yield* (yield* OfficeState).dayStartCapital(office.userId, office.now, capital);
+    // Stored on the office row so the runner's Executor reads the same baseline and a restart keeps it.
+    let dayStartCapital = storedDayCapital(office.row, office.now);
+    if (dayStartCapital === null && walletSol !== null) {
+      dayStartCapital = officeCapital(walletSol, book.open);
+      yield* db.setDayCapital(office.userId, dayStartCapital, new Date(office.now));
+    }
     return {
       ...office,
       walletSol,
@@ -108,36 +108,4 @@ const readFloor = (office: Office) =>
       book,
       rpc: { owner: wallet.owner, url: wallet.rpcUrl },
     } satisfies Floor;
-  });
-
-/** The MVP executor: every approved proposal is marked done without signing or sending anything. */
-const execute = (office: Office) =>
-  Effect.gen(function* () {
-    const db = yield* Db;
-    for (const p of yield* db.proposals(office.userId, ["approved"])) {
-      const claimed = yield* db.move(office.userId, p.id, "approved", "executing");
-      if (!claimed) continue;
-      const open = p.kind === "open" ? PROPOSAL_PARAMS.open.safeParse(p.params) : null;
-      if (open?.success) {
-        yield* db.insertJournal(office.userId, {
-          openProposalId: p.id,
-          poolAddress: p.poolAddress,
-          poolName: p.poolName,
-          simulated: true,
-          amountSol: open.data.amountSol,
-          amountUsd: open.data.solUsd === null ? null : open.data.amountSol * open.data.solUsd,
-          openReason: p.rationale,
-          pnlSol: null,
-          pnlUsd: null,
-        });
-      }
-      yield* db.move(office.userId, p.id, "executing", "done");
-      const what = open?.success
-        ? `opened ${open.data.amountSol} SOL in ${nameOf(p)}`
-        : `ran the ${p.kind} on ${nameOf(p)}`;
-      yield* say(office, "executor", `Simulation: ${what}. Nothing was signed or sent.`, "good", {
-        poolAddress: p.poolAddress,
-        proposalId: p.id,
-      });
-    }
   });

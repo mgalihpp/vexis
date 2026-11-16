@@ -10,11 +10,13 @@ import {
   WALLET_UNREADABLE,
 } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
+import type { WalletSource } from "@vexis/db/office";
 import {
   agentAlerts,
   agentPools,
   agentRebalances,
   agents,
+  officeConfig,
   poolMinutes,
   rebalanceWallets,
   telegramLinks,
@@ -150,7 +152,11 @@ export class Db extends Context.Service<
     /** Failed live rebalances in a row, newest first, counting at most `REBALANCE_FAILURE_LIMIT`. Claims do not count. */
     failureStreak(agentId: string): Effect.Effect<number, DbError>;
     /** Decrypts the agent wallet's secret. The only place anything decrypts it; the web app only writes it. */
-    walletSigner(userId: string): Effect.Effect<WalletSigner, DbError>;
+    /**
+     * The signer for the user's agent wallet (`user`) or their office's own wallet (`office`). The only place a
+     * secret key is decrypted.
+     */
+    walletSigner(userId: string, source?: WalletSource): Effect.Effect<WalletSigner, DbError>;
     /** Newest stored reading per pool, for the next delta. Pools never seen are absent. */
     latestReadings(pools: ReadonlyArray<string>): Effect.Effect<ReadonlyMap<string, StoredReading>, DbError>;
     /** Existing `(pool, minute)` rows are kept. */
@@ -329,13 +335,19 @@ export class Db extends Context.Service<
               .limit(REBALANCE_FAILURE_LIMIT),
           ).pipe(Effect.map(leadingFailures)),
 
-        walletSigner: (userId) =>
+        walletSigner: (userId, source = "user") =>
           run("walletSigner", async (): Promise<WalletSigner> => {
-            const [row] = await db
-              .select({ publicKey: rebalanceWallets.publicKey, secretKey: rebalanceWallets.secretKey })
-              .from(rebalanceWallets)
-              .where(eq(rebalanceWallets.userId, userId));
-            if (!row) return { _tag: "missing" };
+            const [row] =
+              source === "user"
+                ? await db
+                    .select({ publicKey: rebalanceWallets.publicKey, secretKey: rebalanceWallets.secretKey })
+                    .from(rebalanceWallets)
+                    .where(eq(rebalanceWallets.userId, userId))
+                : await db
+                    .select({ publicKey: officeConfig.officePublicKey, secretKey: officeConfig.officeSecretKey })
+                    .from(officeConfig)
+                    .where(eq(officeConfig.userId, userId));
+            if (!row?.publicKey || !row.secretKey) return { _tag: "missing" };
             let secret: string;
             try {
               secret = decryptSecret(row.secretKey, "WALLET_ENC_KEY");

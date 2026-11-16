@@ -1,9 +1,10 @@
-import { PROPOSAL_PARAMS, RiskNotes } from "@vexis/db/office";
+import { checkManage, checkOpen, freeSol, officeCapital } from "@vexis/db/guardrails";
+import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/db/office";
 import type { ProposalRow } from "@vexis/db/office-queries";
 import { alertable } from "@vexis/db/screen";
 import { Effect, Option } from "effect";
 import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
-import { checkOpen, freeSol, officeCapital } from "./guardrails.ts";
+import type { DbError } from "./errors.ts";
 import { sendCard } from "./inbox.ts";
 import type { OfficePool } from "./pools.ts";
 import {
@@ -225,10 +226,11 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
         .move(floor.userId, proposal.id, "draft", "rejected", { riskNotes: notes, decidedBy: "risk" })
         .pipe(Effect.andThen(say(floor, "risk", text, "bad", where)));
 
+    if (proposal.kind !== "open") return yield* reviewManage(floor, proposal, managed, reject);
     const params = PROPOSAL_PARAMS.open.safeParse(proposal.params);
-    if (proposal.kind !== "open" || !params.success) {
-      const check = { rule: "params", ok: false, value: `${proposal.kind} proposals are not handled yet` };
-      return yield* reject({ checks: [check], llm: null }, `Vetoed ${name}: I can only check new positions.`);
+    if (!params.success) {
+      const check = { rule: "params", ok: false, value: "the parameters do not parse" };
+      return yield* reject({ checks: [check], llm: null }, `Vetoed ${name}: its parameters do not parse.`);
     }
 
     const { spent, cap } = yield* llmBudget(floor);
@@ -261,15 +263,94 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
     yield* say(floor, "risk", `${name} passed every check.${llm ? ` ${llm.note}` : ""}`, "good", where);
   });
 
+/**
+ * A rebalance, claim or close of a position the office holds (from the Monitor or the owner) passes the code rules
+ * only: no LLM is asked, so a stop loss never waits on a model or a budget.
+ */
+const reviewManage = (
+  floor: Floor,
+  proposal: ProposalRow,
+  managed: ReadonlySet<string>,
+  reject: (notes: RiskNotes, text: string) => Effect.Effect<void, DbError, Db>,
+) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    const name = proposal.poolName ?? proposal.poolAddress.slice(0, 6);
+    const kind = proposal.kind as Exclude<ProposalKind, "open">;
+    const params = PROPOSAL_PARAMS[kind].safeParse(proposal.params);
+    if (!params.success) {
+      const check = { rule: "params", ok: false, value: "the parameters do not parse" };
+      return yield* reject(
+        { checks: [check], llm: null },
+        `Vetoed the ${kind} of ${name}: its parameters do not parse.`,
+      );
+    }
+    const checks = checkManage(floor.guardrails, {
+      kind,
+      officePosition: floor.book.open.some((j) => !j.simulated && j.positionAddress === proposal.positionAddress),
+      walletSol: floor.walletSol,
+      book: floor.book,
+      rebalanceManaged: managed.has(proposal.poolAddress),
+      lastExecutionAt: yield* db.lastExecutionAt(floor.userId, proposal.poolAddress),
+      now: floor.now,
+    });
+    const failed = checks.filter((c) => !c.ok).map((c) => c.rule);
+    if (failed.length > 0) {
+      return yield* reject({ checks, llm: null }, `Vetoed the ${kind} of ${name}: ${failed.join(", ")}.`);
+    }
+    yield* db.move(floor.userId, proposal.id, "draft", "risk_checked", { riskNotes: { checks, llm: null } });
+    yield* say(floor, "risk", `The ${kind} of ${name} passed every check.`, "good", {
+      poolAddress: proposal.poolAddress,
+      proposalId: proposal.id,
+    });
+  });
+
+/** The card summary for a rebalance, claim or close, written in code: the Monitor's reason is already plain. */
+export function manageSummary(proposal: Pick<ProposalRow, "kind" | "params" | "rationale">) {
+  switch (proposal.kind) {
+    case "rebalance": {
+      const p = PROPOSAL_PARAMS.rebalance.safeParse(proposal.params);
+      const range = p.success ? ` to bins ${p.data.lowerBin}..${p.data.upperBin}` : "";
+      return `Re-center the position${range}. ${proposal.rationale}`;
+    }
+    case "claim":
+      return `Claim the position's fees. ${proposal.rationale}`;
+    case "close":
+      return `Close the position and swap it back to SOL. ${proposal.rationale}`;
+    case "open":
+      return proposal.rationale;
+  }
+}
+
+/** Puts a checked proposal in front of the owner, on the web and on Telegram. */
+const present = (floor: Floor, proposal: ProposalRow, summary: string) =>
+  Effect.gen(function* () {
+    const db = yield* Db;
+    const moved = yield* db.move(floor.userId, proposal.id, "risk_checked", "awaiting_approval", {
+      summary,
+      expiresAt: new Date(floor.now + floor.guardrails.approvalTtlSec * 1000),
+    });
+    if (!moved) return;
+    yield* say(floor, "manager", `${proposal.poolName ?? "A pool"} is ready for your approval.`, "info", {
+      poolAddress: proposal.poolAddress,
+      proposalId: proposal.id,
+    });
+    yield* sendCard(floor, moved);
+  });
+
 /** The Manager summarises each checked proposal and puts it in front of the owner, on the web and on Telegram. */
 export const presentChecked = (floor: Floor) =>
   Effect.gen(function* () {
-    if (!floor.models.manager) return;
     const db = yield* Db;
     const checked = yield* db.proposals(floor.userId, ["risk_checked"]);
     for (const proposal of checked) {
+      if (proposal.kind !== "open") {
+        yield* present(floor, proposal, manageSummary(proposal));
+        continue;
+      }
+      if (!floor.models.manager) continue;
       const params = PROPOSAL_PARAMS.open.safeParse(proposal.params);
-      if (proposal.kind !== "open" || !params.success) continue;
+      if (!params.success) continue;
       const notes = RiskNotes.safeParse(proposal.riskNotes);
       const answer = yield* ask(floor, "manager", managerPrompt, {
         poolName: proposal.poolName,
@@ -278,16 +359,6 @@ export const presentChecked = (floor: Floor) =>
         riskNote: notes.success ? (notes.data.llm?.note ?? null) : null,
       });
       if (Option.isNone(answer)) return;
-      const moved = yield* db.move(floor.userId, proposal.id, "risk_checked", "awaiting_approval", {
-        summary: answer.value.value.summary,
-        expiresAt: new Date(floor.now + floor.guardrails.approvalTtlSec * 1000),
-      });
-      if (moved) {
-        yield* say(floor, "manager", `${proposal.poolName ?? "A pool"} is ready for your approval.`, "info", {
-          poolAddress: proposal.poolAddress,
-          proposalId: proposal.id,
-        });
-        yield* sendCard(floor, moved);
-      }
+      yield* present(floor, proposal, answer.value.value.summary);
     }
   });

@@ -38,6 +38,7 @@ export function OfficeFloor({
   now,
   onNewMessages,
   card,
+  live,
 }: {
   data: SceneData;
   statuses: Record<OfficeAgent, DeskStatus>;
@@ -53,6 +54,8 @@ export function OfficeFloor({
   now: number;
   onNewMessages: () => void;
   card: ReactNode;
+  /** The office signs and sends what is approved (else Preview). */
+  live: boolean;
 }) {
   const view = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
@@ -126,7 +129,7 @@ export function OfficeFloor({
           <HudChip>
             {data.stopped ? 0 : working}/{OFFICE_AGENTS.length} working
           </HudChip>
-          <HudChip className="hidden text-brand sm:inline-flex">Simulation</HudChip>
+          <HudChip className="hidden text-brand sm:inline-flex">{live ? "Live trading" : "Preview"}</HudChip>
           <div className="ml-auto flex items-center gap-1">
             <Button variant="outline" size="sm" aria-pressed={follow} onClick={() => onFollow(!follow)}>
               <CrosshairIcon />

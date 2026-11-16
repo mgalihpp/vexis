@@ -6,6 +6,7 @@ import { rebalanceCycle } from "../src/rebalance/rebalance.ts";
 import type { Db, RebalanceWatch } from "../src/services/db.ts";
 import type { Meteora } from "../src/services/meteora.ts";
 import type { Telegram } from "../src/services/telegram.ts";
+import { WalletLock } from "../src/services/wallet-lock.ts";
 import { cycle } from "../src/volume/cycle.ts";
 import { prune, RETENTION_MS } from "../src/volume/ingest.ts";
 import { screenerCycle } from "../src/volume/screener.ts";
@@ -307,7 +308,7 @@ function rebalanceSetup(
   const chain = fakeChain({ POOL1: poolState({ activeBinId: active, positions }) });
   const telegram = fakeTelegram();
   const zap = fakeZap();
-  const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, zap.layer, testConfig);
+  const layer = Layer.mergeAll(db.layer, chain.layer, telegram.layer, zap.layer, WalletLock.layer, testConfig);
   const run = (at = T0) => runAt(rebalanceCycle().pipe(Effect.provide(layer)), at);
   return { db: db.state, chain: chain.state, telegram: telegram.state, zap: zap.state, config, run };
 }

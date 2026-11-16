@@ -6,7 +6,7 @@ import { RpcUrlInput, SecretKeyInput } from "@/features/agents/wallet.server";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { requireViewer } from "@/features/auth/auth.middleware";
 import {
-  closeSimulated,
+  closePosition,
   decideProposal,
   hasOffice,
   killSwitch,
@@ -17,6 +17,7 @@ import {
   resumeOffice,
   saveGuardrails,
   saveKeySource,
+  saveLive,
   saveLlmKey,
   saveModels,
   saveOfficeWallet,
@@ -67,7 +68,12 @@ export const resumeOfficeFn = createServerFn({ method: "POST" })
 export const closePositionFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
   .validator(z.object({ journalId: z.string().uuid() }))
-  .handler(({ context, data }) => closeSimulated(context.viewer.id, data.journalId));
+  .handler(({ context, data }) => closePosition(context.viewer.id, data.journalId));
+
+export const saveLiveFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .validator(z.object({ live: z.boolean() }))
+  .handler(({ context, data }) => saveLive(context.viewer.id, data.live));
 
 export const saveModelsFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
