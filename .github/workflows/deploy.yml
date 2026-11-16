@@ -27,9 +27,11 @@ jobs:
       - name: Pack build (dereference symlinks)
         run: tar -chzf web-output.tgz -C apps/web .output
 
-      # The runner (pm2 `vexis-agents`) runs one self-contained Bun bundle; the VPS has no workspace install for it.
-      - name: Bundle agents runner
-        run: bun build apps/agents/src/main.ts --target=bun --outfile=agents-main.js
+      # The runner and the office runtime each run one self-contained Bun bundle; the VPS has no workspace install for them.
+      - name: Bundle runner and office
+        run: |
+          bun build apps/agents/src/main.ts --target=bun --outfile=agents-main.js
+          bun build apps/office/src/main.ts --target=bun --outfile=office-main.js
 
       - name: Set up SSH
         env:
@@ -41,41 +43,32 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: Upload and restart
+      - name: Upload artifacts
         env:
           VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
           PORT: ${{ secrets.VPS_PORT }}
         run: |
-          scp -P "$PORT" web-output.tgz "$VPS:/root/vexis/"
-          ssh -p "$PORT" "$VPS" 'set -e
-            cd /root/vexis
-            rm -rf apps/web/.output
-            tar -xzf web-output.tgz -C apps/web
-            rm -f web-output.tgz
-            if [ -n "$(find apps/web/.output -xtype l)" ]; then echo "broken symlinks"; exit 1; fi
-            pm2 restart vexis-dashboard
-            pm2 save'
+          ssh -p "$PORT" "$VPS" 'mkdir -p /root/.vexis-deploy'
+          scp -P "$PORT" web-output.tgz ecosystem.config.cjs scripts/deploy-remote.sh "$VPS:/root/.vexis-deploy/"
+          scp -P "$PORT" agents-main.js "$VPS:/root/.vexis-deploy/runner-main.js"
+          scp -P "$PORT" office-main.js "$VPS:/root/.vexis-deploy/office-main.js"
 
-      # Keeps the previous bundle as main.js.prev and puts it back if the new one does not stay up.
-      - name: Upload and restart agents runner
+      # Every process goes through scripts/deploy-remote.sh: swap in, restart that one pm2 process, health check,
+      # roll back to the .prev copy on failure. Office is skipped, without failing, until /root/vexis-office exists.
+      - name: Deploy web
         env:
           VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
           PORT: ${{ secrets.VPS_PORT }}
-        run: |
-          scp -P "$PORT" agents-main.js "$VPS:/root/vexis-agents/main.js.new"
-          ssh -p "$PORT" "$VPS" 'set -e
-            cd /root/vexis-agents
-            restarts() { pm2 jlist | bun -e "const p = JSON.parse(await Bun.stdin.text()).find((x) => x.name === \"vexis-agents\"); console.log(p?.pm2_env.status === \"online\" ? p.pm2_env.restart_time : \"down\")"; }
-            if [ -f main.js ]; then cp main.js main.js.prev; fi
-            mv main.js.new main.js
-            pm2 restart vexis-agents
-            before=$(restarts)
-            sleep 20
-            after=$(restarts)
-            if [ "$after" = "down" ] || [ "$after" != "$before" ]; then
-              echo "agents runner did not stay up (restarts $before -> $after); rolling back"
-              pm2 logs vexis-agents --lines 30 --nostream || true
-              if [ -f main.js.prev ]; then cp main.js.prev main.js; pm2 restart vexis-agents; fi
-              exit 1
-            fi
-            pm2 save'
+        run: ssh -p "$PORT" "$VPS" 'bash /root/.vexis-deploy/deploy-remote.sh web'
+
+      - name: Deploy agents runner
+        env:
+          VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: ssh -p "$PORT" "$VPS" 'bash /root/.vexis-deploy/deploy-remote.sh runner'
+
+      - name: Deploy office runtime
+        env:
+          VPS: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: ssh -p "$PORT" "$VPS" 'bash /root/.vexis-deploy/deploy-remote.sh office'
