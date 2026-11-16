@@ -40,8 +40,8 @@ import {
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser, getRebalanceWallet } from "@vexis/db/queries";
-import { encryptSecret } from "@vexis/db/secret";
-import { checkRpcUrl, keypairOf, rpcHost } from "@/features/agents/wallet.server";
+import { encryptSecret, sealSecret } from "@vexis/db/secret";
+import { checkRpcUrl, keypairOf } from "@/features/agents/wallet.server";
 import type { ConfigView, MessageView, OfficeData, ProposalView } from "./office";
 
 // Every function takes the signed-in user's id from the viewer middleware and goes through `forUser`, so the
@@ -127,10 +127,8 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     vexisDailyUsd: config.vexisDailyUsd,
     savedKeys: savedKeysOf(config.llmKeys),
     walletSource: config.walletSource,
-    userWallet: userWallet ? { publicKey: userWallet.publicKey, rpcHost: rpcHost(userWallet.rpcUrl) } : null,
-    officeWallet: config.officePublicKey
-      ? { publicKey: config.officePublicKey, rpcHost: rpcHost(config.officeRpcUrl) }
-      : null,
+    userWallet: userWallet ? { publicKey: userWallet.publicKey, rpcHost: userWallet.rpcHost } : null,
+    officeWallet: config.officePublicKey ? { publicKey: config.officePublicKey, rpcHost: config.officeRpcHost } : null,
     screen: parseScreen(config),
   };
 
@@ -294,10 +292,10 @@ async function keysOf(userId: string) {
   return config.llmKeys;
 }
 
-/** Stores the owner's own API key for a provider, encrypted with TOKEN_ENC_KEY. */
+/** Stores the owner's own API key for a provider, encrypted with LLM_ENC_KEY. */
 export async function saveLlmKey(userId: string, provider: LlmProvider, key: string) {
   const keys = await keysOf(userId);
-  await patch(userId, { llmKeys: { ...keys, [provider]: encryptSecret(key, "TOKEN_ENC_KEY") } });
+  await patch(userId, { llmKeys: { ...keys, [provider]: encryptSecret(key, "LLM_ENC_KEY") } });
 }
 
 export async function removeLlmKey(userId: string, provider: LlmProvider) {
@@ -313,14 +311,21 @@ export async function saveOfficeWallet(userId: string, secret: string, rpcUrl: s
   await patch(userId, {
     walletSource: "office",
     officePublicKey: publicKey,
-    officeSecretKey: encryptSecret(secret, "WALLET_ENC_KEY"),
-    officeRpcUrl: encryptSecret(rpcUrl, "WALLET_ENC_KEY"),
+    officeSecretKey: sealSecret(secret),
+    officeRpcUrl: encryptSecret(rpcUrl, "RPC_ENC_KEY"),
+    officeRpcHost: new URL(rpcUrl).host,
   });
 }
 
 export async function removeOfficeWallet(userId: string) {
   await refuseWithOpenPositions(userId);
-  await patch(userId, { walletSource: "user", officePublicKey: null, officeSecretKey: null, officeRpcUrl: null });
+  await patch(userId, {
+    walletSource: "user",
+    officePublicKey: null,
+    officeSecretKey: null,
+    officeRpcUrl: null,
+    officeRpcHost: null,
+  });
 }
 
 export async function saveWalletSource(userId: string, walletSource: WalletSource) {

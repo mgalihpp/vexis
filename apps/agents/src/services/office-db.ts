@@ -108,7 +108,7 @@ export class OfficeDb extends Context.Service<
       const readRpc = (owner: string | null, rpcUrl: string | null): OfficeWallet => {
         if (!owner || !rpcUrl) return { _tag: "missing" };
         try {
-          return { _tag: "ready", owner, rpcUrl: decryptSecret(rpcUrl, "WALLET_ENC_KEY") };
+          return { _tag: "ready", owner, rpcUrl: decryptSecret(rpcUrl, "RPC_ENC_KEY") };
         } catch {
           return { _tag: "unreadable" };
         }

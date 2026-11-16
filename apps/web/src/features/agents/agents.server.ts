@@ -37,7 +37,6 @@ import {
   type RebalancesData,
   type TelegramView,
 } from "./agents";
-import { rpcHost } from "./wallet.server";
 
 // Every function takes the signed-in user's id from the viewer middleware and goes through `forUser`, so no
 // query can touch another user's rows. Writes address an agent by id: a user has one volume-watch agent but
@@ -94,7 +93,7 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
         kind: "auto-rebalance",
         config: parsed.success ? parsed.data : AutoRebalanceConfig.parse({}),
         wallet: wallet?.publicKey ?? null,
-        rpcHost: rpcHost(wallet?.rpcUrl ?? null),
+        rpcHost: wallet?.rpcHost ?? null,
       };
     }),
   );

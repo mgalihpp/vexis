@@ -61,29 +61,32 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 
 ## Configuration
 
-| Variable                 | Used by     | Default                               | What it does                                              |
-| ------------------------ | ----------- | ------------------------------------- | --------------------------------------------------------- |
-| `DATABASE_URL`           | all         | none                                  | Supabase Postgres, transaction pooler on port 6543        |
-| `DATABASE_MIGRATE_URL`   | drizzle-kit | falls back to `DATABASE_URL`          | Session pooler on port 5432, for migrations               |
-| `BETTER_AUTH_SECRET`     | web         | none                                  | Long random string used to sign sessions                  |
-| `BETTER_AUTH_URL`        | web         | none                                  | Public origin; requests from another origin are rejected  |
-| `TOKEN_ENC_KEY`          | all         | none                                  | 32 random bytes, base64; encrypts bot tokens and LLM keys |
-| `WALLET_ENC_KEY`         | all         | none                                  | 32 random bytes, base64; encrypts agent wallets and RPCs  |
-| `ANTHROPIC_API_KEY`      | office      | none, Claude unavailable on Vexis     | Vexis-paid key for offices on the Vexis key source        |
-| `OPENAI_API_KEY`         | office      | none, OpenAI unavailable on Vexis     | Same, for OpenAI                                          |
-| `DEEPSEEK_API_KEY`       | office      | none, DeepSeek unavailable on Vexis   | Same, for DeepSeek                                        |
-| `META_API_KEY`           | office      | none, Meta unavailable on Vexis       | Same, for the Meta Model API                              |
-| `OPENROUTER_API_KEY`     | office      | none, OpenRouter unavailable on Vexis | Same, for OpenRouter                                      |
-| `SOLANA_RPC_URL`         | web         | public mainnet endpoint               | RPC for the analytics page's on-chain bin and fee reads   |
-| `JUPITER_API_KEY`        | web, runner | none, uses `lite-api.jup.ag`          | Switches Jupiter calls (prices, balances, zap swaps)      |
-| `SOLANA_TRACKER_API_KEY` | web         | none, recent trades only              | Solana Tracker key for whale, smart money and KOL lists   |
-| `METEORA_DATAPI_URL`     | all         | `https://dlmm.datapi.meteora.ag`      | Meteora data API base URL                                 |
-| `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo  | Where closed positions and transaction history are cached |
-| `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`       | Origin used in alert links                                |
-| `RESEND_API_KEY`         | web, script | none                                  | Resend key for invite mail (`db:invite --send`, notices)  |
-| `MAIL_FROM`              | web, script | `Vexis <invite@stunobagent.my.id>`    | Sender of invite mail                                     |
-| `INVITE_NOTIFY_EMAIL`    | web         | none, no notice                       | Gets a one-line mail for each new invite request          |
-| `NITRO_PRESET`           | build       | `bun`                                 | Build target, for example `node-server`                   |
+| Variable                 | Used by     | Default                               | What it does                                                           |
+| ------------------------ | ----------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`           | all         | none                                  | Supabase Postgres, transaction pooler on port 6543                     |
+| `DATABASE_MIGRATE_URL`   | drizzle-kit | falls back to `DATABASE_URL`          | Session pooler on port 5432, for migrations                            |
+| `BETTER_AUTH_SECRET`     | web         | none                                  | Long random string used to sign sessions                               |
+| `BETTER_AUTH_URL`        | web         | none                                  | Public origin; requests from another origin are rejected               |
+| `TOKEN_ENC_KEY`          | all         | none                                  | 32 random bytes, base64; encrypts bot tokens                           |
+| `LLM_ENC_KEY`            | web, office | `TOKEN_ENC_KEY`                       | 32 random bytes, base64; encrypts users' LLM keys                      |
+| `RPC_ENC_KEY`            | all         | `WALLET_ENC_KEY`                      | 32 random bytes, base64; encrypts users' RPC URLs                      |
+| `WALLET_PUBLIC_KEY`      | web, office | none                                  | X25519 public key (`bun run db:rewrap --keygen`); seals wallet secrets |
+| `WALLET_PRIVATE_KEY`     | runner only | none                                  | its pair; the only key that opens a wallet secret                      |
+| `ANTHROPIC_API_KEY`      | office      | none, Claude unavailable on Vexis     | Vexis-paid key for offices on the Vexis key source                     |
+| `OPENAI_API_KEY`         | office      | none, OpenAI unavailable on Vexis     | Same, for OpenAI                                                       |
+| `DEEPSEEK_API_KEY`       | office      | none, DeepSeek unavailable on Vexis   | Same, for DeepSeek                                                     |
+| `META_API_KEY`           | office      | none, Meta unavailable on Vexis       | Same, for the Meta Model API                                           |
+| `OPENROUTER_API_KEY`     | office      | none, OpenRouter unavailable on Vexis | Same, for OpenRouter                                                   |
+| `SOLANA_RPC_URL`         | web         | public mainnet endpoint               | RPC for the analytics page's on-chain bin and fee reads                |
+| `JUPITER_API_KEY`        | web, runner | none, uses `lite-api.jup.ag`          | Switches Jupiter calls (prices, balances, zap swaps)                   |
+| `SOLANA_TRACKER_API_KEY` | web         | none, recent trades only              | Solana Tracker key for whale, smart money and KOL lists                |
+| `METEORA_DATAPI_URL`     | all         | `https://dlmm.datapi.meteora.ag`      | Meteora data API base URL                                              |
+| `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo  | Where closed positions and transaction history are cached              |
+| `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`       | Origin used in alert links                                             |
+| `RESEND_API_KEY`         | web, script | none                                  | Resend key for invite mail (`db:invite --send`, notices)               |
+| `MAIL_FROM`              | web, script | `Vexis <invite@stunobagent.my.id>`    | Sender of invite mail                                                  |
+| `INVITE_NOTIFY_EMAIL`    | web         | none, no notice                       | Gets a one-line mail for each new invite request                       |
+| `NITRO_PRESET`           | build       | `bun`                                 | Build target, for example `node-server`                                |
 
 There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 
@@ -155,7 +158,7 @@ On a VPS it runs next to the web process under pm2:
 pm2 start "bun apps/agents/src/main.ts" --name vexis-agents
 ```
 
-It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, the same values the web app uses, and refuses to start without a valid `WALLET_ENC_KEY`. It has no RPC of its own: every auto-rebalance read and send goes through the RPC URL each user saved with their agent wallet. Users should give a Helius URL, since live sends take their priority fee from Helius `getPriorityFeeEstimate` and another RPC sends with no priority fee.
+It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `RPC_ENC_KEY`, the same values the web app uses, and `WALLET_PRIVATE_KEY`, which no other process has; it refuses to start without them. Run it with its own environment, not the web app's `.env`. It has no RPC of its own: every auto-rebalance read and send goes through the RPC URL each user saved with their agent wallet. Users should give a Helius URL, since live sends take their priority fee from Helius `getPriorityFeeEstimate` and another RPC sends with no priority fee.
 
 ## The office
 
@@ -167,7 +170,7 @@ An admin turns an office on with `bun run db:office --enable you@example.com --v
 pm2 start "bun apps/office/src/main.ts" --name vexis-office
 ```
 
-It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, plus whichever provider keys Vexis pays for.
+It needs `DATABASE_URL`, `TOKEN_ENC_KEY`, `LLM_ENC_KEY` and `RPC_ENC_KEY` (never `WALLET_PRIVATE_KEY`), plus whichever provider keys Vexis pays for.
 
 ## Deploy
 

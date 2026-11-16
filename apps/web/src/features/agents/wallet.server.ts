@@ -9,14 +9,15 @@ import {
   saveRebalanceRpcUrl,
   saveRebalanceWallet,
 } from "@vexis/db/queries";
-import { decryptSecret, encryptSecret } from "@vexis/db/secret";
+import { encryptSecret, sealSecret } from "@vexis/db/secret";
 import bs58 from "bs58";
 import { z } from "zod";
 import { SECRET_KEY_PATTERN } from "./agents";
 
-// The auto-rebalance wallet's secret key and RPC URL come in once, are encrypted with WALLET_ENC_KEY and are never
-// sent back or logged: only the public key and the RPC's host are read back. Errors name what was wrong with a
-// value, never the value.
+// The auto-rebalance wallet's secret key comes in once and is sealed to WALLET_PUBLIC_KEY, so this process cannot
+// read it back; the RPC URL is encrypted with RPC_ENC_KEY. Neither is sent back or logged: only the public key and
+// the RPC's host are read back, and the host is stored in the clear. Errors name what was wrong with a value,
+// never the value.
 
 export const SecretKeyInput = z.string().trim().regex(SECRET_KEY_PATTERN, "Paste the wallet's base58 secret key");
 
@@ -72,8 +73,9 @@ export async function saveWallet(userId: string, secret: string, rpcUrl: string)
   const s = forUser(getDb(), userId);
   await saveRebalanceWallet(s, {
     publicKey,
-    encryptedSecret: encryptSecret(secret, "WALLET_ENC_KEY"),
-    encryptedRpcUrl: encryptSecret(rpcUrl, "WALLET_ENC_KEY"),
+    sealedSecret: sealSecret(secret),
+    encryptedRpcUrl: encryptSecret(rpcUrl, "RPC_ENC_KEY"),
+    rpcHost: new URL(rpcUrl).host,
   });
   // The runner paused these because the old key no longer decrypted; this one does. A pause the user chose stays.
   await resumeAgentsPausedFor(s, "auto-rebalance", [WALLET_UNREADABLE]);
@@ -83,7 +85,11 @@ export async function saveWallet(userId: string, secret: string, rpcUrl: string)
 /** Replaces only the RPC URL, keeping the saved key. */
 export async function saveRpcUrl(userId: string, rpcUrl: string) {
   await checkRpcUrl(rpcUrl);
-  const saved = await saveRebalanceRpcUrl(forUser(getDb(), userId), encryptSecret(rpcUrl, "WALLET_ENC_KEY"));
+  const saved = await saveRebalanceRpcUrl(
+    forUser(getDb(), userId),
+    encryptSecret(rpcUrl, "RPC_ENC_KEY"),
+    new URL(rpcUrl).host,
+  );
   if (!saved) throw new Error("Save the wallet first");
 }
 
@@ -92,19 +98,7 @@ export async function removeWallet(userId: string) {
   await removeRebalanceWallet(forUser(getDb(), userId));
 }
 
-/** The host of a stored RPC URL; null when there is none or it no longer decrypts (the user saves it again). */
-export function rpcHost(encrypted: string | null) {
-  if (!encrypted) return null;
-  try {
-    return new URL(decryptSecret(encrypted, "WALLET_ENC_KEY")).host;
-  } catch (error) {
-    // A missing or malformed key is a server misconfiguration, not a stale URL; let it surface.
-    if (error instanceof Error && error.message.startsWith("WALLET_ENC_KEY")) throw error;
-    return null;
-  }
-}
-
 export async function loadWallet(userId: string) {
   const row = await getRebalanceWallet(forUser(getDb(), userId));
-  return { publicKey: row?.publicKey ?? null, rpcHost: rpcHost(row?.rpcUrl ?? null) };
+  return { publicKey: row?.publicKey ?? null, rpcHost: row?.rpcHost ?? null };
 }

@@ -21,7 +21,7 @@ import {
   rebalanceWallets,
   telegramLinks,
 } from "@vexis/db/schema";
-import { decryptSecret } from "@vexis/db/secret";
+import { decryptSecret, openWalletSecret } from "@vexis/db/secret";
 import { and, desc, eq, gt, inArray, isNull, lt, type SQL, sql } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "../errors.ts";
@@ -47,7 +47,7 @@ const volumeSource = (source: "pools" | "screener"): SQL =>
 
 /**
  * The RPC the user gave with the agent wallet. `missing` on wallets saved before it was required; `unreadable` when it
- * does not decrypt with this `WALLET_ENC_KEY`, so the user has to save the wallet again.
+ * does not decrypt with this `RPC_ENC_KEY`, so the user has to save the wallet again.
  */
 export type RpcTarget =
   | { readonly _tag: "missing" }
@@ -81,7 +81,7 @@ export type TxOutcome =
   | { readonly _tag: "failed"; readonly error: string };
 
 /**
- * The agent wallet's signer. `unreadable`: the stored secret does not decrypt with this `WALLET_ENC_KEY` or does
+ * The agent wallet's signer. `unreadable`: the stored secret does not open with this `WALLET_PRIVATE_KEY` (or `WALLET_ENC_KEY`, for a `v1` value) or does
  * not match its public key, so the user has to save the wallet again.
  */
 export type WalletSigner =
@@ -275,7 +275,7 @@ export class Db extends Context.Service<
             return rows.map(({ rpcUrl, ...row }): RebalanceWatch => {
               if (rpcUrl === null) return { ...row, rpc: { _tag: "missing" } };
               try {
-                return { ...row, rpc: { _tag: "ready", url: decryptSecret(rpcUrl, "WALLET_ENC_KEY") } };
+                return { ...row, rpc: { _tag: "ready", url: decryptSecret(rpcUrl, "RPC_ENC_KEY") } };
               } catch {
                 return { ...row, rpc: { _tag: "unreadable" } };
               }
@@ -350,7 +350,7 @@ export class Db extends Context.Service<
             if (!row?.publicKey || !row.secretKey) return { _tag: "missing" };
             let secret: string;
             try {
-              secret = decryptSecret(row.secretKey, "WALLET_ENC_KEY");
+              secret = openWalletSecret(row.secretKey);
             } catch {
               return { _tag: "unreadable" };
             }
