@@ -20,6 +20,15 @@ const key32 = (name: string) =>
     ),
   );
 
+const optionalKey32 = (name: string) =>
+  Config.option(Config.Redacted(name)).pipe(
+    Effect.flatMap((value) =>
+      Option.isSome(value) && Buffer.from(Redacted.value(value.value), "base64").length !== 32
+        ? Effect.die(new Error(`${name} must be 32 bytes, base64 encoded`))
+        : Effect.void,
+    ),
+  );
+
 /** Vexis's LLM keys. A provider with no key here cannot run on key source `vexis`. */
 export class AppConfig extends Context.Service<
   AppConfig,
@@ -28,9 +37,13 @@ export class AppConfig extends Context.Service<
   static readonly layer = Layer.effect(
     AppConfig,
     Effect.gen(function* () {
-      // Checked up front: own LLM keys decrypt with the first, wallet RPC URLs with the second.
+      // Checked up front: bot tokens decrypt with TOKEN_ENC_KEY, own LLM keys with LLM_ENC_KEY (TOKEN_ENC_KEY until
+      // it is set) and wallet RPC URLs with RPC_ENC_KEY (WALLET_ENC_KEY until it is set). The wallet's secret key is
+      // sealed to a key this process never has.
       yield* key32("TOKEN_ENC_KEY");
-      yield* key32("WALLET_ENC_KEY");
+      yield* optionalKey32("LLM_ENC_KEY");
+      if (!Option.isSome(yield* Config.option(Config.Redacted("RPC_ENC_KEY")))) yield* key32("WALLET_ENC_KEY");
+      yield* optionalKey32("RPC_ENC_KEY");
       const vexisKeys: Partial<Record<LlmProvider, Redacted.Redacted>> = {};
       for (const provider of LLM_PROVIDERS) {
         const key = yield* Config.option(Config.Redacted(VEXIS_KEY_ENV[provider]));
@@ -43,7 +56,7 @@ export class AppConfig extends Context.Service<
 
 /**
  * The API key an office calls `provider` with: Vexis's own for key source `vexis`, the owner's (encrypted with
- * `TOKEN_ENC_KEY`) for `own`. Null when there is none or it does not decrypt.
+ * `LLM_ENC_KEY`) for `own`. Null when there is none or it does not decrypt.
  */
 export function llmKey(
   office: { readonly keySource: KeySource; readonly llmKeys: Partial<Record<LlmProvider, string>> },
@@ -57,7 +70,7 @@ export function llmKey(
   const blob = office.llmKeys[provider];
   if (!blob) return null;
   try {
-    return decryptSecret(blob, "TOKEN_ENC_KEY");
+    return decryptSecret(blob, "LLM_ENC_KEY");
   } catch {
     return null;
   }

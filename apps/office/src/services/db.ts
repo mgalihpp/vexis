@@ -51,7 +51,7 @@ export type Spike = { readonly poolAddress: string; readonly ratio: number; read
 
 /**
  * The office's wallet: its public key and the RPC to read it through, never its secret (nothing in the MVP signs).
- * `unreadable` when the RPC URL does not decrypt with this `WALLET_ENC_KEY`.
+ * `unreadable` when the RPC URL does not decrypt with this `RPC_ENC_KEY`.
  */
 export type WalletTarget =
   | { readonly _tag: "missing" }
@@ -142,7 +142,7 @@ export class Db extends Context.Service<
       const decryptRpc = (owner: string | null, rpcUrl: string | null): WalletTarget => {
         if (!owner || !rpcUrl) return { _tag: "missing" };
         try {
-          return { _tag: "ready", owner, rpcUrl: decryptSecret(rpcUrl, "WALLET_ENC_KEY") };
+          return { _tag: "ready", owner, rpcUrl: decryptSecret(rpcUrl, "RPC_ENC_KEY") };
         } catch {
           return { _tag: "unreadable" };
         }

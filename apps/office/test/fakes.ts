@@ -60,6 +60,7 @@ export function office(overrides: Partial<OfficeConfigRow> = {}): OfficeConfigRo
     officePublicKey: null,
     officeSecretKey: null,
     officeRpcUrl: null,
+    officeRpcHost: null,
     poolPreset: "blue-chip",
     poolFilter: null,
     live: false,

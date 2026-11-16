@@ -237,34 +237,39 @@ export function listRebalances({ db, userId }: UserScope, options: { limit?: num
 }
 
 /**
- * The public key and the encrypted RPC URL (the web app shows only its host). The encrypted secret is read by the
- * runner, never by the web app.
+ * The public key and the RPC's host. The sealed secret and the encrypted RPC URL are read by the runner, never by
+ * the web app.
  */
 export function getRebalanceWallet({ db, userId }: UserScope) {
   return db
-    .select({ publicKey: rebalanceWallets.publicKey, rpcUrl: rebalanceWallets.rpcUrl })
+    .select({ publicKey: rebalanceWallets.publicKey, rpcHost: rebalanceWallets.rpcHost })
     .from(rebalanceWallets)
     .where(eq(rebalanceWallets.userId, userId))
     .then((rows) => rows[0]);
 }
 
-/** Saves or replaces the wallet. Secret and RPC URL arrive encrypted. */
+/** Saves or replaces the wallet. The secret arrives sealed, the RPC URL encrypted, and the host in the clear. */
 export async function saveRebalanceWallet(
   { db, userId }: UserScope,
-  wallet: { publicKey: string; encryptedSecret: string; encryptedRpcUrl: string },
+  wallet: { publicKey: string; sealedSecret: string; encryptedRpcUrl: string; rpcHost: string },
 ) {
-  const row = { publicKey: wallet.publicKey, secretKey: wallet.encryptedSecret, rpcUrl: wallet.encryptedRpcUrl };
+  const row = {
+    publicKey: wallet.publicKey,
+    secretKey: wallet.sealedSecret,
+    rpcUrl: wallet.encryptedRpcUrl,
+    rpcHost: wallet.rpcHost,
+  };
   await db
     .insert(rebalanceWallets)
     .values({ userId, ...row })
     .onConflictDoUpdate({ target: rebalanceWallets.userId, set: row });
 }
 
-/** Replaces only the RPC URL (encrypted). False when the user has no wallet saved. */
-export async function saveRebalanceRpcUrl({ db, userId }: UserScope, encryptedRpcUrl: string) {
+/** Replaces only the RPC URL (encrypted) and its host. False when the user has no wallet saved. */
+export async function saveRebalanceRpcUrl({ db, userId }: UserScope, encryptedRpcUrl: string, rpcHost: string) {
   const rows = await db
     .update(rebalanceWallets)
-    .set({ rpcUrl: encryptedRpcUrl })
+    .set({ rpcUrl: encryptedRpcUrl, rpcHost })
     .where(eq(rebalanceWallets.userId, userId))
     .returning({ userId: rebalanceWallets.userId });
   return rows.length > 0;

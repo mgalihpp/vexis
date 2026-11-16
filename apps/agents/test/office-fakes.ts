@@ -31,6 +31,7 @@ export function officeRow(overrides: Partial<OfficeConfigRow> = {}): OfficeConfi
     officePublicKey: null,
     officeSecretKey: null,
     officeRpcUrl: null,
+    officeRpcHost: null,
     poolPreset: "blue-chip",
     poolFilter: null,
     createdAt: new Date(T0),

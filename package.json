@@ -24,7 +24,8 @@
     "db:studio": "bun run --filter @vexis/db studio",
     "db:isolation": "bun run --filter @vexis/db isolation",
     "db:invite": "bun packages/db/scripts/invite.ts",
-    "db:office": "bun packages/db/scripts/office.ts"
+    "db:office": "bun packages/db/scripts/office.ts",
+    "db:rewrap": "bun packages/db/scripts/rewrap.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.4",

@@ -347,9 +347,12 @@ export const agentAlerts = pgTable(
 
 /**
  * The wallet the user's auto-rebalance agents manage: a hot wallet the user hands us, one per user. The secret key
- * and the RPC URL (which usually carries an API key) are AES-256-GCM encrypted with `WALLET_ENC_KEY` (`secret.ts`)
- * and never leave the server; the public key is kept in the clear so reads and previews never decrypt the secret.
- * `rpc_url` is null on rows saved before it was required; the runner skips those until the user adds one.
+ * is a sealed box (`v2`, `secret.ts`): the web app seals it to `WALLET_PUBLIC_KEY` and only the runner can open it.
+ * The RPC URL (which usually carries an API key) is AES-256-GCM encrypted with `RPC_ENC_KEY`, which the runner and
+ * the office runtime read. The public key and the RPC's host (`rpc_host`, no path or key) are kept in the clear, so
+ * the web app shows the wallet without decrypting anything. Rows saved before the sealed box hold `v1` values under
+ * `WALLET_ENC_KEY` until `db:rewrap`. `rpc_url` is null on rows saved before it was required; the runner skips
+ * those until the user adds one.
  */
 export const rebalanceWallets = pgTable("rebalance_wallets", {
   userId: text("user_id")
@@ -358,6 +361,7 @@ export const rebalanceWallets = pgTable("rebalance_wallets", {
   publicKey: text("public_key").notNull(),
   secretKey: text("secret_key").notNull(),
   rpcUrl: text("rpc_url"),
+  rpcHost: text("rpc_host"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }).enableRLS();
@@ -435,7 +439,7 @@ const openStatus = sql.raw(`status in (${OPEN_STATUSES.map((s) => `'${s}'`).join
  * The office's one row; having it is what turns the office on. `guardrails` and `models` are jsonb parsed with
  * `Guardrails` and `OfficeModels`. `llm_keys` maps a provider to the user's own API key, encrypted with
  * `TOKEN_ENC_KEY`. `wallet_source` `user` reads `rebalance_wallets`; `office` reads the office's own wallet below,
- * encrypted with `WALLET_ENC_KEY`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
+ * stored like `rebalance_wallets`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
  */
 export const officeConfig = pgTable(
   "office_config",
@@ -461,6 +465,7 @@ export const officeConfig = pgTable(
     officePublicKey: text("office_public_key"),
     officeSecretKey: text("office_secret_key"),
     officeRpcUrl: text("office_rpc_url"),
+    officeRpcHost: text("office_rpc_host"),
     /** A preset id, never its filter, so tuning a preset reaches every office on it; `custom` reads `pool_filter`. */
     poolPreset: text("pool_preset").$type<PresetChoice>().notNull().default("blue-chip"),
     poolFilter: jsonb("pool_filter").$type<Record<string, unknown>>(),
