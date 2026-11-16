@@ -189,7 +189,6 @@ function Office({
                     setCardOpen(false);
                     setTab("log");
                   }}
-                  onClose={() => setCardOpen(false)}
                 />
               }
             />

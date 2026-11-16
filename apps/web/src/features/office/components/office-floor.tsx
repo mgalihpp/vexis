@@ -1,17 +1,11 @@
 import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/shared/office";
 import { CrosshairIcon, Maximize2Icon, MinusIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon } from "lucide-react";
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-  type PointerEvent as ReactPointerEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Kbd } from "@/components/ui/kbd";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AGENT_INFO, DESK_LABEL, type DeskStatus, type MessageView, walks } from "../office";
 import { Portrait } from "./agent-card";
 import { createFloor, type Floor, type FloorInput } from "./floor/engine";
@@ -30,8 +24,8 @@ const typing = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
 /**
- * The pixel office: a canvas the engine draws, an overlay of bubbles, name tags and room labels, the card of the
- * picked agent anchored over its head, and the roster under the floor (keys 1 to 7 pick an agent).
+ * The pixel office: a canvas the engine draws, an overlay of bubbles, name tags and room labels, the picked agent's
+ * card in a dialog, and the roster under the floor (keys 1 to 7 pick an agent).
  */
 export function OfficeFloor({
   data,
@@ -65,71 +59,14 @@ export function OfficeFloor({
   /** The office signs and sends what is approved (else Preview). */
   live: boolean;
 }) {
-  const section = useRef<HTMLElement>(null);
+  const isMobile = useIsMobile();
   const view = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const floor = useRef<Floor | null>(null);
-  // Dragging a card pins its anchor, so the agent can walk away without dragging the card along.
-  const [cardOffset, setCardOffset] = useState({ x: 0, y: 0 });
-  const [anchorLocked, setAnchorLocked] = useState(false);
-  const input = useRef<FloorInput>({ data, selected, focus, follow, anchorLocked: false, talking: new Set() });
-  input.current = { data, selected, focus, follow, anchorLocked, talking: new Set(Object.keys(bubbles)) };
+  const input = useRef<FloorInput>({ data, selected, focus, follow, talking: new Set() });
+  input.current = { data, selected, focus, follow, talking: new Set(Object.keys(bubbles)) };
   const handlers = useRef({ onSelect, onFollow });
   handlers.current = { onSelect, onFollow };
-
-  const drag = useRef<{ id: number; x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
-  useEffect(() => {
-    if (selected) {
-      setCardOffset({ x: 0, y: 0 });
-      setAnchorLocked(false);
-    }
-  }, [selected]);
-  const onCardDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || !(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
-    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, ox: cardOffset.x, oy: cardOffset.y, moved: false };
-  };
-  const onCardMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId) return;
-    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
-    if (!d.moved) {
-      d.moved = true;
-      e.currentTarget.setPointerCapture(e.pointerId);
-    }
-    // Keep the card inside the viewport, so a drag cannot strand it half off-screen.
-    const box = e.currentTarget.getBoundingClientRect();
-    const m = 8;
-    const left = box.left - cardOffset.x;
-    const top = box.top - cardOffset.y;
-    setAnchorLocked(true);
-    setCardOffset({
-      x: Math.max(m - left, Math.min(window.innerWidth - m - box.width - left, d.ox + e.clientX - d.x)),
-      y: Math.max(m - top, Math.min(window.innerHeight - m - box.height - top, d.oy + e.clientY - d.y)),
-    });
-  };
-  const onCardUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (drag.current?.id === e.pointerId) drag.current = null;
-  };
-  const onCardKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (!(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
-    const step = e.shiftKey ? 40 : 10;
-    const move: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
-    };
-    const delta = move[e.key];
-    if (!delta) return;
-    e.preventDefault();
-    setAnchorLocked(true);
-    setCardOffset((o) => ({ x: o.x + delta[0], y: o.y + delta[1] }));
-  };
-  const onCardDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
-    setCardOffset({ x: 0, y: 0 });
-    setAnchorLocked(false);
-  };
 
   useEffect(() => {
     if (!view.current || !overlay.current) return;
@@ -179,7 +116,6 @@ export function OfficeFloor({
 
   return (
     <section
-      ref={section}
       aria-label="Office floor"
       className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 lg:h-full lg:flex-row"
     >
@@ -272,34 +208,6 @@ export function OfficeFloor({
                   </div>
                 );
               })}
-              <Popover open={selected !== null} onOpenChange={(open) => !open && onSelect(null)}>
-                <PopoverAnchor asChild>
-                  <div data-floor-anchor className="absolute size-px" />
-                </PopoverAnchor>
-                <PopoverContent
-                  side="top"
-                  sideOffset={26}
-                  collisionPadding={8}
-                  updatePositionStrategy="always"
-                  hideWhenDetached
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                  style={{ translate: `${cardOffset.x}px ${cardOffset.y}px` }}
-                  className="max-h-[min(70dvh,36rem)] overflow-y-auto overscroll-contain"
-                  // The floor and the roster pick or clear the agent themselves, so a click there moves the card.
-                  onInteractOutside={(e) => {
-                    if (e.target instanceof Node && section.current?.contains(e.target)) e.preventDefault();
-                  }}
-                  aria-label={selected ? AGENT_INFO[selected].name : undefined}
-                  onPointerDown={onCardDown}
-                  onPointerMove={onCardMove}
-                  onPointerUp={onCardUp}
-                  onPointerCancel={onCardUp}
-                  onKeyDown={onCardKeyDown}
-                  onDoubleClick={onCardDoubleClick}
-                >
-                  {card}
-                </PopoverContent>
-              </Popover>
               {data.stopped && (
                 <div className="absolute top-1/2 left-1/2 flex -translate-1/2 flex-col items-center gap-1 rounded-lg border-2 border-[#ff6b6b] bg-[rgba(20,4,6,.92)] px-5 py-3 text-center">
                   <b className="font-brand text-[clamp(16px,3vw,28px)] tracking-[0.08em] text-[#ff6b6b]">
@@ -312,6 +220,23 @@ export function OfficeFloor({
           </div>
         </div>
       </div>
+      {isMobile ? (
+        <Drawer open={selected !== null} onOpenChange={(open) => !open && onSelect(null)}>
+          <DrawerContent aria-describedby={undefined} className="data-[vaul-drawer-direction=bottom]:max-h-[85dvh]">
+            {card}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={selected !== null} onOpenChange={(open) => !open && onSelect(null)}>
+          <DialogContent
+            aria-describedby={undefined}
+            showCloseButton={false}
+            className="flex max-h-[min(40rem,90dvh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
+          >
+            {card}
+          </DialogContent>
+        </Dialog>
+      )}
     </section>
   );
 }
@@ -367,7 +292,7 @@ function Roster({
             aria-label={folded ? AGENT_INFO[agent].name : undefined}
             title={folded ? `${AGENT_INFO[agent].name} · ${DESK_LABEL[st]}` : undefined}
             onClick={() => onSelect(agent === selected ? null : agent)}
-            className={`flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-muted ${folded ? "justify-center" : ""} ${agent === selected ? "bg-brand/10 text-brand" : ""}`}
+            className={`flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left max-lg:shrink-0 max-lg:pr-2.5 transition-colors hover:bg-muted ${folded ? "justify-center" : ""} ${agent === selected ? "bg-brand/10 text-brand" : ""}`}
           >
             <span className="relative shrink-0">
               <Portrait agent={agent} className="block h-7 w-[1.15rem]" />
