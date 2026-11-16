@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { money } from "@/features/portfolio/money";
 import { OFFICE_KEY } from "../office.queries";
 
@@ -34,33 +36,40 @@ export const cost = (v: number | null) => (v === null ? DASH : money(v, "usd", {
 export const toneOf = (v: number | null) =>
   v === null || v === 0 ? "text-muted-foreground" : v > 0 ? "text-profit" : "text-loss";
 
-export function Section({
-  title,
-  action,
-  className = "",
-  children,
-}: {
-  title: ReactNode;
-  action?: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
+/** A sidebar panel: a small shadcn card with a title and an optional action on the right. */
+export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className={`flex min-w-0 flex-col gap-2.5 rounded-lg bg-card p-3.5 ${className}`}>
-      <header className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {action}
-      </header>
-      {children}
-    </section>
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        {action && <CardAction>{action}</CardAction>}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2.5">{children}</CardContent>
+    </Card>
   );
 }
 
-export function Chip({ children }: { children: ReactNode }) {
+/** The empty state of a panel: an icon, one line, and an optional hint or action. */
+export function PanelEmpty({
+  icon,
+  title,
+  hint,
+  action,
+}: {
+  icon: ReactNode;
+  title: ReactNode;
+  hint?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.6875rem] whitespace-nowrap text-muted-foreground">
-      {children}
-    </span>
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">{icon}</EmptyMedia>
+        <EmptyTitle>{title}</EmptyTitle>
+        {hint && <EmptyDescription>{hint}</EmptyDescription>}
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
+    </Empty>
   );
 }
 

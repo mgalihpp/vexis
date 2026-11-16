@@ -158,7 +158,7 @@ It needs `DATABASE_URL`, `TOKEN_ENC_KEY` and `WALLET_ENC_KEY`, the same values t
 
 ## The office
 
-`apps/office` is a third process. Every minute it walks each enabled office: Scout every 15 minutes (or early after a volume alert), then Strategist, Risk Manager and Manager on whatever is waiting, then expiry and the simulated executor. One screener request every 15 minutes serves every office, so more users never cost more datapi requests. There is no default model: the user picks a provider and model per agent in `/office` settings, on Vexis's keys under the admin's daily cap, or on their own keys under their own cap. An agent with no model does not run.
+`apps/office` is a third process. Every minute it walks each enabled office: Scout every 15 minutes (or early after a volume alert), then Strategist, Risk Manager and Manager on whatever is waiting, then expiry and the simulated executor. One screener request every 15 minutes serves every office, so more users never cost more datapi requests. On Vexis's keys, under the admin's daily cap, Vexis picks every agent's model. On their own keys, under their own cap, the user picks a provider and model per agent in `/office` settings, and an agent with no model does not run.
 
 An admin turns an office on with `bun run db:office --enable you@example.com --vexis-usd 1`. `--stop-all` is the global kill switch and `--resume-all` lifts it. Under pm2:
 

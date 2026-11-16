@@ -1,6 +1,7 @@
 import { getDb } from "@vexis/db/client";
 import {
   AgentModel,
+  activeModels,
   type Guardrails,
   type KeySource,
   KILL_SWITCH,
@@ -117,7 +118,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     pausedReason: config.pausedReason,
     pausedUntil: config.pausedUntil?.getTime() ?? null,
     guardrails: parseGuardrails(config.guardrails),
-    models: modelsOf(config.models),
+    models: activeModels(config.keySource, modelsOf(config.models)),
     keySource: config.keySource,
     vexisDailyUsd: config.vexisDailyUsd,
     savedKeys: savedKeysOf(config.llmKeys),

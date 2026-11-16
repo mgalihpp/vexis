@@ -1,6 +1,6 @@
 import { PROVIDER_LABEL } from "@vexis/db/office";
-import { XIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { LayersIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,89 +13,65 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { timeAgo } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import { deployed, type OfficeView, type PositionView, spendVsCap } from "../office";
 import { closePositionFn } from "../office.functions";
-import { cost, DASH, Meter, Section, sol, toneOf, usd, useOfficeMutation } from "./office-ui";
+import { cost, Meter, PanelEmpty, Section, sol, toneOf, usd, useOfficeMutation } from "./office-ui";
 
-function Stat({ label, value, sub, tone = "" }: { label: string; value: ReactNode; sub: ReactNode; tone?: string }) {
+/** Realized PnL of closed positions, today (UTC) and all time; unknown PnL is a dash. */
+export function PnlCard({ view }: { view: OfficeView }) {
+  const cells = [
+    { label: "Today (UTC)", amount: view.pnl.today },
+    { label: "All time", amount: view.pnl.total },
+  ];
   return (
-    <div className="flex min-w-0 flex-col gap-0.5 rounded-lg bg-card px-3.5 py-3">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <span className={`truncate font-mono text-lg font-medium tabular-nums ${tone}`}>{value}</span>
-      <div className="font-mono text-[0.6875rem] text-muted-foreground tabular-nums">{sub}</div>
-    </div>
-  );
-}
-
-/** The four cards over the floor. A value the office does not track is a dash. */
-export function OfficeStats({ view }: { view: OfficeView }) {
-  const g = view.config.guardrails;
-  const dep = deployed(view.positions);
-  const spend = spendVsCap(view.spend, view.config)[view.config.keySource];
-  return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <Stat label="Free balance" value={DASH} sub={`Not tracked yet · reserve ${g.solReserve} SOL`} />
-      <Stat
-        label="Active positions"
-        value={`${view.positions.length} / ${g.maxActivePositions}`}
-        sub={`${sol(dep.sol)} · ${usd(dep.usd)} deployed`}
-      />
-      <Stat
-        label="PnL today (UTC)"
-        value={sol(view.pnl.today.sol, true)}
-        tone={toneOf(view.pnl.today.sol)}
-        sub={`${usd(view.pnl.today.usd, true)} · total ${sol(view.pnl.total.sol, true)}`}
-      />
-      <Stat
-        label="LLM cost today"
-        value={cost(spend.usd)}
-        tone={spend.share >= 1 ? "text-loss" : ""}
-        sub={
-          <>
-            of {cost(spend.cap)} · {view.config.keySource === "vexis" ? "Vexis key" : "own keys"}
-            <div className="mt-1.5">
-              <Meter share={spend.share} className={spend.share >= 1 ? "bg-loss" : "bg-brand"} />
-            </div>
-          </>
-        }
-      />
-    </div>
+    <Section title="Realized PnL">
+      <dl className="m-0 grid grid-cols-2 gap-3">
+        {cells.map((c) => (
+          <div key={c.label} className="flex min-w-0 flex-col gap-0.5">
+            <dt className="text-[0.6875rem] text-muted-foreground">{c.label}</dt>
+            <dd className={`m-0 truncate font-mono text-base font-medium tabular-nums ${toneOf(c.amount.sol)}`}>
+              {sol(c.amount.sol, true)}
+            </dd>
+            <dd className="m-0 font-mono text-[0.6875rem] text-muted-foreground tabular-nums">
+              {usd(c.amount.usd, true)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Section>
   );
 }
 
 /** Open journal rows. In the MVP every one is simulated, and closing one records no PnL. */
 export function PositionsCard({ view, now }: { view: OfficeView; now: number }) {
+  const dep = deployed(view.positions);
   return (
     <Section
-      title="Active positions"
-      action={<span className="text-xs text-muted-foreground">{view.positions.length}</span>}
+      title="Positions"
+      action={
+        <Badge variant="outline" className="font-mono">
+          {view.positions.length} / {view.config.guardrails.maxActivePositions}
+        </Badge>
+      }
     >
       {view.positions.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No open positions.</p>
+        <PanelEmpty icon={<LayersIcon />} title="No open positions" />
       ) : (
-        <ul className="m-0 flex list-none flex-col p-0">
-          {view.positions.map((p) => (
-            <PositionRow key={p.id} position={p} now={now} />
-          ))}
-        </ul>
+        <>
+          <ItemGroup className="gap-1.5">
+            {view.positions.map((p) => (
+              <PositionRow key={p.id} position={p} now={now} />
+            ))}
+          </ItemGroup>
+          <p className="font-mono text-[0.6875rem] text-muted-foreground tabular-nums">
+            {sol(dep.sol)} · {usd(dep.usd)} deployed
+          </p>
+        </>
       )}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-2.5 text-xs">
-        <span className="text-muted-foreground">
-          Realized today{" "}
-          <span className={`font-mono ${toneOf(view.pnl.today.sol)}`}>
-            {sol(view.pnl.today.sol, true)} · {usd(view.pnl.today.usd, true)}
-          </span>
-        </span>
-        <span className="text-muted-foreground">
-          All time{" "}
-          <span className={`font-mono ${toneOf(view.pnl.total.sol)}`}>
-            {sol(view.pnl.total.sol, true)} · {usd(view.pnl.total.usd, true)}
-          </span>
-        </span>
-      </div>
     </Section>
   );
 }
@@ -105,33 +81,36 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
   const close = useOfficeMutation(closePositionFn);
   const name = p.poolName ?? shortAddr(p.poolAddress);
   return (
-    <li className="flex items-center gap-3 border-t py-2 first:border-t-0 first:pt-0">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-xs font-medium">
+    <Item variant="outline" size="xs">
+      <ItemContent className="min-w-0">
+        <ItemTitle>
           <span className="truncate">{name}</span>
-          {p.simulated && <Badge variant="info">Simulated</Badge>}
-        </div>
-        <div className="truncate text-[0.6875rem] text-muted-foreground">
-          <span className="font-mono">
-            {sol(p.amountSol)} · {usd(p.amountUsd)}
-          </span>{" "}
-          · opened {timeAgo(p.openedAt, now)} · {p.openReason}
-        </div>
+          {p.simulated && <Badge variant="info">Sim</Badge>}
+        </ItemTitle>
+        <ItemDescription className="truncate font-mono">
+          {sol(p.amountSol)} · {timeAgo(p.openedAt, now)}
+        </ItemDescription>
         <FormError error={close.error} />
-      </div>
+      </ItemContent>
       {p.simulated && (
-        <Button variant="outline" size="sm" disabled={close.isPending} onClick={() => setConfirming(true)}>
-          <XIcon />
-          Close
-        </Button>
+        <ItemActions>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Close ${name}`}
+            disabled={close.isPending}
+            onClick={() => setConfirming(true)}
+          >
+            <XIcon />
+          </Button>
+        </ItemActions>
       )}
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Close {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This simulated position is marked closed by hand. Nothing was priced, so its PnL stays unknown and is left
-              out of the totals. No transaction is sent.
+              The simulated position is marked closed. Its PnL stays unknown and is left out of the totals.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -142,44 +121,41 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </li>
+    </Item>
   );
 }
 
-/** Today's LLM spend per provider, against the cap of the key source it was billed to. */
+/** Today's LLM spend against the cap of each key source, and per provider. */
 export function SpendCard({ view }: { view: OfficeView }) {
   const s = spendVsCap(view.spend, view.config);
   const caps = [
-    { key: "vexis" as const, label: "Vexis key", hint: "cap set by the admin", meter: s.vexis },
-    { key: "own" as const, label: "Own keys", hint: "your daily guardrail", meter: s.own },
+    { key: "vexis" as const, label: "Vexis key", meter: s.vexis },
+    { key: "own" as const, label: "Own keys", meter: s.own },
   ];
   return (
-    <Section title="LLM cost today (UTC)">
+    <Section title="Model usage">
       {caps.map((c) => (
         <div key={c.key} className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2 text-xs">
-            <span>
+            <span className="flex items-center gap-1.5">
               {c.label}
-              {view.config.keySource === c.key && <span className="ml-1.5 text-brand">in use</span>}
-              <span className="ml-1.5 text-muted-foreground">{c.hint}</span>
+              {view.config.keySource === c.key && <Badge variant="brand">In use</Badge>}
             </span>
             <span className="font-mono tabular-nums">
-              {cost(c.meter.usd)} / {cost(c.meter.cap)}
+              {cost(c.meter.usd)} <span className="text-muted-foreground">/ {cost(c.meter.cap)}</span>
             </span>
           </div>
           <Meter share={c.meter.share} className={c.meter.share >= 1 ? "bg-loss" : "bg-brand"} />
         </div>
       ))}
-      {s.rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No LLM runs today.</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-1 p-0">
+      {s.rows.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-1 border-t p-0 pt-2.5">
           {s.rows.map((r) => (
             <li key={`${r.provider}-${r.keySource}`} className="flex items-center justify-between gap-2 text-xs">
               <span>
                 {PROVIDER_LABEL[r.provider]}
                 <span className="ml-1.5 text-muted-foreground">
-                  {r.keySource === "vexis" ? "Vexis key" : "own key"} · {r.runs} {r.runs === 1 ? "run" : "runs"}
+                  {r.runs} {r.runs === 1 ? "run" : "runs"}
                 </span>
               </span>
               <span className="font-mono tabular-nums">{cost(r.usd)}</span>
