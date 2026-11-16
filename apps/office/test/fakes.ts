@@ -159,6 +159,9 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
     Db,
     Db.of({
       listOffices: () => Effect.sync(() => [...state.offices]),
+      heartbeat: () => Effect.void,
+      heartbeats: () => Effect.succeed([]),
+      markAlerted: () => Effect.void,
       expire: (userId, now) =>
         Effect.sync(() =>
           mine(userId)
@@ -427,7 +430,10 @@ export function fakeTelegram() {
   return { state, layer };
 }
 
-export const testConfig = Layer.succeed(AppConfig, AppConfig.of({ vexisKeys: { claude: Redacted.make("vexis-key") } }));
+export const testConfig = Layer.succeed(
+  AppConfig,
+  AppConfig.of({ vexisKeys: { claude: Redacted.make("vexis-key") }, admin: null }),
+);
 
 /** Fresh fakes wired together; `run` gives every tick in one effect the same in-memory state and screener cache. */
 export function setup(seed: Parameters<typeof fakeDb>[0] = {}) {

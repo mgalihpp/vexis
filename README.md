@@ -83,6 +83,7 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 | `METEORA_DATAPI_URL`     | all         | `https://dlmm.datapi.meteora.ag`      | Meteora data API base URL                                              |
 | `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo  | Where closed positions and transaction history are cached              |
 | `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`       | Origin used in alert links                                             |
+| `ADMIN_TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_CHAT_ID` | runner, office | none, no watchdog | Admin's own bot and chat for stalled-schedule alerts |
 | `RESEND_API_KEY`         | web, script | none                                  | Resend key for invite mail (`db:invite --send`, notices)               |
 | `MAIL_FROM`              | web, script | `Vexis <invite@stunobagent.my.id>`    | Sender of invite mail                                                  |
 | `INVITE_NOTIFY_EMAIL`    | web         | none, no notice                       | Gets a one-line mail for each new invite request                       |

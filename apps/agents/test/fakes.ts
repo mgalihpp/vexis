@@ -1,5 +1,6 @@
 import { Keypair } from "@solana/web3.js";
 import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
+import type { Beat } from "@vexis/db/heartbeat";
 import type { PositionPnl } from "@vexis/db/pnl";
 import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
@@ -76,6 +77,7 @@ export function fakeDb(
     alerts: [] as StoredAlert[],
     paused: new Map<string, string>(),
     pruned: [] as Date[],
+    beats: new Map<string, Beat>(),
     /** Agent wallets by user; a user absent here has none. */
     wallets: new Map<string, WalletSigner>(),
   };
@@ -149,6 +151,23 @@ export function fakeDb(
             if (!list.some((r) => r.minute.getTime() === row.minute.getTime())) list.push(row);
             state.minutes.set(row.poolAddress, list);
           }
+        }),
+      heartbeat: (name, at, error) =>
+        Effect.sync(() => {
+          const old = state.beats.get(name);
+          state.beats.set(name, {
+            name,
+            lastTickAt: error === null || !old ? at : old.lastTickAt,
+            lastError: error ?? old?.lastError ?? null,
+            lastErrorAt: error === null ? (old?.lastErrorAt ?? null) : at,
+            alertedAt: old?.alertedAt ?? null,
+          });
+        }),
+      heartbeats: () => Effect.sync(() => [...state.beats.values()]),
+      markAlerted: (name, at) =>
+        Effect.sync(() => {
+          const old = state.beats.get(name);
+          if (old) state.beats.set(name, { ...old, alertedAt: at });
         }),
       pruneMinutes: (before) => Effect.sync(() => void state.pruned.push(before)),
       recentMinutes: (pool, limit) =>
@@ -304,7 +323,12 @@ export function fakeTelegram() {
   return { state, layer };
 }
 
-export const testConfig = Layer.succeed(AppConfig, AppConfig.of({ webUrl: "https://vexis.test" }));
+export const ADMIN = { botToken: "admin-token", chatId: 42n };
+
+export const configWith = (admin: typeof ADMIN | null) =>
+  Layer.succeed(AppConfig, AppConfig.of({ webUrl: "https://vexis.test", admin }));
+
+export const testConfig = configWith(null);
 
 export function watch(overrides: Partial<Watch> = {}): Watch {
   return {

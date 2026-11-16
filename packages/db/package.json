@@ -10,6 +10,8 @@
     "./office-prompts": "./src/office-prompts.ts",
     "./office-queries": "./src/office.server.ts",
     "./guardrails": "./src/guardrails.ts",
+    "./heartbeat": "./src/heartbeat.ts",
+    "./heartbeat-queries": "./src/heartbeat.server.ts",
     "./pnl": "./src/pnl.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",

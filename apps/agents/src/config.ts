@@ -7,6 +7,8 @@ export class AppConfig extends Context.Service<
   {
     /** Public origin of the web app, for the links in alerts. */
     readonly webUrl: string;
+    /** The admin's own bot and chat for watchdog messages; null leaves the watchdog off. Never a user's bot. */
+    readonly admin: { readonly botToken: string; readonly chatId: bigint } | null;
   }
 >()("vexis/agents/AppConfig") {
   static readonly layer = Layer.effect(
@@ -38,7 +40,13 @@ export class AppConfig extends Context.Service<
       if (Option.isNone(rpc) && Option.isNone(legacy)) {
         return yield* Effect.die(new Error("RPC_ENC_KEY (or WALLET_ENC_KEY until it is set) is required"));
       }
-      return AppConfig.of({ webUrl });
+      const botToken = yield* Config.option(Config.Redacted("ADMIN_TELEGRAM_BOT_TOKEN"));
+      const chatId = yield* Config.option(Config.String("ADMIN_TELEGRAM_CHAT_ID"));
+      const admin =
+        Option.isSome(botToken) && Option.isSome(chatId) && /^-?\d+$/.test(chatId.value)
+          ? { botToken: Redacted.value(botToken.value), chatId: BigInt(chatId.value) }
+          : null;
+      return AppConfig.of({ webUrl, admin });
     }),
   );
 }
