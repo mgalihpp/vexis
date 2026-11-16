@@ -1,3 +1,4 @@
+import { datapiBackgroundFetch } from "@vexis/db/datapi-budget";
 import { PnlPage, type PositionPnl } from "@vexis/db/pnl";
 import { type FilterPool, filterPool } from "@vexis/db/screen";
 import { Config, Context, Effect, flow, Layer, Option, Schedule, Schema } from "effect";
@@ -194,5 +195,15 @@ export class Meteora extends Context.Service<
 
       return Meteora.of({ pools, screener, closedPositions });
     }),
-  ).pipe(Layer.provide(FetchHttpClient.layer));
+  ).pipe(
+    Layer.provide(
+      FetchHttpClient.layer.pipe(
+        Layer.provide(
+          Layer.sync(FetchHttpClient.Fetch, () =>
+            datapiBackgroundFetch(new URL(process.env.METEORA_DATAPI_URL ?? "https://dlmm.datapi.meteora.ag").origin),
+          ),
+        ),
+      ),
+    ),
+  );
 }

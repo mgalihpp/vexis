@@ -12,6 +12,7 @@
     "./guardrails": "./src/guardrails.ts",
     "./heartbeat": "./src/heartbeat.ts",
     "./heartbeat-queries": "./src/heartbeat.server.ts",
+    "./datapi-budget": "./src/datapi-budget.ts",
     "./pnl": "./src/pnl.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",
