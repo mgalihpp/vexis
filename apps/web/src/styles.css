@@ -42,7 +42,7 @@
     @apply rounded-xl border bg-card text-card-foreground;
   }
   .num {
-    @apply font-mono tabular-nums;
+    @apply tabular-nums;
   }
   /* Animated numbers: the wrapper anchors the floating delta chip, the inner span is the value. */
   .num-wrap {

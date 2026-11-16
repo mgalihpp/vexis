@@ -33,12 +33,10 @@ export function PnlCard({ view }: { view: OfficeView }) {
         {cells.map((c) => (
           <div key={c.label} className="flex min-w-0 flex-col gap-0.5">
             <dt className="text-[0.6875rem] text-muted-foreground">{c.label}</dt>
-            <dd className={`m-0 truncate font-mono text-base font-medium tabular-nums ${toneOf(c.amount.sol)}`}>
+            <dd className={`m-0 truncate text-base font-medium tabular-nums ${toneOf(c.amount.sol)}`}>
               {sol(c.amount.sol, true)}
             </dd>
-            <dd className="m-0 font-mono text-[0.6875rem] text-muted-foreground tabular-nums">
-              {usd(c.amount.usd, true)}
-            </dd>
+            <dd className="m-0 text-[0.6875rem] text-muted-foreground tabular-nums">{usd(c.amount.usd, true)}</dd>
           </div>
         ))}
       </dl>
@@ -67,7 +65,7 @@ export function PositionsCard({ view, now }: { view: OfficeView; now: number }) 
               <PositionRow key={p.id} position={p} now={now} />
             ))}
           </ItemGroup>
-          <p className="font-mono text-[0.6875rem] text-muted-foreground tabular-nums">
+          <p className="text-[0.6875rem] text-muted-foreground tabular-nums">
             {sol(dep.sol)} · {usd(dep.usd)} deployed
           </p>
         </>
@@ -141,7 +139,7 @@ export function SpendCard({ view }: { view: OfficeView }) {
               {c.label}
               {view.config.keySource === c.key && <Badge variant="brand">In use</Badge>}
             </span>
-            <span className="font-mono tabular-nums">
+            <span className="tabular-nums">
               {cost(c.meter.usd)} <span className="text-muted-foreground">/ {cost(c.meter.cap)}</span>
             </span>
           </div>
@@ -158,7 +156,7 @@ export function SpendCard({ view }: { view: OfficeView }) {
                   {r.runs} {r.runs === 1 ? "run" : "runs"}
                 </span>
               </span>
-              <span className="font-mono tabular-nums">{cost(r.usd)}</span>
+              <span className="tabular-nums">{cost(r.usd)}</span>
             </li>
           ))}
         </ul>

@@ -90,7 +90,7 @@ export function OfficeLog({
               key={m.id}
               className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-x-2 border-t py-1.5 text-xs first:border-t-0 first:pt-0"
             >
-              <time className="pt-px font-mono text-[0.65rem] text-muted-foreground tabular-nums">
+              <time className="pt-px text-[0.65rem] text-muted-foreground tabular-nums">
                 {utcClock(m.at).slice(0, 5)}
               </time>
               <span className="min-w-0 [overflow-wrap:anywhere]">

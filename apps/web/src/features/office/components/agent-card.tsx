@@ -84,7 +84,7 @@ export function AgentCard({
         {rows.map(([label, value, tone]) => (
           <div key={label} className="contents">
             <dt className="text-[0.6875rem] text-muted-foreground">{label}</dt>
-            <dd className={`m-0 truncate text-right font-mono text-[0.6875rem] ${tone ?? ""}`}>{value}</dd>
+            <dd className={`m-0 truncate text-right tabular-nums text-[0.6875rem] ${tone ?? ""}`}>{value}</dd>
           </div>
         ))}
       </dl>
@@ -95,7 +95,9 @@ export function AgentCard({
         {said.length === 0 && <p className="text-[0.6875rem] text-muted-foreground">Nothing yet.</p>}
         {said.map((m) => (
           <p key={m.id} className="text-[0.6875rem] leading-snug [overflow-wrap:anywhere]">
-            <time className="mr-1.5 font-mono text-[0.625rem] text-muted-foreground">{utcClock(m.at).slice(0, 5)}</time>
+            <time className="mr-1.5 tabular-nums text-[0.625rem] text-muted-foreground">
+              {utcClock(m.at).slice(0, 5)}
+            </time>
             {m.text}
           </p>
         ))}
