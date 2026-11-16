@@ -637,3 +637,17 @@ export const officeJournal = pgTable(
     index("office_journal_user_open_idx").on(t.userId).where(sql`${t.closedAt} is null`),
   ],
 ).enableRLS();
+
+/**
+ * One row per runtime schedule, written by the runner and the office runtime after each tick. Global market-style
+ * data with no `user_id`; the other runtime's watchdog and the admin page read it.
+ */
+export const serviceHeartbeats = pgTable("service_heartbeats", {
+  name: text("name").primaryKey(),
+  /** The last tick that finished without error. */
+  lastTickAt: timestamp("last_tick_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  /** Set while a stale alert for this schedule is open, so one outage sends one message. */
+  alertedAt: timestamp("alerted_at", { withTimezone: true }),
+}).enableRLS();

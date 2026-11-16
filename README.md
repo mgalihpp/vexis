@@ -61,32 +61,33 @@ One thing worth knowing before you test with a big wallet: Meteora allows 300 re
 
 ## Configuration
 
-| Variable                 | Used by     | Default                               | What it does                                                           |
-| ------------------------ | ----------- | ------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`           | all         | none                                  | Supabase Postgres, transaction pooler on port 6543                     |
-| `DATABASE_MIGRATE_URL`   | drizzle-kit | falls back to `DATABASE_URL`          | Session pooler on port 5432, for migrations                            |
-| `BETTER_AUTH_SECRET`     | web         | none                                  | Long random string used to sign sessions                               |
-| `BETTER_AUTH_URL`        | web         | none                                  | Public origin; requests from another origin are rejected               |
-| `TOKEN_ENC_KEY`          | all         | none                                  | 32 random bytes, base64; encrypts bot tokens                           |
-| `LLM_ENC_KEY`            | web, office | `TOKEN_ENC_KEY`                       | 32 random bytes, base64; encrypts users' LLM keys                      |
-| `RPC_ENC_KEY`            | all         | `WALLET_ENC_KEY`                      | 32 random bytes, base64; encrypts users' RPC URLs                      |
-| `WALLET_PUBLIC_KEY`      | web, office | none                                  | X25519 public key (`bun run db:rewrap --keygen`); seals wallet secrets |
-| `WALLET_PRIVATE_KEY`     | runner only | none                                  | its pair; the only key that opens a wallet secret                      |
-| `ANTHROPIC_API_KEY`      | office      | none, Claude unavailable on Vexis     | Vexis-paid key for offices on the Vexis key source                     |
-| `OPENAI_API_KEY`         | office      | none, OpenAI unavailable on Vexis     | Same, for OpenAI                                                       |
-| `DEEPSEEK_API_KEY`       | office      | none, DeepSeek unavailable on Vexis   | Same, for DeepSeek                                                     |
-| `META_API_KEY`           | office      | none, Meta unavailable on Vexis       | Same, for the Meta Model API                                           |
-| `OPENROUTER_API_KEY`     | office      | none, OpenRouter unavailable on Vexis | Same, for OpenRouter                                                   |
-| `SOLANA_RPC_URL`         | web         | public mainnet endpoint               | RPC for the analytics page's on-chain bin and fee reads                |
-| `JUPITER_API_KEY`        | web, runner | none, uses `lite-api.jup.ag`          | Switches Jupiter calls (prices, balances, zap swaps)                   |
-| `SOLANA_TRACKER_API_KEY` | web         | none, recent trades only              | Solana Tracker key for whale, smart money and KOL lists                |
-| `METEORA_DATAPI_URL`     | all         | `https://dlmm.datapi.meteora.ag`      | Meteora data API base URL                                              |
-| `VEXIS_CACHE_DIR`        | web         | `.state/portfolio-cache` in the repo  | Where closed positions and transaction history are cached              |
-| `VEXIS_WEB_URL`          | runner      | falls back to `BETTER_AUTH_URL`       | Origin used in alert links                                             |
-| `RESEND_API_KEY`         | web, script | none                                  | Resend key for invite mail (`db:invite --send`, notices)               |
-| `MAIL_FROM`              | web, script | `Vexis <invite@stunobagent.my.id>`    | Sender of invite mail                                                  |
-| `INVITE_NOTIFY_EMAIL`    | web         | none, no notice                       | Gets a one-line mail for each new invite request                       |
-| `NITRO_PRESET`           | build       | `bun`                                 | Build target, for example `node-server`                                |
+| Variable                                             | Used by        | Default                               | What it does                                                           |
+| ---------------------------------------------------- | -------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                                       | all            | none                                  | Supabase Postgres, transaction pooler on port 6543                     |
+| `DATABASE_MIGRATE_URL`                               | drizzle-kit    | falls back to `DATABASE_URL`          | Session pooler on port 5432, for migrations                            |
+| `BETTER_AUTH_SECRET`                                 | web            | none                                  | Long random string used to sign sessions                               |
+| `BETTER_AUTH_URL`                                    | web            | none                                  | Public origin; requests from another origin are rejected               |
+| `TOKEN_ENC_KEY`                                      | all            | none                                  | 32 random bytes, base64; encrypts bot tokens                           |
+| `LLM_ENC_KEY`                                        | web, office    | `TOKEN_ENC_KEY`                       | 32 random bytes, base64; encrypts users' LLM keys                      |
+| `RPC_ENC_KEY`                                        | all            | `WALLET_ENC_KEY`                      | 32 random bytes, base64; encrypts users' RPC URLs                      |
+| `WALLET_PUBLIC_KEY`                                  | web, office    | none                                  | X25519 public key (`bun run db:rewrap --keygen`); seals wallet secrets |
+| `WALLET_PRIVATE_KEY`                                 | runner only    | none                                  | its pair; the only key that opens a wallet secret                      |
+| `ANTHROPIC_API_KEY`                                  | office         | none, Claude unavailable on Vexis     | Vexis-paid key for offices on the Vexis key source                     |
+| `OPENAI_API_KEY`                                     | office         | none, OpenAI unavailable on Vexis     | Same, for OpenAI                                                       |
+| `DEEPSEEK_API_KEY`                                   | office         | none, DeepSeek unavailable on Vexis   | Same, for DeepSeek                                                     |
+| `META_API_KEY`                                       | office         | none, Meta unavailable on Vexis       | Same, for the Meta Model API                                           |
+| `OPENROUTER_API_KEY`                                 | office         | none, OpenRouter unavailable on Vexis | Same, for OpenRouter                                                   |
+| `SOLANA_RPC_URL`                                     | web            | public mainnet endpoint               | RPC for the analytics page's on-chain bin and fee reads                |
+| `JUPITER_API_KEY`                                    | web, runner    | none, uses `lite-api.jup.ag`          | Switches Jupiter calls (prices, balances, zap swaps)                   |
+| `SOLANA_TRACKER_API_KEY`                             | web            | none, recent trades only              | Solana Tracker key for whale, smart money and KOL lists                |
+| `METEORA_DATAPI_URL`                                 | all            | `https://dlmm.datapi.meteora.ag`      | Meteora data API base URL                                              |
+| `VEXIS_CACHE_DIR`                                    | web            | `.state/portfolio-cache` in the repo  | Where closed positions and transaction history are cached              |
+| `VEXIS_WEB_URL`                                      | runner         | falls back to `BETTER_AUTH_URL`       | Origin used in alert links                                             |
+| `ADMIN_TELEGRAM_BOT_TOKEN`, `ADMIN_TELEGRAM_CHAT_ID` | runner, office | none, no watchdog                     | Admin's own bot and chat for stalled-schedule alerts                   |
+| `RESEND_API_KEY`                                     | web, script    | none                                  | Resend key for invite mail (`db:invite --send`, notices)               |
+| `MAIL_FROM`                                          | web, script    | `Vexis <invite@stunobagent.my.id>`    | Sender of invite mail                                                  |
+| `INVITE_NOTIFY_EMAIL`                                | web            | none, no notice                       | Gets a one-line mail for each new invite request                       |
+| `NITRO_PRESET`                                       | build          | `bun`                                 | Build target, for example `node-server`                                |
 
 There is no shared Telegram bot. Each user links their own BotFather bot per agent (Volume spike and Auto-rebalance each have their own): paste the token in the agent's settings, send `/start` to it, and press Check. The token is stored AES-256-GCM encrypted with `TOKEN_ENC_KEY`, which is why the web app and the runner need the same value.
 

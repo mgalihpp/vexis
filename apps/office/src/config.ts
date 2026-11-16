@@ -32,7 +32,11 @@ const optionalKey32 = (name: string) =>
 /** Vexis's LLM keys. A provider with no key here cannot run on key source `vexis`. */
 export class AppConfig extends Context.Service<
   AppConfig,
-  { readonly vexisKeys: Partial<Record<LlmProvider, Redacted.Redacted>> }
+  {
+    readonly vexisKeys: Partial<Record<LlmProvider, Redacted.Redacted>>;
+    /** The admin's own bot and chat for watchdog messages; null leaves the watchdog off. Never a user's bot. */
+    readonly admin: { readonly botToken: string; readonly chatId: number } | null;
+  }
 >()("vexis/office/AppConfig") {
   static readonly layer = Layer.effect(
     AppConfig,
@@ -49,7 +53,13 @@ export class AppConfig extends Context.Service<
         const key = yield* Config.option(Config.Redacted(VEXIS_KEY_ENV[provider]));
         if (Option.isSome(key)) vexisKeys[provider] = key.value;
       }
-      return AppConfig.of({ vexisKeys });
+      const botToken = yield* Config.option(Config.Redacted("ADMIN_TELEGRAM_BOT_TOKEN"));
+      const chatId = yield* Config.option(Config.String("ADMIN_TELEGRAM_CHAT_ID"));
+      const admin =
+        Option.isSome(botToken) && Option.isSome(chatId) && /^-?\d+$/.test(chatId.value)
+          ? { botToken: Redacted.value(botToken.value), chatId: Number(chatId.value) }
+          : null;
+      return AppConfig.of({ vexisKeys, admin });
     }),
   );
 }

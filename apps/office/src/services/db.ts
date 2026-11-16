@@ -1,4 +1,6 @@
 import { closeDb, createDb } from "@vexis/db/client";
+import type { Beat } from "@vexis/db/heartbeat";
+import { listHeartbeats, recordTick, setAlerted } from "@vexis/db/heartbeat-queries";
 import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/db/office";
 import {
   decideProposal,
@@ -83,6 +85,11 @@ export class Db extends Context.Service<
   Db,
   {
     listOffices(): Effect.Effect<ReadonlyArray<OfficeConfigRow>, DbError>;
+    /** A finished tick of a schedule (`error` null), or the error it ended with. */
+    heartbeat(name: string, at: Date, error: string | null): Effect.Effect<void, DbError>;
+    heartbeats(): Effect.Effect<ReadonlyArray<Beat>, DbError>;
+    /** `at` opens a stale alert for a schedule, null closes it. */
+    markAlerted(name: string, at: Date | null): Effect.Effect<void, DbError>;
     expire(userId: string, now: Date): Effect.Effect<ReadonlyArray<ProposalRow>, DbError>;
     proposals(userId: string, statuses: readonly ProposalStatus[]): Effect.Effect<ReadonlyArray<ProposalRow>, DbError>;
     /** Undefined when another actor moved it first. */
@@ -158,6 +165,9 @@ export class Db extends Context.Service<
 
       return Db.of({
         listOffices: () => run("listOffices", () => listOffices(db)),
+        heartbeat: (name, at, error) => run("heartbeat", () => recordTick(db, name, at, error)),
+        heartbeats: () => run("heartbeats", () => listHeartbeats(db)),
+        markAlerted: (name, at) => run("markAlerted", () => setAlerted(db, name, at)),
         expire: (userId, now) => run("expire", () => expireProposals(as(userId), now)),
         proposals: (userId, statuses) => run("proposals", () => listProposals(as(userId), { statuses })),
         move: (userId, id, from, to, patch) => run("move", () => moveProposal(as(userId), id, from, to, patch)),

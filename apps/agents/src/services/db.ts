@@ -10,6 +10,8 @@ import {
   WALLET_UNREADABLE,
 } from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
+import type { Beat } from "@vexis/db/heartbeat";
+import { listHeartbeats, recordTick, setAlerted } from "@vexis/db/heartbeat-queries";
 import type { WalletSource } from "@vexis/db/office";
 import {
   agentAlerts,
@@ -162,6 +164,11 @@ export class Db extends Context.Service<
     /** Existing `(pool, minute)` rows are kept. */
     insertMinutes(rows: ReadonlyArray<NewMinute>): Effect.Effect<void, DbError>;
     pruneMinutes(before: Date): Effect.Effect<void, DbError>;
+    /** A finished tick of a schedule (`error` null), or the error it ended with. */
+    heartbeat(name: string, at: Date, error: string | null): Effect.Effect<void, DbError>;
+    heartbeats(): Effect.Effect<ReadonlyArray<Beat>, DbError>;
+    /** `at` opens a stale alert for a schedule, null closes it. */
+    markAlerted(name: string, at: Date | null): Effect.Effect<void, DbError>;
     /** Newest `limit` rows of a pool, ascending by minute. */
     recentMinutes(
       pool: string,
@@ -392,6 +399,10 @@ export class Db extends Context.Service<
                   .values([...rows])
                   .onConflictDoNothing(),
               ).pipe(Effect.asVoid),
+
+        heartbeat: (name, at, error) => run("heartbeat", () => recordTick(db, name, at, error)),
+        heartbeats: () => run("heartbeats", () => listHeartbeats(db)),
+        markAlerted: (name, at) => run("markAlerted", () => setAlerted(db, name, at)),
 
         pruneMinutes: (before) =>
           run("pruneMinutes", () => db.delete(poolMinutes).where(lt(poolMinutes.minute, before))).pipe(Effect.asVoid),
