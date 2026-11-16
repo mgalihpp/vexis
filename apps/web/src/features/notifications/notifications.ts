@@ -106,7 +106,6 @@ export function volumeSpike(bars: VolumeBar[], multiplier: SpikeMultiplier, minU
   return { kind: "multiple", t: current.t, volume: current.volume, average };
 }
 
-
 const volumeIn = (amountUsd: number, currency: Currency, solPrice: number | null) =>
   currency === "sol" && solPrice ? compactSol(amountUsd / solPrice) : compactUsd(amountUsd);
 

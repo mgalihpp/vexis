@@ -33,7 +33,7 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { amount, CollapsiblePanel, NA, short, sol, solRound, solAmount, tone, Updated, usd } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };

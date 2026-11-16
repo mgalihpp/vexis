@@ -6,10 +6,9 @@ import type { ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { type Sort, SortHead } from "@/features/portfolio/components/table-controls";
-import { timeAgo } from "@/features/portfolio/money";
+import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { shortAddr } from "@/lib/format";
-import { compactUsd } from "@/features/portfolio/money";
 import { type AlertView, type PairTokens, ratioText } from "../agents";
 
 /** The bar under the header: what this page is on the left, its actions on the right. */

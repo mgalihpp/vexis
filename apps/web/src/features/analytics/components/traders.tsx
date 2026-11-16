@@ -430,7 +430,6 @@ function Side({
   );
 }
 
-
 const SPLIT: { key: "holding" | "partial" | "sold" | "rebought" | "unknown"; label: string; className: string }[] = [
   { key: "holding", label: "Holding", className: "bg-profit" },
   { key: "partial", label: "Partial", className: "bg-brand" },

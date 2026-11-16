@@ -98,8 +98,7 @@ const PAGE = 50;
 const DASH = "—";
 
 const compactFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
-const solText = (usd: number, solPrice: number | null) =>
-  solPrice ? compactSol(usd / solPrice) : DASH;
+const solText = (usd: number, solPrice: number | null) => (solPrice ? compactSol(usd / solPrice) : DASH);
 
 /** `12.4%`, `0.21%`, `0.004%`: enough digits that a small ratio never reads as zero. */
 function percent(v: number | null) {

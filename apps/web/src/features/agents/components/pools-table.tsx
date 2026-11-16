@@ -45,9 +45,7 @@ function Amount({ usd, solPrice }: { usd: number; solPrice: number | null }) {
   return (
     <>
       <div>{compactUsd(usd)}</div>
-      <div className="text-[0.625rem] text-muted-foreground">
-        {solPrice ? compactSol(usd / solPrice) : "—"}
-      </div>
+      <div className="text-[0.625rem] text-muted-foreground">{solPrice ? compactSol(usd / solPrice) : "—"}</div>
     </>
   );
 }

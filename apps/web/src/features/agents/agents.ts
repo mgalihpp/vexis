@@ -324,7 +324,6 @@ export function describeRule(c: SourceConfig & Pick<VolumeWatchConfig, "cooldown
 
 export const ratioText = (ratio: number) => (ratio >= 1_000_000 ? "from zero" : `${ratio.toFixed(1)}×`);
 
-
 // --- config form -------------------------------------------------------------------------------
 
 export interface ConfigFields {

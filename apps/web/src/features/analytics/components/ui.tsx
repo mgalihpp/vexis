@@ -1,9 +1,9 @@
 import { ChevronDownIcon } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { compactSol, compactUsd, money } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
-import { compactSol, compactUsd, money } from "@/features/portfolio/money";
 import { age } from "../analytics";
 
 /**
