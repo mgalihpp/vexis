@@ -10,7 +10,12 @@ module.exports = {
       script: "bun",
       args: "apps/web/.output/server/index.mjs",
       interpreter: "none",
-      env: { NODE_ENV: "production", PORT: "3000", VEXIS_BOTS_FILE: `${root}/vexis/bots.vps.json`, BUN_INSTALL: `${root}/.bun` },
+      env: {
+        NODE_ENV: "production",
+        PORT: "3000",
+        VEXIS_BOTS_FILE: `${root}/vexis/bots.vps.json`,
+        BUN_INSTALL: `${root}/.bun`,
+      },
     },
     {
       name: "vexis-agents",
