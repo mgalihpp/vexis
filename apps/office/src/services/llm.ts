@@ -5,9 +5,10 @@ import { claude } from "../providers/claude.ts";
 import { deepseek } from "../providers/deepseek.ts";
 import { meta } from "../providers/meta.ts";
 import { openai } from "../providers/openai.ts";
+import { openrouter } from "../providers/openrouter.ts";
 import type { Completion, Provider } from "../providers/provider.ts";
 
-const PROVIDERS: Record<LlmProvider, Provider> = { claude, openai, deepseek, meta };
+const PROVIDERS: Record<LlmProvider, Provider> = { claude, openai, deepseek, meta, openrouter };
 
 export type LlmRequest = {
   /** For logs and spans only; the provider never sees it. */

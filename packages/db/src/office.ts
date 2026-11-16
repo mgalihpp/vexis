@@ -13,7 +13,7 @@ export type LlmAgent = (typeof LLM_AGENTS)[number];
 export const OFFICE_AGENTS = [...LLM_AGENTS, "monitor", "executor", "bookkeeper"] as const;
 export type OfficeAgent = (typeof OFFICE_AGENTS)[number];
 
-export const LLM_PROVIDERS = ["claude", "openai", "deepseek", "meta"] as const;
+export const LLM_PROVIDERS = ["claude", "openai", "deepseek", "meta", "openrouter"] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
 export const PROVIDER_LABEL: Record<LlmProvider, string> = {
@@ -21,6 +21,7 @@ export const PROVIDER_LABEL: Record<LlmProvider, string> = {
   openai: "OpenAI",
   deepseek: "DeepSeek",
   meta: "Meta",
+  openrouter: "OpenRouter",
 };
 
 /** USD per million tokens. A model missing here cannot be picked, so every run has a known cost. */
@@ -29,6 +30,7 @@ export type ModelPrice = { readonly input: number; readonly output: number };
 // Checked 2026-11-15 against each provider's pricing page. DeepSeek bills double during its peak hours; the peak
 // rate is kept so the daily budget never undercounts. Haiku 5.5's rate is for prompts up to 100k tokens, Muse Ember's
 // up to 200k. Meta is the Meta Model API (dev.meta.ai) in Standard mode; Contributor mode trains on what we send.
+// OpenRouter prices are its /api/v1/models listing; the provider sends them as `max_price`, so routing never costs more.
 export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
   claude: {
     "claude-haiku-5-5": { input: 0.1, output: 0.5 },
@@ -48,6 +50,16 @@ export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
     "muse-ember-1.0": { input: 0.1, output: 0.5 },
     "muse-spark-1.3": { input: 1.25, output: 4.25 },
     "muse-wonder-1.0": { input: 4, output: 20 },
+  },
+  openrouter: {
+    "anthropic/claude-haiku-5.5": { input: 0.1, output: 0.5 },
+    "anthropic/claude-sonnet-5.5": { input: 2, output: 10 },
+    "openai/gpt-6-luna": { input: 0.1, output: 0.5 },
+    "openai/gpt-6.1-terra": { input: 1, output: 5 },
+    "google/gemini-4-hydrogen": { input: 1.5, output: 7.5 },
+    "deepseek/deepseek-v4.1-flash": { input: 0.14, output: 0.42 },
+    "qwen/qwen3.8-flash": { input: 0.15, output: 0.47 },
+    "x-ai/grok-4.7": { input: 2, output: 6 },
   },
 };
 
