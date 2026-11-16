@@ -565,7 +565,7 @@ export const officeRuns = pgTable(
 
 /**
  * One row per position the office opened: why it opened, why it closed and what it made. PnL is null until the
- * position closes, and stays null for a simulated position nobody priced.
+ * Bookkeeper reads a real close from Meteora, and stays null for a simulated position nobody priced.
  */
 export const officeJournal = pgTable(
   "office_journal",
@@ -577,6 +577,8 @@ export const officeJournal = pgTable(
     poolAddress: text("pool_address").notNull(),
     poolName: text("pool_name"),
     positionAddress: text("position_address"),
+    /** The wallet that holds a real position, for the Bookkeeper's PnL read. */
+    walletAddress: text("wallet_address"),
     simulated: boolean("simulated").notNull(),
     amountSol: doublePrecision("amount_sol").notNull(),
     amountUsd: doublePrecision("amount_usd"),
@@ -589,6 +591,8 @@ export const officeJournal = pgTable(
     closedAt: timestamp("closed_at", { withTimezone: true }),
     pnlSol: doublePrecision("pnl_sol"),
     pnlUsd: doublePrecision("pnl_usd"),
+    /** When the Bookkeeper read a real close's PnL; a PnL still null after it is unknown for good. */
+    pnlCheckedAt: timestamp("pnl_checked_at", { withTimezone: true }),
   },
   (t) => [
     index("office_journal_user_opened_idx").on(t.userId, t.openedAt.desc()),

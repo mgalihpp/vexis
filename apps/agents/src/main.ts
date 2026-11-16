@@ -1,6 +1,7 @@
 import { BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Schedule } from "effect";
 import { AppConfig } from "./config.ts";
+import { officeBookkeeper } from "./office/bookkeeper.ts";
 import { officeExecutor } from "./office/executor.ts";
 import { officeMonitor } from "./office/monitor.ts";
 import { rebalanceCycle } from "./rebalance/rebalance.ts";
@@ -31,6 +32,7 @@ const Runner = Layer.effectDiscard(
     yield* Effect.forkScoped(supervised("rebalance", rebalanceCycle(), Schedule.fixed("1 minute")));
     yield* Effect.forkScoped(supervised("office executor", officeExecutor(), Schedule.fixed("1 minute")));
     yield* Effect.forkScoped(supervised("office monitor", officeMonitor(), Schedule.fixed("1 minute")));
+    yield* Effect.forkScoped(supervised("office bookkeeper", officeBookkeeper(), Schedule.fixed("1 minute")));
     yield* Effect.forkScoped(supervised("prune", prune(), Schedule.spaced("1 hour")));
   }),
 ).pipe(

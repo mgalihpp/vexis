@@ -9,6 +9,7 @@
     "./office": "./src/office.ts",
     "./office-queries": "./src/office.server.ts",
     "./guardrails": "./src/guardrails.ts",
+    "./pnl": "./src/pnl.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",
     "./secret": "./src/secret.ts",

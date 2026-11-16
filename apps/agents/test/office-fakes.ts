@@ -87,6 +87,8 @@ export function journalRow(overrides: Partial<JournalRow> = {}): JournalRow {
     closedAt: null,
     pnlSol: null,
     pnlUsd: null,
+    walletAddress: null,
+    pnlCheckedAt: null,
     ...overrides,
   };
 }
@@ -186,6 +188,15 @@ export function fakeOfficeDb(
         }),
       rebalancePools: (userId) => Effect.sync(() => new Set(state.rebalancePools.get(userId) ?? [])),
       wallet: (office) => Effect.sync(() => state.wallets.get(office.userId) ?? { _tag: "missing" }),
+      unbookedCloses: (before) =>
+        Effect.sync(() =>
+          state.journal.filter((j) => !j.simulated && !j.pnlCheckedAt && j.closedAt && j.closedAt <= before),
+        ),
+      bookClose: (userId, id, pnl, at) =>
+        Effect.sync(() => {
+          const j = state.journal.find((r) => r.id === id && r.userId === userId && !r.pnlCheckedAt);
+          if (j) Object.assign(j, pnl, { pnlCheckedAt: at });
+        }),
     }),
   );
   return { state, layer };

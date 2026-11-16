@@ -258,6 +258,7 @@ const act = (office: Office, p: ProposalRow, signer: Keypair) =>
           poolAddress: p.poolAddress,
           poolName: p.poolName,
           positionAddress: opened.positionAddress,
+          walletAddress: office.wallet.owner,
           simulated: false,
           amountSol: params.amountSol,
           amountUsd: params.solUsd === null ? null : params.amountSol * params.solUsd,
