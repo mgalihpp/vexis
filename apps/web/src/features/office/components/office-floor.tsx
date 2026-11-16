@@ -1,6 +1,14 @@
 import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
 import { CrosshairIcon, Maximize2Icon, MinusIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -57,13 +65,71 @@ export function OfficeFloor({
   /** The office signs and sends what is approved (else Preview). */
   live: boolean;
 }) {
+  const section = useRef<HTMLElement>(null);
   const view = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<HTMLDivElement>(null);
   const floor = useRef<Floor | null>(null);
-  const input = useRef<FloorInput>({ data, selected, focus, follow, talking: new Set() });
-  input.current = { data, selected, focus, follow, talking: new Set(Object.keys(bubbles)) };
+  // Dragging a card pins its anchor, so the agent can walk away without dragging the card along.
+  const [cardOffset, setCardOffset] = useState({ x: 0, y: 0 });
+  const [anchorLocked, setAnchorLocked] = useState(false);
+  const input = useRef<FloorInput>({ data, selected, focus, follow, anchorLocked: false, talking: new Set() });
+  input.current = { data, selected, focus, follow, anchorLocked, talking: new Set(Object.keys(bubbles)) };
   const handlers = useRef({ onSelect, onFollow });
   handlers.current = { onSelect, onFollow };
+
+  const drag = useRef<{ id: number; x: number; y: number; ox: number; oy: number; moved: boolean } | null>(null);
+  useEffect(() => {
+    if (selected) {
+      setCardOffset({ x: 0, y: 0 });
+      setAnchorLocked(false);
+    }
+  }, [selected]);
+  const onCardDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 || !(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, ox: cardOffset.x, oy: cardOffset.y, moved: false };
+  };
+  const onCardMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
+    if (!d.moved) {
+      d.moved = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    // Keep the card inside the viewport, so a drag cannot strand it half off-screen.
+    const box = e.currentTarget.getBoundingClientRect();
+    const m = 8;
+    const left = box.left - cardOffset.x;
+    const top = box.top - cardOffset.y;
+    setAnchorLocked(true);
+    setCardOffset({
+      x: Math.max(m - left, Math.min(window.innerWidth - m - box.width - left, d.ox + e.clientX - d.x)),
+      y: Math.max(m - top, Math.min(window.innerHeight - m - box.height - top, d.oy + e.clientY - d.y)),
+    });
+  };
+  const onCardUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (drag.current?.id === e.pointerId) drag.current = null;
+  };
+  const onCardKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
+    const step = e.shiftKey ? 40 : 10;
+    const move: Record<string, [number, number]> = {
+      ArrowLeft: [-step, 0],
+      ArrowRight: [step, 0],
+      ArrowUp: [0, -step],
+      ArrowDown: [0, step],
+    };
+    const delta = move[e.key];
+    if (!delta) return;
+    e.preventDefault();
+    setAnchorLocked(true);
+    setCardOffset((o) => ({ x: o.x + delta[0], y: o.y + delta[1] }));
+  };
+  const onCardDoubleClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!(e.target instanceof Element) || !e.target.closest("[data-card-grip]")) return;
+    setCardOffset({ x: 0, y: 0 });
+    setAnchorLocked(false);
+  };
 
   useEffect(() => {
     if (!view.current || !overlay.current) return;
@@ -113,6 +179,7 @@ export function OfficeFloor({
 
   return (
     <section
+      ref={section}
       aria-label="Office floor"
       className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 lg:h-full lg:flex-row"
     >
@@ -216,7 +283,19 @@ export function OfficeFloor({
                   updatePositionStrategy="always"
                   hideWhenDetached
                   onOpenAutoFocus={(e) => e.preventDefault()}
+                  style={{ translate: `${cardOffset.x}px ${cardOffset.y}px` }}
+                  className="max-h-[min(70dvh,36rem)] overflow-y-auto overscroll-contain"
+                  // The floor and the roster pick or clear the agent themselves, so a click there moves the card.
+                  onInteractOutside={(e) => {
+                    if (e.target instanceof Node && section.current?.contains(e.target)) e.preventDefault();
+                  }}
                   aria-label={selected ? AGENT_INFO[selected].name : undefined}
+                  onPointerDown={onCardDown}
+                  onPointerMove={onCardMove}
+                  onPointerUp={onCardUp}
+                  onPointerCancel={onCardUp}
+                  onKeyDown={onCardKeyDown}
+                  onDoubleClick={onCardDoubleClick}
                 >
                   {card}
                 </PopoverContent>

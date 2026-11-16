@@ -30,8 +30,8 @@ export const utcClock = (ms: number) => new Date(ms).toISOString().slice(11, 19)
 export const sol = (v: number | null, signed = false) => (v === null ? DASH : money(v, "sol", { signed }));
 export const usd = (v: number | null, signed = false) => (v === null ? DASH : money(v, "usd", { signed }));
 
-/** LLM spend: a run often costs a fraction of a cent, so three decimals under a dollar. */
-export const cost = (v: number | null) => (v === null ? DASH : money(v, "usd", { digits: v < 1 ? 3 : 2 }));
+/** LLM spend: a run often costs a fraction of a cent, so three decimals under a dollar; a free run reads $0.00. */
+export const cost = (v: number | null) => (v === null ? DASH : money(v, "usd", { digits: v > 0 && v < 1 ? 3 : 2 }));
 
 export const toneOf = (v: number | null) =>
   v === null || v === 0 ? "text-muted-foreground" : v > 0 ? "text-profit" : "text-loss";
@@ -39,7 +39,7 @@ export const toneOf = (v: number | null) =>
 /** A sidebar panel: a small shadcn card with a title and an optional action on the right. */
 export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
-    <Card size="sm">
+    <Card size="sm" className="shrink-0">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {action && <CardAction>{action}</CardAction>}

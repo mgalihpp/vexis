@@ -60,6 +60,12 @@ export const MODEL_PRICES: Record<LlmProvider, Record<string, ModelPrice>> = {
     "deepseek/deepseek-v4.1-flash": { input: 0.14, output: 0.42 },
     "qwen/qwen3.8-flash": { input: 0.15, output: 0.47 },
     "x-ai/grok-4.7": { input: 2, output: 6 },
+    // Free endpoints, for running an office without spending. OpenRouter rate-limits them hard (a few dozen calls a
+    // day without credit), so a tick that seats four agents can use up the day. Price 0 bills nothing and never
+    // exhausts the daily cap.
+    "openrouter/free": { input: 0, output: 0 },
+    "inclusionai/ling-3.2-flash:free": { input: 0, output: 0 },
+    "baidu/ernie-5.5-flash-preview:free": { input: 0, output: 0 },
   },
 };
 

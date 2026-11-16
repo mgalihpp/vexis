@@ -7,14 +7,18 @@ import {
   countdown,
   deployed,
   deskStatuses,
+  deskUsage,
+  freeModel,
   type MessageView,
   missingKeys,
   type OfficeView,
   type PositionView,
   type ProposalView,
   pauseView,
+  prettyReply,
   proposalFacts,
   RECENT_MS,
+  type RunView,
   spendVsCap,
   waitingProposals,
   walks,
@@ -22,6 +26,19 @@ import {
 
 const NOW = Date.UTC(2026, 10, 15, 12, 0, 0);
 const claude = { provider: "claude" as const, model: "claude-haiku-5-5" };
+
+const run = (over: Partial<RunView> & Pick<RunView, "agent">): RunView => ({
+  provider: "claude",
+  model: claude.model,
+  promptVersion: "scout-v1",
+  inputTokens: null,
+  outputTokens: null,
+  costUsd: null,
+  durationMs: 1_000,
+  error: null,
+  at: NOW,
+  ...over,
+});
 
 const config = (over: Partial<ConfigView> = {}): ConfigView => ({
   paused: false,
@@ -78,6 +95,7 @@ const view = (over: Partial<OfficeView> = {}): OfficeView => ({
   proposals: [],
   messages: [],
   runs: [],
+  threads: [],
   positions: [],
   pnl: { today: { sol: null, usd: null }, total: { sol: null, usd: null } },
   spend: [],
@@ -91,10 +109,7 @@ describe("desk status", () => {
       view({
         config: config({ models: { scout: null, strategist: claude, risk: claude, manager: claude } }),
         proposals: [proposal(), proposal({ id: "p2", status: "executing" })],
-        runs: [
-          { agent: "strategist", provider: "claude", model: claude.model, error: "429", at: NOW - 5000 },
-          { agent: "risk", provider: "claude", model: claude.model, error: null, at: NOW - 5000 },
-        ],
+        runs: [run({ agent: "strategist", error: "429", at: NOW - 5000 }), run({ agent: "risk", at: NOW - 5000 })],
         messages: [message({ agent: "monitor", at: NOW - RECENT_MS - 1 })],
       }),
       NOW,
@@ -114,8 +129,8 @@ describe("desk status", () => {
     const s = deskStatuses(
       view({
         runs: [
-          { agent: "scout", provider: "claude", model: claude.model, error: null, at: NOW - RECENT_MS - 10 },
-          { agent: "scout", provider: "claude", model: claude.model, error: "timeout", at: NOW - RECENT_MS - 20 },
+          run({ agent: "scout", at: NOW - RECENT_MS - 10 }),
+          run({ agent: "scout", error: "timeout", at: NOW - RECENT_MS - 20 }),
         ],
       }),
       NOW,
@@ -215,15 +230,49 @@ describe("LLM spend", () => {
   test("each key source against its own cap", () => {
     const s = spendVsCap(
       [
-        { provider: "claude", keySource: "vexis", usd: 0.5, runs: 3 },
-        { provider: "openai", keySource: "vexis", usd: 0.5, runs: 3 },
-        { provider: "claude", keySource: "own", usd: 3, runs: 3 },
+        { agent: "scout", provider: "claude", model: "claude-haiku-5-5", keySource: "vexis", usd: 0.5, runs: 3 },
+        { agent: "risk", provider: "openai", model: "gpt-6-luna", keySource: "vexis", usd: 0.5, runs: 3 },
+        { agent: "scout", provider: "claude", model: "claude-haiku-5-5", keySource: "own", usd: 3, runs: 3 },
       ],
       { vexisDailyUsd: 2, guardrails: parseGuardrails({ dailyLlmUsd: 1 }) },
     );
     expect(s.vexis).toEqual({ usd: 1, cap: 2, share: 0.5 });
     expect(s.own).toEqual({ usd: 3, cap: 1, share: 1 });
     expect(spendVsCap([], { vexisDailyUsd: 0, guardrails: parseGuardrails({}) }).vexis.share).toBe(0);
+  });
+
+  test("each desk's model, calls and spend, free models marked", () => {
+    const free = { provider: "openrouter" as const, model: "openrouter/free" };
+    const usage = deskUsage(
+      [
+        { agent: "scout", provider: "openrouter", model: "openrouter/free", keySource: "own", usd: 0, runs: 2 },
+        { agent: "risk", provider: "claude", model: "claude-haiku-5-5", keySource: "own", usd: 0.25, runs: 1 },
+      ],
+      { ...config().models, scout: free, risk: claude, manager: null },
+    );
+    expect(usage.find((u) => u.agent === "scout")).toEqual({
+      agent: "scout",
+      model: free,
+      runs: 2,
+      usd: 0,
+      free: true,
+    });
+    expect(usage.find((u) => u.agent === "risk")).toEqual({
+      agent: "risk",
+      model: claude,
+      runs: 1,
+      usd: 0.25,
+      free: false,
+    });
+    expect(usage.find((u) => u.agent === "manager")).toEqual({
+      agent: "manager",
+      model: null,
+      runs: 0,
+      usd: 0,
+      free: false,
+    });
+    expect(freeModel(free)).toBe(true);
+    expect(freeModel(claude)).toBe(false);
   });
 
   test("own keys missing for a picked provider", () => {
@@ -237,6 +286,14 @@ describe("LLM spend", () => {
       { agent: "strategist", provider: "openai" },
     ]);
     expect(missingKeys({ keySource: "vexis", models, savedKeys: [] })).toEqual([]);
+  });
+
+  test("a reply reads as indented JSON when it is one, and as sent when it is not", () => {
+    expect(prettyReply('Here:\n```json\n{"candidates":[{"pool":"P1"}]}\n```')).toBe(
+      '{\n  "candidates": [\n    {\n      "pool": "P1"\n    }\n  ]\n}',
+    );
+    expect(prettyReply("I cannot help with that.")).toBe("I cannot help with that.");
+    expect(prettyReply("{not json}")).toBe("{not json}");
   });
 });
 

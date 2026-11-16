@@ -564,6 +564,39 @@ export const officeRuns = pgTable(
 ).enableRLS();
 
 /**
+ * The last exchange with each LLM desk: the two messages it was sent, the raw answer and that call's metadata. One row
+ * per (user, agent), replaced on every call, so showing a thread never grows with history. A desk has no tools: one
+ * system message, one user message, one JSON answer, and nothing else on the wire.
+ */
+export const officeThreads = pgTable(
+  "office_threads",
+  {
+    userId: userId(),
+    agent: text("agent").$type<LlmAgent>().notNull(),
+    provider: text("provider").$type<LlmProvider>().notNull(),
+    model: text("model").notNull(),
+    keySource: text("key_source").$type<KeySource>().notNull(),
+    promptVersion: text("prompt_version").notNull(),
+    system: text("system").notNull(),
+    userMessage: text("user_message").notNull(),
+    /** The answer exactly as the provider sent it; null when the call failed before one arrived. */
+    reply: text("reply"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    costUsd: doublePrecision("cost_usd"),
+    durationMs: integer("duration_ms").notNull(),
+    error: text("error"),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.agent] }),
+    enumCheck("office_threads_agent_check", "agent", LLM_AGENTS),
+    enumCheck("office_threads_provider_check", "provider", LLM_PROVIDERS),
+    enumCheck("office_threads_key_source_check", "key_source", KEY_SOURCES),
+  ],
+).enableRLS();
+
+/**
  * One row per position the office opened: why it opened, why it closed and what it made. PnL is null until the
  * Bookkeeper reads a real close from Meteora, and stays null for a simulated position nobody priced.
  */

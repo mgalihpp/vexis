@@ -12,6 +12,7 @@ import {
   PROVIDER_LABEL,
   WALLET_SOURCES,
 } from "@vexis/db/office";
+import { PROMPT_TEXT } from "@vexis/db/office-prompts";
 import {
   BotIcon,
   BrainIcon,
@@ -19,6 +20,7 @@ import {
   GlobeIcon,
   KeyRoundIcon,
   type LucideIcon,
+  ScrollTextIcon,
   SendIcon,
   ShieldCheckIcon,
   WalletIcon,
@@ -85,6 +87,7 @@ function Save({ disabled, pending, children }: { disabled: boolean; pending: boo
 
 const SECTIONS = [
   { value: "models", label: "Models", Icon: BrainIcon, Page: ModelsPage },
+  { value: "prompts", label: "Prompts", Icon: ScrollTextIcon, Page: PromptsPage },
   { value: "pools", label: "Pools", Icon: WavesIcon, Page: PoolsPage },
   { value: "keys", label: "API keys", Icon: KeyRoundIcon, Page: KeysPage },
   { value: "wallet", label: "Wallet", Icon: WalletIcon, Page: WalletPage },
@@ -311,6 +314,34 @@ function OwnModels({ config }: { config: ConfigView }) {
         Save models
       </Save>
     </form>
+  );
+}
+
+/** The exact system prompt each LLM desk sends, with its version and the model it runs on. */
+function PromptsPage({ config }: { config: ConfigView }) {
+  return (
+    <Group
+      title="System prompts"
+      footer="Fixed per desk and versioned; every call records its version in the runs table. The user message carries this tick's pools, wallet and proposal, and is never stored."
+    >
+      {LLM_AGENTS.map((agent) => {
+        const model = config.models[agent];
+        const prompt = PROMPT_TEXT[agent];
+        return (
+          <div key={agent} className="flex flex-col gap-2 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Portrait agent={agent} className="h-6 w-4" />
+              <span className="text-xs font-medium">{AGENT_INFO[agent].name}</span>
+              <Badge variant="outline">{prompt.version}</Badge>
+              <span className="font-mono text-[0.6875rem] text-muted-foreground">{model?.model ?? "No model"}</span>
+            </div>
+            <pre className="m-0 max-h-64 overflow-auto rounded-md bg-foreground/[0.05] p-2.5 font-mono text-[0.6875rem] leading-relaxed whitespace-pre-wrap">
+              {prompt.system}
+            </pre>
+          </div>
+        );
+      })}
+    </Group>
   );
 }
 

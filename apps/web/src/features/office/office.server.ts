@@ -30,6 +30,7 @@ import {
   listJournal,
   listMessages,
   listProposals,
+  listThreads,
   llmSpendToday,
   type MessageRow,
   type OfficeConfigRow,
@@ -100,11 +101,12 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
   if (!config) return { enabled: false };
 
   const now = new Date();
-  const [open, recent, messages, runs, positions, pnl, spend, counts, userWallet] = await Promise.all([
+  const [open, recent, messages, runs, threads, positions, pnl, spend, counts, userWallet] = await Promise.all([
     listProposals(s, { statuses: OPEN_STATUSES, limit: 100 }),
     listProposals(s, { limit: 10 }),
     listMessages(s, { limit: 60 }),
     latestRuns(s, 50),
+    listThreads(s),
     listJournal(s, { openOnly: true, limit: 100 }),
     journalPnl(s, utcDayStart(now)),
     llmSpendToday(s, now),
@@ -142,8 +144,29 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
       agent: r.agent,
       provider: r.provider,
       model: r.model,
+      promptVersion: r.promptVersion,
+      inputTokens: r.inputTokens,
+      outputTokens: r.outputTokens,
+      costUsd: r.costUsd,
+      durationMs: r.durationMs,
       error: r.error,
       at: r.at.getTime(),
+    })),
+    threads: threads.map((t) => ({
+      agent: t.agent,
+      provider: t.provider,
+      model: t.model,
+      keySource: t.keySource,
+      promptVersion: t.promptVersion,
+      system: t.system,
+      user: t.userMessage,
+      reply: t.reply,
+      inputTokens: t.inputTokens,
+      outputTokens: t.outputTokens,
+      costUsd: t.costUsd,
+      durationMs: t.durationMs,
+      error: t.error,
+      at: t.at.getTime(),
     })),
     positions: positions.map((j) => ({
       id: j.id,
@@ -157,7 +180,14 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
       openedAt: j.openedAt.getTime(),
     })),
     pnl,
-    spend: spend.map((r) => ({ provider: r.provider, keySource: r.keySource, usd: r.usd, runs: r.runs })),
+    spend: spend.map((r) => ({
+      agent: r.agent,
+      provider: r.provider,
+      model: r.model,
+      keySource: r.keySource,
+      usd: r.usd,
+      runs: r.runs,
+    })),
     today: Object.fromEntries(counts.map((c) => [c.status, c.count])),
   };
 }

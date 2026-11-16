@@ -9,7 +9,7 @@ import {
   transition,
   utcDayStart,
 } from "@vexis/db/office";
-import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow } from "@vexis/db/office-queries";
+import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow, ThreadRow } from "@vexis/db/office-queries";
 import { Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";
@@ -142,6 +142,7 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
     proposals: seed.proposals ?? [],
     messages: [] as Pick<MessageRow, "userId" | "agent" | "text" | "tone" | "poolAddress" | "proposalId">[],
     runs: [] as (Omit<RunRow, "inputTokens" | "outputTokens" | "costUsd" | "error"> & Partial<RunRow>)[],
+    threads: new Map<string, ThreadRow>(),
     journal: [] as JournalRow[],
     alerts: [] as (Spike & { userId: string })[],
     rebalancePools: new Map<string, string[]>(),
@@ -185,6 +186,18 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
           const runId = id("run");
           state.runs.push({ id: runId, userId, at: new Date(), ...r });
           return runId;
+        }),
+      saveThread: (userId, t) =>
+        Effect.sync(() => {
+          state.threads.set(`${userId}:${t.agent}`, {
+            ...t,
+            userId,
+            reply: t.reply ?? null,
+            inputTokens: t.inputTokens ?? null,
+            outputTokens: t.outputTokens ?? null,
+            costUsd: t.costUsd ?? null,
+            error: t.error ?? null,
+          });
         }),
       spendToday: (userId, now) =>
         Effect.sync(() => {

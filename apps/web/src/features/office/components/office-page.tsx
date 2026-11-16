@@ -194,7 +194,7 @@ function Office({
               }
             />
           </div>
-          <div className="flex min-w-0 flex-col lg:h-full">
+          <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
             <nav aria-label="Office panels" className="flex shrink-0 overflow-x-auto border-b px-2">
               {SIDE_TABS.map((t) => (
                 <button
@@ -211,7 +211,7 @@ function Office({
                 </button>
               ))}
             </nav>
-            <div className="flex flex-col gap-3 pt-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto overscroll-contain pt-3 pr-1 [scrollbar-gutter:stable] lg:flex-1">
               {tab === "overview" && (
                 <>
                   <PnlCard view={view} />

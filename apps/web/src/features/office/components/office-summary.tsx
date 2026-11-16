@@ -1,4 +1,3 @@
-import { PROVIDER_LABEL } from "@vexis/db/office";
 import { LayersIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -13,13 +12,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { timeAgo } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
-import { deployed, type OfficeView, type PositionView, spendVsCap } from "../office";
+import { AGENT_INFO, deployed, deskUsage, type OfficeView, type PositionView, spendVsCap } from "../office";
 import { closePositionFn } from "../office.functions";
-import { cost, Meter, PanelEmpty, Section, sol, toneOf, usd, useOfficeMutation } from "./office-ui";
+import { Portrait } from "./agent-card";
+import { cost, DASH, Meter, PanelEmpty, Section, sol, toneOf, usd, useOfficeMutation } from "./office-ui";
 
 /** Realized PnL of closed positions, today (UTC) and all time; unknown PnL is a dash. */
 export function PnlCard({ view }: { view: OfficeView }) {
@@ -126,15 +126,24 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
   );
 }
 
-/** Today's LLM spend against the cap of each key source, and per provider. */
+/** Today's LLM spend against each key source's cap, then what each desk ran on. */
 export function SpendCard({ view }: { view: OfficeView }) {
   const s = spendVsCap(view.spend, view.config);
+  const usage = deskUsage(view.spend, view.config.models);
+  const calls = usage.reduce((n, u) => n + u.runs, 0);
   const caps = [
     { key: "vexis" as const, label: "Vexis key", meter: s.vexis },
     { key: "own" as const, label: "Own keys", meter: s.own },
   ];
   return (
-    <Section title="Model usage">
+    <Section
+      title="Model usage"
+      action={
+        <span className="text-[0.6875rem] text-muted-foreground tabular-nums">
+          {calls} {calls === 1 ? "call" : "calls"} today
+        </span>
+      }
+    >
       {caps.map((c) => (
         <div key={c.key} className="flex flex-col gap-1">
           <div className="flex items-center justify-between gap-2 text-xs">
@@ -149,21 +158,41 @@ export function SpendCard({ view }: { view: OfficeView }) {
           <Meter share={c.meter.share} className={c.meter.share >= 1 ? "bg-loss" : "bg-brand"} />
         </div>
       ))}
-      {s.rows.length > 0 && (
-        <ul className="m-0 flex list-none flex-col gap-1 border-t p-0 pt-2.5">
-          {s.rows.map((r) => (
-            <li key={`${r.provider}-${r.keySource}`} className="flex items-center justify-between gap-2 text-xs">
-              <span>
-                {PROVIDER_LABEL[r.provider]}
-                <span className="ml-1.5 text-muted-foreground">
-                  {r.runs} {r.runs === 1 ? "run" : "runs"}
-                </span>
-              </span>
-              <span className="tabular-nums">{cost(r.usd)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ItemGroup className="gap-1 border-t pt-2">
+        {usage.map((u) => {
+          const last = view.runs.filter((r) => r.agent === u.agent).sort((a, b) => b.at - a.at)[0];
+          const idle = !u.model || u.usd === 0;
+          return (
+            <Item key={u.agent} variant="outline" size="xs">
+              <ItemMedia variant="image" className="h-7 w-5 rounded border bg-muted/50">
+                <Portrait agent={u.agent} className="h-6 w-4" />
+              </ItemMedia>
+              <ItemContent className="min-w-0">
+                <ItemTitle>
+                  <span className="truncate">{AGENT_INFO[u.agent].name}</span>
+                  {u.free && <Badge variant="secondary">free</Badge>}
+                </ItemTitle>
+                <ItemDescription className="truncate font-mono">{u.model?.model ?? "No model"}</ItemDescription>
+                {last?.error && (
+                  <span className="text-[0.625rem] text-loss" title={last.error}>
+                    Last call failed {timeAgo(last.at, view.now)}
+                  </span>
+                )}
+              </ItemContent>
+              <ItemActions>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className={`text-xs font-medium tabular-nums ${idle ? "text-muted-foreground" : ""}`}>
+                    {u.model ? cost(u.usd) : DASH}
+                  </span>
+                  <span className="text-[0.625rem] text-muted-foreground tabular-nums">
+                    {!u.model ? DASH : u.runs === 0 ? "not run yet" : `${u.runs} ${u.runs === 1 ? "call" : "calls"}`}
+                  </span>
+                </div>
+              </ItemActions>
+            </Item>
+          );
+        })}
+      </ItemGroup>
     </Section>
   );
 }

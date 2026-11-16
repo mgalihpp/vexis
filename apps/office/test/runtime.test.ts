@@ -42,6 +42,16 @@ describe("office tick", () => {
     ]);
     expect(s.chain.calls).toEqual([`https://rpc.test/?api-key=secret-key ${POOL}`]);
     expect(s.llm.calls.every((c) => !c.user.includes("secret-key") && !c.user.includes("OWNER1"))).toBe(true);
+    // Each desk's thread is the exchange just sent, answer included.
+    expect([...s.db.threads.values()].map((t) => [t.agent, t.reply !== null])).toEqual([
+      ["scout", true],
+      ["strategist", true],
+      ["risk", true],
+      ["manager", true],
+    ]);
+    const [scoutCall] = s.llm.calls;
+    const scoutThread = s.db.threads.get("user-1:scout");
+    expect([scoutThread?.system, scoutThread?.userMessage]).toEqual([scoutCall?.system, scoutCall?.user]);
   });
 
   test("a code veto rejects the draft without asking the Risk agent", async () => {
@@ -52,6 +62,9 @@ describe("office tick", () => {
     const notes = RiskNotes.parse(s.db.proposals[0]?.riskNotes);
     expect(notes.checks.filter((c) => !c.ok).map((c) => c.rule)).toEqual(["max_position_pct"]);
     expect(s.llm.calls.filter((c) => c.agent === "risk")).toHaveLength(0);
+    // A call that failed still keeps its thread: the two messages, the error, and no answer.
+    const scout = s.db.threads.get("user-1:scout");
+    expect([scout?.reply, scout?.error]).toEqual([null, "claude/claude-haiku-5-5: HTTP 500"]);
   });
 
   test("the Risk agent can add a veto", async () => {

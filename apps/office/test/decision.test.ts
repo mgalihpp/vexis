@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import {
+  ManagerDecision,
+  parseDecision,
+  RiskDecision,
+  ScoutDecision,
+  StrategistDecision,
+} from "@vexis/db/office-prompts";
 import type { z } from "zod";
-import { ManagerDecision, parseDecision, RiskDecision, ScoutDecision, StrategistDecision } from "../src/decision.ts";
 import { POOL } from "./fakes.ts";
 
 describe("parseDecision", () => {
