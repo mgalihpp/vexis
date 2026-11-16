@@ -117,10 +117,10 @@ export type WalletSource = (typeof WALLET_SOURCES)[number];
 
 /** Hard rules, checked in code by `guardrails.ts`. Only the owner changes them, from the web. */
 export const Guardrails = z.object({
-  /** Largest share of the wallet's SOL one position may take, in percent. */
+  /** Largest share of the office's capital (free SOL plus open positions at cost) one position may take, in percent. */
   maxPositionPct: z.number().gt(0).max(100).default(25),
   maxActivePositions: z.number().int().min(1).max(20).default(3),
-  /** Loss against the UTC day's starting balance, in percent, that pauses the office until tomorrow. */
+  /** The office's loss today (realized plus unrealized on its own positions) against its capital at the day start. */
   maxDailyLossPct: z.number().gt(0).max(100).default(5),
   /** SOL that always stays in the wallet. */
   solReserve: z.number().min(0).max(100).default(0.1),

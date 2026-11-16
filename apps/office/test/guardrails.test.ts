@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { Guardrails } from "@vexis/db/office";
 import { SCREENER_PRESETS } from "@vexis/db/screen";
-import { checkOpen, dailyCapUsd, dailyLossHit, dailyLossPct, type RiskFacts } from "../src/guardrails.ts";
+import {
+  type BookPosition,
+  checkOpen,
+  dailyCapUsd,
+  dailyLossHit,
+  dailyLossPct,
+  dayPnlSol,
+  freeSol,
+  officeCapital,
+  type RiskFacts,
+} from "../src/guardrails.ts";
 import { pool, T0 } from "./fakes.ts";
 
 // Defaults: 25% max position, 3 positions, 5% daily loss, 0.1 SOL reserve, 300 s cooldown, $1 own-key budget.
@@ -11,8 +21,8 @@ const BLUE_CHIP = SCREENER_PRESETS["blue-chip"].filter;
 const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
   params: { strategy: "Spot", activeBin: 100, lowerBin: 90, upperBin: 110, amountSol: 1, solUsd: 150 },
   walletSol: 10,
-  dayStartSol: 10,
-  openPositions: 0,
+  dayStartCapital: 10,
+  book: { open: [], closedToday: [] },
   pool: pool(),
   rebalanceManaged: false,
   lastExecutionAt: null,
@@ -21,6 +31,18 @@ const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
   llmCapUsd: 1,
   ...overrides,
 });
+
+/** A real position valued a minute ago. */
+const position = (o: Partial<BookPosition> = {}): BookPosition => ({
+  amountSol: 1,
+  simulated: false,
+  valueSol: 1,
+  valuedAt: new Date(T0 - 60_000),
+  pnlSol: null,
+  ...o,
+});
+const open = (...ps: BookPosition[]) => ({ book: { open: ps, closedToday: [] } });
+const closed = (...ps: BookPosition[]) => ({ book: { open: [], closedToday: ps } });
 
 const params = (amountSol: number) => ({ ...facts().params, amountSol });
 const verdict = (rule: string, f: RiskFacts) => checkOpen(g, BLUE_CHIP, f).find((c) => c.rule === rule)?.ok;
@@ -34,14 +56,23 @@ describe("checkOpen", () => {
     ["max_position_pct", facts({ params: params(2.5) }), true],
     ["max_position_pct", facts({ params: params(2.51) }), false],
     ["max_position_pct", facts({ walletSol: null }), false],
-    ["sol_reserve", facts({ walletSol: 0.2, params: params(0.05), dayStartSol: 0.2 }), true],
-    ["sol_reserve", facts({ walletSol: 0.12, params: params(0.03), dayStartSol: 0.12 }), false],
-    ["max_active_positions", facts({ openPositions: 2 }), true],
-    ["max_active_positions", facts({ openPositions: 3 }), false],
-    ["daily_loss", facts({ walletSol: 9.51 }), true],
-    ["daily_loss", facts({ walletSol: 9.5 }), false],
-    ["daily_loss", facts({ dayStartSol: null }), false],
-    ["daily_loss", facts({ walletSol: 12 }), true],
+    // SOL locked in a real position still counts toward the base: 8 free + 2 committed = 10.
+    ["max_position_pct", facts({ walletSol: 8, params: params(2.5), ...open(position({ amountSol: 2 })) }), true],
+    ["sol_reserve", facts({ walletSol: 0.2, params: params(0.05) }), true],
+    ["sol_reserve", facts({ walletSol: 0.12, params: params(0.03) }), false],
+    // A simulated position never left the wallet, so it is taken off the free SOL.
+    ["sol_reserve", facts({ params: params(0.05), ...open(position({ amountSol: 9.85, simulated: true })) }), true],
+    ["sol_reserve", facts({ params: params(0.06), ...open(position({ amountSol: 9.85, simulated: true })) }), false],
+    ["max_active_positions", facts(open(position(), position())), true],
+    ["max_active_positions", facts(open(position(), position(), position())), false],
+    ["daily_loss", facts(closed(position({ pnlSol: -0.49 }))), true],
+    ["daily_loss", facts(closed(position({ pnlSol: -0.5 }))), false],
+    ["daily_loss", facts(open(position({ amountSol: 2, valueSol: 1.5 }))), false],
+    ["daily_loss", facts({ dayStartCapital: null }), false],
+    ["daily_loss", facts(closed(position({ pnlSol: null }))), false],
+    ["daily_loss", facts(open(position({ valuedAt: new Date(T0 - 5 * 60_000 - 1) }))), false],
+    // An auto-rebalance agent spending the shared wallet's SOL is not the office's loss.
+    ["daily_loss", facts({ walletSol: 2 }), true],
     ["pool_alertable", facts({ pool: pool({ blacklisted: true }) }), false],
     ["pool_alertable", facts({ pool: pool({ freezable: true }) }), false],
     ["pool_alertable", facts({ pool: pool({ binStep: 25 }) }), false],
@@ -78,12 +109,29 @@ describe("checkOpen", () => {
 });
 
 describe("daily loss and budget", () => {
-  test("loss is measured against the day's first balance and hits at the limit", () => {
-    expect(dailyLossPct(10, 9)).toBeCloseTo(10);
-    expect(dailyLossPct(10, 11)).toBe(0);
-    expect(dailyLossPct(null, 9)).toBe(0);
-    expect(dailyLossHit(g, 10, 9.5)).toBe(true);
-    expect(dailyLossHit(g, 10, 9.51)).toBe(false);
+  test("PnL is realized today plus unrealized now, simulated positions count zero", () => {
+    const book = {
+      open: [position({ amountSol: 2, valueSol: 2.3 }), position({ amountSol: 5, simulated: true, valueSol: null })],
+      closedToday: [position({ pnlSol: -0.1 }), position({ simulated: true })],
+    };
+    expect(dayPnlSol(book, T0)).toBeCloseTo(0.2);
+    expect(dayPnlSol({ open: [position({ valueSol: null })], closedToday: [] }, T0)).toBeNull();
+  });
+
+  test("capital counts real positions at cost, free SOL takes simulated ones off", () => {
+    const ps = [position({ amountSol: 2 }), position({ amountSol: 3, simulated: true })];
+    expect(officeCapital(5, ps)).toBe(7);
+    expect(freeSol(5, ps)).toBe(2);
+  });
+
+  test("loss is measured against the day's starting capital and hits at the limit", () => {
+    expect(dailyLossPct(10, -1)).toBeCloseTo(10);
+    expect(dailyLossPct(10, 1)).toBe(0);
+    expect(dailyLossPct(null, -1)).toBeNull();
+    expect(dailyLossPct(10, null)).toBeNull();
+    expect(dailyLossHit(g, dailyLossPct(10, -0.5))).toBe(true);
+    expect(dailyLossHit(g, dailyLossPct(10, -0.49))).toBe(false);
+    expect(dailyLossHit(g, null)).toBe(false);
   });
 
   test("the cap follows the key source", () => {

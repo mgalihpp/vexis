@@ -157,6 +157,14 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
           }));
         }),
       openJournal: (userId) => Effect.sync(() => state.journal.filter((j) => j.userId === userId && !j.closedAt)),
+      book: (userId, since) =>
+        Effect.sync(() => {
+          const mineJ = state.journal.filter((j) => j.userId === userId);
+          return {
+            open: mineJ.filter((j) => !j.closedAt),
+            closedToday: mineJ.filter((j) => j.closedAt && j.closedAt >= since),
+          };
+        }),
       insertJournal: (userId, j) =>
         Effect.sync(() => {
           state.journal.push({
@@ -168,6 +176,8 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
             poolName: null,
             positionAddress: null,
             amountUsd: null,
+            valueSol: null,
+            valuedAt: null,
             closeReason: null,
             closedAt: null,
             pnlSol: null,

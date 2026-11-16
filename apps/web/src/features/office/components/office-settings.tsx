@@ -487,7 +487,7 @@ const GUARDRAIL_GROUPS: {
   {
     title: "Positions",
     fields: [
-      { key: "maxPositionPct", label: "Largest position", unit: "% of wallet SOL", step: "1" },
+      { key: "maxPositionPct", label: "Largest position", unit: "% of office capital", step: "1" },
       { key: "maxActivePositions", label: "Active positions", unit: "At most", step: "1" },
       { key: "solReserve", label: "SOL reserve", unit: "SOL always kept", step: "0.01" },
     ],
@@ -495,7 +495,7 @@ const GUARDRAIL_GROUPS: {
   {
     title: "Limits",
     fields: [
-      { key: "maxDailyLossPct", label: "Daily loss limit", unit: "% of the UTC day's start", step: "0.5" },
+      { key: "maxDailyLossPct", label: "Daily loss limit", unit: "% of capital at 00:00 UTC", step: "0.5" },
       { key: "maxConsecutiveFailures", label: "Failures before pause", unit: "In a row", step: "1" },
       { key: "dailyLlmUsd", label: "Daily LLM budget", unit: "USD, own keys", step: "0.5" },
     ],

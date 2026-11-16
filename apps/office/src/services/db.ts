@@ -8,6 +8,7 @@ import {
   insertProposal,
   insertRun,
   type JournalRow,
+  journalBook,
   killOffice,
   lastExecutionAt,
   linkedOfficeBots,
@@ -34,6 +35,7 @@ import { DbError } from "../errors.ts";
 
 export type NewMessage = Omit<typeof officeMessages.$inferInsert, "id" | "userId" | "at">;
 export type NewRun = Omit<typeof officeRuns.$inferInsert, "id" | "userId">;
+export type JournalBook = { readonly open: ReadonlyArray<JournalRow>; readonly closedToday: ReadonlyArray<JournalRow> };
 export type NewJournal = Omit<typeof officeJournal.$inferInsert, "id" | "userId" | "openedAt">;
 export type MovePatch = Parameters<typeof moveProposal>[4];
 export type SpendRow = { readonly keySource: string; readonly usd: number };
@@ -89,6 +91,8 @@ export class Db extends Context.Service<
     insertRun(userId: string, r: NewRun): Effect.Effect<string, DbError>;
     spendToday(userId: string, now: Date): Effect.Effect<ReadonlyArray<SpendRow>, DbError>;
     openJournal(userId: string): Effect.Effect<ReadonlyArray<JournalRow>, DbError>;
+    /** Open positions and the ones closed since `since`. */
+    book(userId: string, since: Date): Effect.Effect<JournalBook, DbError>;
     insertJournal(userId: string, j: NewJournal): Effect.Effect<void, DbError>;
     lastExecutionAt(userId: string, poolAddress: string): Effect.Effect<Date | null, DbError>;
     /** Pools one of the user's auto-rebalance agents manages. */
@@ -151,6 +155,7 @@ export class Db extends Context.Service<
         insertRun: (userId, r) => run("insertRun", () => insertRun(as(userId), r)),
         spendToday: (userId, now) => run("spendToday", () => llmSpendToday(as(userId), now)),
         openJournal: (userId) => run("openJournal", () => listJournal(as(userId), { openOnly: true })),
+        book: (userId, since) => run("book", () => journalBook(as(userId), since)),
         insertJournal: (userId, j) => run("insertJournal", () => insertJournal(as(userId), j)).pipe(Effect.asVoid),
         lastExecutionAt: (userId, pool) => run("lastExecutionAt", () => lastExecutionAt(as(userId), pool)),
         rebalancePools: (userId) =>

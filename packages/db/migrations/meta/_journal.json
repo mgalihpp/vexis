@@ -85,6 +85,13 @@
       "when": 1794812573280,
       "tag": "0011_office_telegram",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794813769273,
+      "tag": "0012_office_journal_value",
+      "breakpoints": true
     }
   ]
 }

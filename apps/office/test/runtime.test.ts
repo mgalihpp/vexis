@@ -4,6 +4,7 @@ import { SCREENER_PRESETS } from "@vexis/db/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { pollInbox } from "../src/inbox.ts";
+import { Db } from "../src/services/db.ts";
 import { callbackData } from "../src/telegram.ts";
 import { tick } from "../src/tick.ts";
 import { BOT_TOKEN, CHAT, MINUTE, office, openParams, POOL, PROPOSAL_ID, proposal, setup, T0 } from "./fakes.ts";
@@ -24,7 +25,7 @@ describe("office tick", () => {
     expect(notes.llm).toEqual({ veto: false, note: "Range suits the bin step." });
     expect(s.db.runs.map((r) => [r.agent, r.promptVersion, r.costUsd])).toEqual([
       ["scout", "scout-v1", 0.0002],
-      ["strategist", "strategist-v1", 0.0002],
+      ["strategist", "strategist-v2", 0.0002],
       ["risk", "risk-v1", 0.0002],
       ["manager", "manager-v1", 0.0002],
     ]);
@@ -155,15 +156,30 @@ describe("office tick", () => {
     expect(s.db.messages.filter((m) => m.text.startsWith("The custom pool filter is empty"))).toHaveLength(1);
   });
 
-  test("a daily loss over the limit pauses the office until the next UTC midnight", async () => {
+  test("the office's own loss pauses it until the next UTC midnight, a shared wallet's spending does not", async () => {
     const s = setup({ offices: [office({ models: {} })] });
     await s.run(
       Effect.gen(function* () {
         yield* tick();
-        s.chain.balanceSol = 9.4;
+        s.chain.balanceSol = 5;
         yield* TestClock.adjust(MINUTE);
         yield* tick();
       }),
+    );
+    expect(s.db.offices[0]?.paused).toBe(false);
+    await s.run(
+      Effect.gen(function* () {
+        yield* (yield* Db).insertJournal("user-1", {
+          poolAddress: POOL,
+          simulated: false,
+          amountSol: 1,
+          openReason: "test",
+          closedAt: new Date(T0),
+          pnlSol: -0.6,
+        });
+        yield* tick();
+      }),
+      T0 + 2 * MINUTE,
     );
     expect(s.db.offices[0]).toMatchObject({
       paused: true,

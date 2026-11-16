@@ -2,7 +2,7 @@ import { utcDayStart } from "@vexis/db/office";
 import { Context, Effect, Layer, Ref } from "effect";
 
 // Memory the runtime keeps between ticks. A restart forgets it on purpose: Scout runs at once, the day's starting
-// balance is taken again at the first read, and each once-a-day notice can repeat one time.
+// capital is taken again at the first read, and each once-a-day notice can repeat one time.
 
 type Store = {
   readonly scoutAt: Map<string, number>;
@@ -15,8 +15,8 @@ export class OfficeState extends Context.Service<
   {
     lastScout(userId: string): Effect.Effect<number | null>;
     markScout(userId: string, at: number): Effect.Effect<void>;
-    /** The wallet's SOL at the first read of the UTC day holding `now`; `sol` is today's first when none is kept yet. */
-    dayStartSol(userId: string, now: number, sol: number | null): Effect.Effect<number | null>;
+    /** The office's capital at the first read of the UTC day holding `now`; `sol` is today's first when none is kept. */
+    dayStartCapital(userId: string, now: number, sol: number | null): Effect.Effect<number | null>;
     /** True the first time `key` is seen on the UTC day holding `now`, so a notice goes to the feed once a day. */
     firstToday(key: string, now: number): Effect.Effect<boolean>;
   }
@@ -28,7 +28,7 @@ export class OfficeState extends Context.Service<
       return OfficeState.of({
         lastScout: (userId) => Ref.get(store).pipe(Effect.map((s) => s.scoutAt.get(userId) ?? null)),
         markScout: (userId, at) => Ref.update(store, (s) => ({ ...s, scoutAt: new Map(s.scoutAt).set(userId, at) })),
-        dayStartSol: (userId, now, sol) =>
+        dayStartCapital: (userId, now, sol) =>
           Ref.modify(store, (s) => {
             const day = utcDayStart(now).getTime();
             const kept = s.dayStart.get(userId);

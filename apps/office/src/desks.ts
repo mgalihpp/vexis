@@ -3,7 +3,7 @@ import type { ProposalRow } from "@vexis/db/office-queries";
 import { alertable } from "@vexis/db/screen";
 import { Effect, Option } from "effect";
 import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
-import { checkOpen } from "./guardrails.ts";
+import { checkOpen, freeSol, officeCapital } from "./guardrails.ts";
 import { sendCard } from "./inbox.ts";
 import type { OfficePool } from "./pools.ts";
 import {
@@ -15,7 +15,7 @@ import {
   strategistPrompt,
 } from "./prompts/prompts.ts";
 import { Chain } from "./services/chain.ts";
-import { Db } from "./services/db.ts";
+import { Db, type JournalBook } from "./services/db.ts";
 import { SCREENER_WINDOW_MS, Screener } from "./services/meteora.ts";
 import { OfficeState } from "./services/state.ts";
 
@@ -27,7 +27,10 @@ const HOUR_MS = 60 * 60_000;
 export type Floor = Office & {
   /** Native SOL in the wallet now; null when there is no wallet or the read failed. */
   readonly walletSol: number | null;
-  readonly dayStartSol: number | null;
+  /** The office's capital at the first read of the UTC day; null until a balance was read today. */
+  readonly dayStartCapital: number | null;
+  /** The office's open positions and today's closes, read at the start of the tick. */
+  readonly book: JournalBook;
   readonly rpc: { readonly owner: string; readonly url: string } | null;
 };
 
@@ -122,7 +125,9 @@ const draft = (
       yield* sayOnce(floor, "no-wallet", "strategist", `${why}, so I cannot size a position.`, "warn");
       return;
     }
-    const { rpc, walletSol } = floor;
+    const { rpc } = floor;
+    const walletSol = freeSol(floor.walletSol, floor.book.open);
+    const maxPositionSol = (officeCapital(floor.walletSol, floor.book.open) * floor.guardrails.maxPositionPct) / 100;
     const db = yield* Db;
     const chain = yield* Chain;
 
@@ -146,6 +151,7 @@ const draft = (
     const answer = yield* ask(floor, "strategist", strategistPrompt, {
       candidates: ready,
       walletSol,
+      maxPositionSol,
       guardrails: floor.guardrails,
       openPositions: open.map((j) => ({ name: j.poolName, amountSol: j.amountSol })),
     });
@@ -225,13 +231,12 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
       return yield* reject({ checks: [check], llm: null }, `Vetoed ${name}: I can only check new positions.`);
     }
 
-    const open = yield* db.openJournal(floor.userId);
     const { spent, cap } = yield* llmBudget(floor);
     const checks = checkOpen(floor.guardrails, floor.filter, {
       params: params.data,
       walletSol: floor.walletSol,
-      dayStartSol: floor.dayStartSol,
-      openPositions: open.length,
+      dayStartCapital: floor.dayStartCapital,
+      book: floor.book,
       pool: pools.find((p) => p.address === proposal.poolAddress) ?? null,
       rebalanceManaged: managed.has(proposal.poolAddress),
       lastExecutionAt: yield* db.lastExecutionAt(floor.userId, proposal.poolAddress),

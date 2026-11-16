@@ -58,13 +58,16 @@ export type StrategistCandidate = ScoutPool & { readonly reason: string; readonl
 
 export type StrategistInput = {
   readonly candidates: readonly StrategistCandidate[];
+  /** SOL the office may still spend. */
   readonly walletSol: number;
+  /** The largest position the guardrails allow, in SOL. */
+  readonly maxPositionSol: number;
   readonly guardrails: Guardrails;
   readonly openPositions: readonly { readonly name: string | null; readonly amountSol: number }[];
 };
 
 export const strategistPrompt: Prompt<StrategistInput, StrategistDecision> = {
-  version: "strategist-v1",
+  version: "strategist-v2",
   schema: StrategistDecision,
   system: [
     "You are the Strategist of a Meteora DLMM liquidity desk on Solana.",
@@ -76,9 +79,9 @@ export const strategistPrompt: Prompt<StrategistInput, StrategistDecision> = {
     'Shape: {"action":"open","pool":"<address>","strategy":"Spot|Curve|BidAsk","lowerBin":0,"upperBin":0,"amountSol":0,"rationale":"<two sentences>"}',
     'or {"action":"skip","reason":"<one sentence>"}',
   ].join("\n"),
-  user: ({ candidates, walletSol, guardrails, openPositions }) =>
+  user: ({ candidates, walletSol, maxPositionSol, guardrails, openPositions }) =>
     [
-      `Wallet: ${walletSol.toFixed(3)} SOL. Max position: ${guardrails.maxPositionPct}% of the wallet. Keep at least ${guardrails.solReserve} SOL.`,
+      `Wallet: ${walletSol.toFixed(3)} SOL free. Max position: ${maxPositionSol.toFixed(3)} SOL. Keep at least ${guardrails.solReserve} SOL.`,
       `Open positions (${openPositions.length} of max ${guardrails.maxActivePositions}):`,
       ...openPositions.map((p) => `- ${p.name ?? "?"}: ${p.amountSol} SOL`),
       "Candidates (address | pair | TVL | 24h volume | 24h fee/TVL | bin step | active bin | Scout's reason):",
