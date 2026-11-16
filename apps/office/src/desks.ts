@@ -4,7 +4,7 @@ import { alertable } from "@vexis/db/screen";
 import { Effect, Option } from "effect";
 import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
 import { checkOpen } from "./guardrails.ts";
-import { OFFICE_FILTER, type OfficePool } from "./pools.ts";
+import type { OfficePool } from "./pools.ts";
 import {
   managerPrompt,
   riskPrompt,
@@ -52,6 +52,12 @@ const screenedPools = Effect.gen(function* () {
 export const scoutAndDraft = (floor: Floor) =>
   Effect.gen(function* () {
     if (!floor.models.scout) return;
+    const { filter } = floor;
+    if (!filter) {
+      const text = "The custom pool filter is empty, so I am not scouting. Pick a preset in Settings.";
+      yield* sayOnce(floor, "no-filter", "scout", text, "warn");
+      return;
+    }
     const db = yield* Db;
     const state = yield* OfficeState;
 
@@ -73,7 +79,7 @@ export const scoutAndDraft = (floor: Floor) =>
       return;
     }
     const pools = snapshot.pools
-      .filter((p) => alertable(p, OFFICE_FILTER))
+      .filter((p) => alertable(p, filter))
       .toSorted((a, b) => (b.feeTvl24h ?? -1) - (a.feeTvl24h ?? -1))
       .slice(0, SCOUT_POOLS);
     if (pools.length === 0) {
@@ -220,7 +226,7 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
 
     const open = yield* db.openJournal(floor.userId);
     const { spent, cap } = yield* llmBudget(floor);
-    const checks = checkOpen(floor.guardrails, OFFICE_FILTER, {
+    const checks = checkOpen(floor.guardrails, floor.filter, {
       params: params.data,
       walletSol: floor.walletSol,
       dayStartSol: floor.dayStartSol,

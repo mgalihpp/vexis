@@ -4,15 +4,19 @@ import {
   activeModels,
   canTransition,
   FINAL_STATUSES,
+  OfficeScreen,
+  officeFilter,
   PROPOSAL_STATUSES,
   parseGuardrails,
   parseModels,
   parseProposalParams,
+  parseScreen,
   runCost,
   transition,
   utcDayStart,
   VEXIS_MODELS,
 } from "./office.ts";
+import { SCREENER_PRESETS } from "./screen.ts";
 
 describe("proposal lifecycle", () => {
   it.each([
@@ -79,6 +83,18 @@ describe("config", () => {
       approvalTtlSec: 900,
       dailyLlmUsd: 1,
     });
+  });
+
+  it("the pool screen stores a preset id or a custom filter, and custom never falls back to a preset", () => {
+    const custom = { ...SCREENER_PRESETS.degen.filter, minTvl: 50_000 };
+    expect(parseScreen({ poolPreset: null, poolFilter: null })).toEqual({ preset: "blue-chip", custom: null });
+    expect(officeFilter(parseScreen({ poolPreset: "mid-cap", poolFilter: custom }))).toBe(
+      SCREENER_PRESETS["mid-cap"].filter,
+    );
+    expect(officeFilter(parseScreen({ poolPreset: "custom", poolFilter: custom }))).toEqual(custom);
+    expect(officeFilter(parseScreen({ poolPreset: "custom", poolFilter: null }))).toBeNull();
+    expect(OfficeScreen.safeParse({ preset: "whale" }).success).toBe(false);
+    expect(() => parseScreen({ poolPreset: "custom", poolFilter: { minTvl: -1 } })).toThrow();
   });
 
   it("an open proposal's range must hold the active bin", () => {

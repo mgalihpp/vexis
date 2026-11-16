@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// The screener's pool filter, shared by the web screener and the runner's screener-mode volume alerts.
+// The screener's pool filter, shared by the web screener, the runner's screener-mode volume alerts and the office.
 
 /** SOL, USDC and USDT: the quote side of a pair, never the token whose risk the pool carries. */
 export const QUOTES: ReadonlySet<string> = new Set([
@@ -181,6 +181,10 @@ export function screenRule(c: {
   minUsd: number;
   baseline: number;
 }): ScreenRule | null {
-  const filter = c.preset === "custom" ? c.custom : SCREENER_PRESETS[c.preset].filter;
+  const filter = presetFilter(c.preset, c.custom);
   return filter && { filter, mult: c.mult, minUsd: c.minUsd, baseline: c.baseline };
 }
+
+/** The preset's filter, or the custom one; null for custom with no filter. */
+export const presetFilter = (preset: PresetChoice, custom: PoolFilter | null) =>
+  preset === "custom" ? custom : SCREENER_PRESETS[preset].filter;

@@ -10,9 +10,11 @@ import {
   type LlmProvider,
   type OfficeAgent,
   type OfficeModels,
+  type OfficeScreen,
   OPEN_STATUSES,
   PROPOSAL_PARAMS,
   parseGuardrails,
+  parseScreen,
   RiskNotes,
   utcDayStart,
   type WalletSource,
@@ -127,6 +129,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     officeWallet: config.officePublicKey
       ? { publicKey: config.officePublicKey, rpcHost: rpcHost(config.officeRpcUrl) }
       : null,
+    screen: parseScreen(config),
   };
 
   return {
@@ -235,6 +238,19 @@ export const saveModels = (userId: string, models: OfficeModels) => patch(userId
 export const saveGuardrails = (userId: string, guardrails: Guardrails) => patch(userId, { guardrails });
 
 export const saveKeySource = (userId: string, keySource: KeySource) => patch(userId, { keySource });
+
+/** A preset keeps the stored custom filter, so picking Custom again restores it. Custom needs one, given or stored. */
+export async function saveScreen(userId: string, preset: OfficeScreen["preset"], custom?: OfficeScreen["custom"]) {
+  if (preset === "custom" && !custom) {
+    const config = await getOfficeConfig(scope(userId));
+    if (!config) throw new Error(NO_OFFICE);
+    if (!config.poolFilter) throw new Error("Hand a filter over from the screener first");
+  }
+  await patch(userId, { poolPreset: preset, ...(custom ? { poolFilter: custom } : {}) });
+}
+
+/** Whether the viewer has an office, for the screener's hand-off button. One primary-key read. */
+export const hasOffice = async (userId: string) => Boolean(await getOfficeConfig(scope(userId)));
 
 async function keysOf(userId: string) {
   const config = await getOfficeConfig(scope(userId));

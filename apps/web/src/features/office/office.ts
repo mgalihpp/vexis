@@ -14,6 +14,7 @@ import {
   type OfficeAgent,
   type OfficeMode,
   type OfficeModels,
+  type OfficeScreen,
   type ProposalKind,
   type ProposalParams,
   type ProposalStatus,
@@ -97,6 +98,8 @@ export type ConfigView = PauseFields & {
   userWallet: { publicKey: string; rpcHost: string | null } | null;
   /** The office's own wallet, when one was saved. */
   officeWallet: { publicKey: string; rpcHost: string | null } | null;
+  /** Which screener pools the office scouts: a preset, or the custom filter the screener handed over. */
+  screen: OfficeScreen;
 };
 
 export type OfficeData =
