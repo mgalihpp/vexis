@@ -467,6 +467,34 @@ export async function usersWithApproved(db: Db) {
   return rows.map((r) => r.userId);
 }
 
+/** Real closes the Bookkeeper has not read yet, closed at or before `before`. */
+export function unbookedCloses(db: Db, before: Date) {
+  return db
+    .select()
+    .from(officeJournal)
+    .where(
+      and(
+        eq(officeJournal.simulated, false),
+        isNull(officeJournal.pnlCheckedAt),
+        isNotNull(officeJournal.closedAt),
+        lte(officeJournal.closedAt, before),
+      ),
+    );
+}
+
+/** The Bookkeeper's one read of a close: its PnL, or nulls when Meteora did not have it. */
+export async function bookClose(
+  { db, userId }: UserScope,
+  journalId: string,
+  pnl: { pnlSol: number | null; pnlUsd: number | null },
+  at: Date,
+) {
+  await db
+    .update(officeJournal)
+    .set({ ...pnl, pnlCheckedAt: at })
+    .where(and(eq(officeJournal.id, journalId), eq(officeJournal.userId, userId), isNull(officeJournal.pnlCheckedAt)));
+}
+
 /** Every real (not simulated) open office position, with the strategy it was opened with, for the Monitor. */
 export function liveOpenPositions(db: Db) {
   return db

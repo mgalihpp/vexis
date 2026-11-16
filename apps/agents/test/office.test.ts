@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { EXECUTION_FAILING, Guardrails, KILL_SWITCH, RiskNotes } from "@vexis/db/office";
+import type { PositionPnl } from "@vexis/db/pnl";
 import { Effect, Layer } from "effect";
+import { BOOK_DELAY_MS, officeBookkeeper } from "../src/office/bookkeeper.ts";
 import { officeExecutor } from "../src/office/executor.ts";
 import { officeMonitor } from "../src/office/monitor.ts";
 import { type MonitorReading, monitorProposal } from "../src/office/monitor-rules.ts";
@@ -10,6 +12,7 @@ import {
   chainPosition,
   fakeChain,
   fakeDb,
+  fakeMeteora,
   fakeTelegram,
   fakeZap,
   link,
@@ -251,5 +254,71 @@ describe("monitorProposal", () => {
     ["no SOL side: no value, no fees", { valueSol: null, feeSol: null }],
   ] as const)("nothing due: %s", (_, o) => {
     expect(kind(o)).toBeUndefined();
+  });
+});
+
+describe("office bookkeeper", () => {
+  const closed = (o: Partial<PositionPnl> = {}): PositionPnl => {
+    const side = (sol: number, usd: number) => ({ total: { sol, usd } });
+    return {
+      positionAddress: "POS1",
+      isClosed: true,
+      lowerBinId: 100,
+      upperBinId: 120,
+      minPrice: 0,
+      maxPrice: 0,
+      allTimeDeposits: side(0.2, 30),
+      allTimeWithdrawals: side(0.19, 29),
+      allTimeFees: side(0.02, 3),
+      pnlSol: null,
+      pnlUsd: 2,
+      ...o,
+    };
+  };
+
+  function bookSetup(journal: ReturnType<typeof journalRow>[]) {
+    const office = fakeOfficeDb({ journal });
+    const meteora = fakeMeteora();
+    const layer = Layer.merge(office.layer, meteora.layer);
+    const run = (at = T0) => runAt(officeBookkeeper().pipe(Effect.provide(layer)), at);
+    return { office: office.state, meteora: meteora.state, run };
+  }
+  const closedAt = new Date(T0 - BOOK_DELAY_MS);
+
+  test("reads a close's PnL like the portfolio, one request for a pool's closes", async () => {
+    const s = bookSetup([
+      journalRow({ walletAddress: "OWNER1", closedAt }),
+      journalRow({ id: "journal-2", positionAddress: "POS2", walletAddress: "OWNER1", closedAt }),
+    ]);
+    s.meteora.closed.set(OFFICE_POOL, [closed(), closed({ positionAddress: "POS2", pnlSol: -0.05, pnlUsd: -7.5 })]);
+    await s.run();
+    expect(s.meteora.pnlCalls).toEqual([`${OFFICE_POOL} OWNER1`]);
+    // No pnlSol from Meteora: withdrawals plus fees minus deposits, as the portfolio computes it.
+    expect(s.office.journal[0]?.pnlSol).toBeCloseTo(0.01);
+    expect(s.office.journal.map((j) => [j.pnlUsd, j.pnlCheckedAt])).toEqual([
+      [2, new Date(T0)],
+      [-7.5, new Date(T0)],
+    ]);
+    expect(s.office.journal[1]?.pnlSol).toBe(-0.05);
+  });
+
+  test("waits for Meteora to index the close, then reads it once; what it lacks stays unknown", async () => {
+    const s = bookSetup([journalRow({ walletAddress: "OWNER1", closedAt: new Date(T0 - 60_000) })]);
+    await s.run();
+    expect(s.meteora.pnlCalls).toEqual([]);
+    await s.run(T0 + BOOK_DELAY_MS);
+    await s.run(T0 + BOOK_DELAY_MS + 60_000);
+    expect(s.meteora.pnlCalls).toHaveLength(1);
+    expect(s.office.journal[0]).toMatchObject({
+      pnlSol: null,
+      pnlUsd: null,
+      pnlCheckedAt: new Date(T0 + BOOK_DELAY_MS),
+    });
+  });
+
+  test("open and simulated positions are never read", async () => {
+    const s = bookSetup([journalRow(), journalRow({ id: "sim", simulated: true, closedAt })]);
+    await s.run();
+    expect(s.meteora.pnlCalls).toEqual([]);
   });
 });

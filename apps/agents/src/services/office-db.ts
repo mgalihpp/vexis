@@ -1,6 +1,7 @@
 import { closeDb, createDb } from "@vexis/db/client";
 import type { ProposalStatus } from "@vexis/db/office";
 import {
+  bookClose,
   closeJournal,
   insertJournal,
   insertMessage,
@@ -18,6 +19,7 @@ import {
   type OfficeConfigRow,
   type ProposalRow,
   setJournalValue,
+  unbookedCloses,
   updateOfficeConfig,
   usersWithApproved,
 } from "@vexis/db/office-queries";
@@ -80,6 +82,14 @@ export class OfficeDb extends Context.Service<
     lastExecutionAt(userId: string, poolAddress: string): Effect.Effect<Date | null, DbError>;
     lastProposalAt(userId: string, poolAddress: string): Effect.Effect<Date | null, DbError>;
     rebalancePools(userId: string): Effect.Effect<ReadonlySet<string>, DbError>;
+    /** Real closes not yet read by the Bookkeeper, closed at or before `before`. */
+    unbookedCloses(before: Date): Effect.Effect<ReadonlyArray<JournalRow>, DbError>;
+    bookClose(
+      userId: string,
+      journalId: string,
+      pnl: { pnlSol: number | null; pnlUsd: number | null },
+      at: Date,
+    ): Effect.Effect<void, DbError>;
     wallet(office: OfficeConfigRow): Effect.Effect<OfficeWallet, DbError>;
   }
 >()("vexis/agents/OfficeDb") {
@@ -129,6 +139,8 @@ export class OfficeDb extends Context.Service<
           run("rebalancePools", () => listPoolsOfKind(as(userId), "auto-rebalance")).pipe(
             Effect.map((rows) => new Set(rows.map((r) => r.poolAddress))),
           ),
+        unbookedCloses: (before) => run("unbookedCloses", () => unbookedCloses(db, before)),
+        bookClose: (userId, id, pnl, at) => run("bookClose", () => bookClose(as(userId), id, pnl, at)),
         wallet: (office) =>
           office.walletSource === "office"
             ? Effect.succeed(readRpc(office.officePublicKey, office.officeRpcUrl))

@@ -1,3 +1,4 @@
+import { PnlPage, type PositionPnl } from "@vexis/db/pnl";
 import { type FilterPool, filterPool } from "@vexis/db/screen";
 import { Config, Context, Effect, flow, Layer, Option, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
@@ -75,6 +76,11 @@ export class Meteora extends Context.Service<
      * budget) for organic scores. A failed discovery request leaves organic unknown instead of failing.
      */
     screener(): Effect.Effect<ReadonlyArray<ScreenerReading>, MeteoraError>;
+    /**
+     * One page (the newest 100 the API returns) of a wallet's closed positions in a pool, parsed like the portfolio
+     * reads them. One request; the Bookkeeper's only datapi call.
+     */
+    closedPositions(pool: string, owner: string): Effect.Effect<ReadonlyArray<PositionPnl>, MeteoraError>;
   }
 >()("vexis/agents/Meteora") {
   static readonly layer = Layer.effect(
@@ -173,7 +179,20 @@ export class Meteora extends Context.Service<
         );
       });
 
-      return Meteora.of({ pools, screener });
+      const closedPositions = Effect.fn("Meteora.closedPositions")(function* (pool: string, owner: string) {
+        const body = yield* client
+          .get(`/positions/${pool}/pnl`, { urlParams: { user: owner, status: "closed", page: 1, page_size: 100 } })
+          .pipe(
+            Effect.flatMap((response) => response.json),
+            Effect.mapError((cause) => new MeteoraError({ cause })),
+          );
+        return yield* Effect.try({
+          try: () => PnlPage.parse(body).positions,
+          catch: (cause) => new MeteoraError({ cause }),
+        });
+      });
+
+      return Meteora.of({ pools, screener, closedPositions });
     }),
   ).pipe(Layer.provide(FetchHttpClient.layer));
 }

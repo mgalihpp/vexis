@@ -1,5 +1,6 @@
 import { Keypair } from "@solana/web3.js";
 import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
+import type { PositionPnl } from "@vexis/db/pnl";
 import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";
@@ -215,6 +216,9 @@ export function fakeMeteora() {
     calls: [] as string[][],
     screener: [] as ScreenerReading[],
     screenerCalls: 0,
+    /** Closed positions by pool, for the Bookkeeper. */
+    closed: new Map<string, PositionPnl[]>(),
+    pnlCalls: [] as string[],
     failing: false,
   };
   const down = () => Effect.fail(new MeteoraError({ cause: new Error("down") }));
@@ -228,6 +232,10 @@ export function fakeMeteora() {
       screener: () => {
         state.screenerCalls++;
         return state.failing ? down() : Effect.succeed(state.screener);
+      },
+      closedPositions: (pool, owner) => {
+        state.pnlCalls.push(`${pool} ${owner}`);
+        return state.failing ? down() : Effect.succeed(state.closed.get(pool) ?? []);
       },
     }),
   );

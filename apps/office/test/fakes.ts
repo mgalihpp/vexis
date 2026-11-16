@@ -129,6 +129,8 @@ export function journal(overrides: Partial<JournalRow> = {}): JournalRow {
     closedAt: null,
     pnlSol: null,
     pnlUsd: null,
+    walletAddress: null,
+    pnlCheckedAt: null,
     ...overrides,
   };
 }
