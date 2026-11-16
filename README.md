@@ -184,6 +184,8 @@ The server listens on `PORT`, default 3000. Pass `NITRO_PRESET=node-server` to b
 
 One gotcha from doing this the hard way: Nitro symlinks some packages into `.output/server/node_modules/.nf3` with absolute paths. If you build on your laptop and run on a server, pack the output with `tar -czhf output.tgz .output` so the archive holds real files instead of links that point at your machine.
 
+On the VPS, `.github/workflows/deploy.yml` deploys the web app, the runner and the office runtime the same way: CI builds, uploads, restarts one pm2 process from `ecosystem.config.cjs`, health checks it and rolls back to the previous version if it does not stay up. The office runtime needs a one-time `/root/vexis-office` with its own `.env`; until it exists that step is skipped. See `AGENTS.md`.
+
 ## Notes
 
 - `.state/` is a cache, not a database. Deleting it costs you one slow reload per wallet.
