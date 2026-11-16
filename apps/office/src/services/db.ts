@@ -28,12 +28,7 @@ import {
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser, getTelegramLink, listAlerts, listPoolsOfKind } from "@vexis/db/queries";
-import {
-  type officeJournal,
-  type officeMessages,
-  type officeRuns,
-  type officeThreads,
-} from "@vexis/db/schema";
+import type { officeJournal, officeMessages, officeRuns, officeThreads } from "@vexis/db/schema";
 import type { Beat } from "@vexis/shared/heartbeat";
 import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/shared/office";
 import { decryptSecret } from "@vexis/shared/secret";

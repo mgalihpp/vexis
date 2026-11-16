@@ -436,8 +436,7 @@ const openStatus = sql.raw(`status in (${OPEN_STATUSES.map((s) => `'${s}'`).join
 /**
  * The office's one row; having it is what turns the office on. `guardrails` and `models` are jsonb parsed with
  * `Guardrails` and `OfficeModels`. `llm_keys` maps a provider to the user's own API key, encrypted with
- * `TOKEN_ENC_KEY`. The office's own agent wallet is the `office_*` columns below, stored like `rebalance_wallets`
- * and never shared with auto-rebalance. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
+ * `TOKEN_ENC_KEY`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
  */
 export const officeConfig = pgTable(
   "office_config",

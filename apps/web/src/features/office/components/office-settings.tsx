@@ -443,7 +443,10 @@ function WalletPage({ config }: { config: ConfigView }) {
       <ModeGroup config={config} />
 
       {config.officeWallet ? (
-        <Group title="Agent wallet" footer="The office's own wallet, separate from any auto-rebalance agent's. It cannot change while the office holds real positions.">
+        <Group
+          title="Agent wallet"
+          footer="The office's own wallet, separate from any auto-rebalance agent's. It cannot change while the office holds real positions."
+        >
           <Row
             icon={icon(WalletIcon)}
             label={<span className="font-mono">{shortAddr(config.officeWallet.publicKey)}</span>}
