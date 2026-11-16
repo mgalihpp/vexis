@@ -31,7 +31,7 @@ jobs:
       - name: Bundle runner and office
         run: |
           bun build apps/agents/src/main.ts --target=bun --outfile=agents-main.js
-          bun build apps/office/src/main.ts --target=bun --outfile=office-main.js
+          bun scripts/bundle-office.ts office-main.js
 
       - name: Set up SSH
         env:
