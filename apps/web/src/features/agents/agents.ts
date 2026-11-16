@@ -26,6 +26,7 @@ import {
   SCREENER_PRESETS,
   screenRule,
 } from "@vexis/db/screen";
+import { compactUsd, money } from "@/features/portfolio/money";
 import { type AlertPool, asFilterPool } from "@/features/screener/screener";
 import { shortAddr } from "@/lib/format";
 
@@ -238,8 +239,6 @@ export const STATUS_HINT: Partial<Record<AgentStatus, string>> = {
 
 // --- rules -------------------------------------------------------------------------------------
 
-const usd = (v: number) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-
 export function formatMinutes(seconds: number) {
   const m = seconds / 60;
   return `${Number.isInteger(m) ? m : m.toFixed(1)} min`;
@@ -284,7 +283,7 @@ export function pickSource<T extends { fields: ConfigFields; source: Source }>(f
   return { ...form, source, fields };
 }
 
-const compactBound = (v: number) => compactUsd(v).replace(".0", "");
+const compactBound = (v: number) => compactUsd(v).replace(".00", "");
 
 /** A custom filter in one line, for the source picker. */
 export function describeFilter(f: PoolFilter) {
@@ -319,18 +318,11 @@ export function describeFilter(f: PoolFilter) {
 /** One line for cards: when an alert fires. */
 export function describeRule(c: SourceConfig & Pick<VolumeWatchConfig, "cooldownSec">) {
   const r = c;
-  const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${usd(r.minUsd)} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
+  const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${money(r.minUsd, "usd")} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
   return c.source === "pools" ? rule : `${presetLabel(c.preset)} screener pools: ${rule}`;
 }
 
 export const ratioText = (ratio: number) => (ratio >= 1_000_000 ? "from zero" : `${ratio.toFixed(1)}×`);
-
-/** `$18.4k`, `$1.2M`, `$850`. */
-export function compactUsd(v: number) {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`;
-  return `$${Math.round(v)}`;
-}
 
 // --- config form -------------------------------------------------------------------------------
 
@@ -528,8 +520,7 @@ export const FEE_MODE_LABEL: Record<FeeMode, string> = {
   sweep: "Sweep to SOL",
 };
 
-/** `0.05 SOL`, up to 4 decimals. */
-export const solText = (v: number) => `${v.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`;
+export const solText = (v: number) => money(v, "sol");
 
 /** What happens to the fees, and whether they are also claimed in range. */
 export function describeFees(c: Pick<AutoRebalanceConfig, "feeMode" | "feeClaimThresholdSol">) {
@@ -562,25 +553,18 @@ export function ruleSummary(a: AgentView): [string, string][] {
   ];
 }
 
-export interface FleetSummary {
-  total: number;
-  live: number;
-  attention: number;
-  pools: number;
-  alerts24h: number;
-}
-
 /** The pools an agent watches: its own, or the screener pools its preset matches (none until the list loads). */
 export const watchedCount = (a: AgentView, screener: AlertPool[] = []) =>
   (a.kind === "volume-watch" ? screenerMatches(a.config, screener)?.length : undefined) ?? a.pools.length;
 
-export function summarizeFleet(agents: AgentView[], screener: AlertPool[] = []): FleetSummary {
-  const statuses = agents.map(agentStatus);
-  return {
-    total: agents.length,
-    live: statuses.filter((s) => s === "live").length,
-    attention: statuses.filter((s) => s === "attention").length,
-    pools: agents.reduce((n, a) => n + watchedCount(a, screener), 0),
-    alerts24h: agents.reduce((n, a) => n + a.alerts24h, 0),
-  };
+const HOUR = 3_600_000;
+
+/** How many of `times` fall in each of the last `buckets` spans of `hoursEach` hours before `now`, oldest first. */
+export function hourlyCounts(times: number[], now: number, buckets = 24, hoursEach = 1): number[] {
+  const out = Array.from({ length: buckets }, () => 0);
+  for (const t of times) {
+    const ago = Math.floor((now - t) / (HOUR * hoursEach));
+    if (ago >= 0 && ago < buckets) out[buckets - 1 - ago] = (out[buckets - 1 - ago] ?? 0) + 1;
+  }
+  return out;
 }

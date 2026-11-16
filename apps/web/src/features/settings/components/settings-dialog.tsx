@@ -9,7 +9,9 @@ import {
   CircleDollarSignIcon,
   ClockIcon,
   CoinsIcon,
+  FootprintsIcon,
   HashIcon,
+  HistoryIcon,
   MonitorIcon,
   MoonIcon,
   MusicIcon,
@@ -26,9 +28,11 @@ import {
 import { useEffect, useState } from "react";
 import { Group, Row, RowIcon, SegmentedControl } from "@/components/grouped-list";
 import { SolIcon, UsdcIcon } from "@/components/icons";
+import { PairIcons } from "@/components/pair-icons";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Switch } from "@/components/ui/switch";
+import { WalletAvatar } from "@/features/analytics/components/wallet-avatar";
 import {
   clearCustomSound,
   getCustomSound,
@@ -37,6 +41,7 @@ import {
 } from "@/features/notifications/custom-sound";
 import { BASELINE_BARS, SPIKE_TIMEFRAMES } from "@/features/notifications/notifications";
 import { playAlert } from "@/features/notifications/sound";
+import { Badge } from "@/features/portfolio/components/pool-identity";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useTheme } from "@/features/theme/theme";
 import { offsetLabel, UTC_OFFSETS } from "@/features/timezone/timezone";
@@ -81,12 +86,12 @@ export function SettingsDialog({
     return (
       <Drawer open={open} onOpenChange={onOpenChange}>
         <DrawerContent className="h-[90dvh] data-[vaul-drawer-direction=bottom]:max-h-[90dvh]">
-          <div className="relative flex h-11 shrink-0 items-center justify-center px-4">
+          <div className="relative flex h-12 shrink-0 items-center justify-center border-b px-4">
             {current && (
               <button
                 type="button"
                 onClick={() => onSectionChange(null)}
-                className="absolute left-2 flex items-center text-xs font-medium text-brand"
+                className="absolute left-3 flex items-center gap-0.5 text-sm font-medium text-brand"
               >
                 <ChevronLeftIcon className="size-4" />
                 Settings
@@ -95,12 +100,12 @@ export function SettingsDialog({
             <DrawerTitle className="text-sm font-semibold">{current?.label ?? "Settings"}</DrawerTitle>
             <DrawerDescription className="sr-only">App preferences, notifications and favorites</DrawerDescription>
             <DrawerClose asChild>
-              <button type="button" className="absolute right-4 text-xs font-semibold text-brand">
+              <button type="button" className="absolute right-4 text-sm font-semibold text-brand">
                 Done
               </button>
             </DrawerClose>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-2 pb-8">
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-8">
             {current ? (
               page(current.value)
             ) : (
@@ -131,7 +136,7 @@ export function SettingsDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[min(46rem,90dvh)] flex-row gap-0 overflow-hidden p-0 sm:max-w-4xl">
-        <nav className="flex w-52 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
+        <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
           <DialogTitle className="px-2 pt-1 pb-3 text-sm font-semibold">Settings</DialogTitle>
           <DialogDescription className="sr-only">App preferences, notifications and favorites</DialogDescription>
           {SECTIONS.map(({ value, label, Icon }) => (
@@ -140,20 +145,22 @@ export function SettingsDialog({
               type="button"
               aria-current={active === value ? "page" : undefined}
               onClick={() => onSectionChange(value)}
-              className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors ${
                 active === value
                   ? "bg-foreground/[0.08] text-foreground"
                   : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground"
               }`}
             >
-              <Icon className="size-3.5" />
+              <Icon className="size-4" />
               {label}
             </button>
           ))}
         </nav>
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-6">
-          <h2 className="mb-4 text-base font-semibold">{SECTIONS.find((s) => s.value === active)?.label}</h2>
-          {page(active)}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="flex h-12 shrink-0 items-center border-b px-5 pr-12">
+            <h2 className="text-sm font-semibold">{SECTIONS.find((s) => s.value === active)?.label}</h2>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-6">{page(active)}</div>
         </div>
       </DialogContent>
     </Dialog>
@@ -263,7 +270,7 @@ function General() {
           <select
             value={timezoneOffset}
             onChange={(e) => setTimezoneOffset(e.target.value === "auto" ? "auto" : Number(e.target.value))}
-            className="h-7 rounded-md border bg-transparent px-2 text-xs text-foreground outline-none focus:border-brand"
+            className="h-8 rounded-md border bg-transparent px-2 text-sm text-foreground outline-none focus:border-brand"
           >
             <option value="auto" className="bg-popover text-popover-foreground">
               Browser timezone
@@ -518,7 +525,7 @@ function CustomSoundRow() {
   // Read after mount: localStorage does not exist on the server.
   useEffect(() => setSound(getCustomSound()), []);
 
-  const button = "h-6.5 rounded-md bg-foreground/[0.07] px-2.5 text-xs hover:bg-foreground/[0.12]";
+  const button = "h-7.5 rounded-md bg-foreground/[0.07] px-2.5 text-sm hover:bg-foreground/[0.12]";
 
   return (
     <Row
@@ -594,7 +601,7 @@ function MinimumVolume() {
           if (e.target.value !== "" && Number.isFinite(value) && value >= 0) setSpikeMin(value);
         }}
         onBlur={() => setDraft(String(spikeMin))}
-        className="h-6.5 w-16 rounded-md bg-foreground/[0.07] px-2 text-right text-xs tabular-nums outline-none [appearance:textfield] focus:ring-1 focus:ring-ring [&::-webkit-inner-spin-button]:appearance-none"
+        className="h-7 w-20 rounded-md bg-foreground/[0.07] px-2 text-right text-sm tabular-nums outline-none [appearance:textfield] focus:ring-1 focus:ring-ring [&::-webkit-inner-spin-button]:appearance-none"
       />
       <SegmentedControl
         value={spikeMinCurrency}
@@ -619,32 +626,47 @@ function Favorites({ onNavigate }: { onNavigate: () => void }) {
       type="button"
       aria-label={`Remove ${label}`}
       onClick={onClick}
-      className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+      className="rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-loss/10 hover:text-loss"
     >
-      <XIcon className="size-3" />
+      <XIcon className="size-3.5" />
     </button>
   );
   const open = (go: () => void) => () => {
     onNavigate();
     go();
   };
+  const openPool = (address: string) => open(() => navigate({ to: "/analytics", search: { pool: address } }));
+  const openWallet = (wallet: string) =>
+    open(() => navigate({ to: "/portfolio/$wallet", params: { wallet }, search: { currency } }));
 
   return (
     <div className="flex flex-col gap-5">
       <Group title="Pools">
         {pools.length === 0 ? (
-          <Row label={<span className="text-muted-foreground">No favorite pools</span>} />
+          <Empty Icon={StarIcon} title="No favorite pools" hint="Open a pool on Analytics and press its star." />
         ) : (
           pools.map((pool) => (
             <Row
               key={pool.address}
+              icon={
+                <PairIcons
+                  tokens={[
+                    { symbol: pool.tokenXSymbol ?? "?", logo: pool.tokenXIcon },
+                    { symbol: pool.tokenYSymbol ?? "?", logo: pool.tokenYIcon },
+                  ]}
+                />
+              }
               label={
                 <button
                   type="button"
-                  className="hover:text-brand"
-                  onClick={open(() => navigate({ to: "/analytics", search: { pool: pool.address } }))}
+                  className="flex items-center gap-1.5 hover:text-brand"
+                  onClick={openPool(pool.address)}
                 >
-                  {pool.name} <span className="text-muted-foreground">{pool.binStep}</span>
+                  <span className="truncate">{pool.name}</span>
+                  <Badge tone="blue" title="Bin step">
+                    <FootprintsIcon className="size-3.5" />
+                    {pool.binStep}
+                  </Badge>
                 </button>
               }
               description={shortAddr(pool.address)}
@@ -656,17 +678,14 @@ function Favorites({ onNavigate }: { onNavigate: () => void }) {
       </Group>
       <Group title="Wallets">
         {wallets.length === 0 ? (
-          <Row label={<span className="text-muted-foreground">No favorite wallets</span>} />
+          <Empty Icon={WalletIcon} title="No favorite wallets" hint="Star a wallet on Portfolio to keep it here." />
         ) : (
           wallets.map((wallet) => (
             <Row
               key={wallet}
+              icon={<WalletAvatar address={wallet} className="size-7" />}
               label={
-                <button
-                  type="button"
-                  className="font-mono hover:text-brand"
-                  onClick={open(() => navigate({ to: "/portfolio/$wallet", params: { wallet }, search: { currency } }))}
-                >
+                <button type="button" className="font-mono hover:text-brand" onClick={openWallet(wallet)}>
                   {shortAddr(wallet)}
                 </button>
               }
@@ -676,21 +695,60 @@ function Favorites({ onNavigate }: { onNavigate: () => void }) {
           ))
         )}
       </Group>
-      <Group title="Recent wallets">
-        {recent.length === 0 ? (
-          <Row label={<span className="text-muted-foreground">No recent wallets</span>} />
-        ) : (
-          <Row label={`${recent.length} recent wallet${recent.length === 1 ? "" : "s"}`}>
-            <button
-              type="button"
-              onClick={clearRecent}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground"
-            >
-              Clear
+      <Group
+        title="Recent wallets"
+        footer={
+          recent.length > 0 && (
+            <button type="button" onClick={clearRecent} className="font-medium hover:text-foreground">
+              Clear recent wallets
             </button>
-          </Row>
+          )
+        }
+      >
+        {recent.length === 0 ? (
+          <Empty Icon={HistoryIcon} title="No recent wallets" hint="Wallets you open show up here." />
+        ) : (
+          recent.map((wallet) => {
+            const favorite = wallets.includes(wallet);
+            return (
+              <Row
+                key={wallet}
+                icon={<WalletAvatar address={wallet} className="size-7" />}
+                label={
+                  <button type="button" className="font-mono hover:text-brand" onClick={openWallet(wallet)}>
+                    {shortAddr(wallet)}
+                  </button>
+                }
+              >
+                <button
+                  type="button"
+                  aria-label={favorite ? `Unstar ${shortAddr(wallet)}` : `Star ${shortAddr(wallet)}`}
+                  aria-pressed={favorite}
+                  onClick={() => toggleFavorite(wallet)}
+                  className={`rounded-full p-1.5 transition-colors hover:bg-brand/10 ${
+                    favorite ? "text-brand" : "text-muted-foreground hover:text-brand"
+                  }`}
+                >
+                  <StarIcon className="size-3.5" fill={favorite ? "currentColor" : "none"} />
+                </button>
+              </Row>
+            );
+          })
         )}
       </Group>
+    </div>
+  );
+}
+
+/** The empty state of a Favorites group: an icon tile, a title and how to fill it. */
+function Empty({ Icon, title, hint }: { Icon: typeof StarIcon; title: string; hint: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 px-6 py-7 text-center">
+      <span className="mb-1.5 flex size-10 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground">
+        <Icon className="size-4.5" />
+      </span>
+      <p className="text-sm font-medium">{title}</p>
+      <p className="max-w-64 text-xs leading-relaxed text-muted-foreground">{hint}</p>
     </div>
   );
 }

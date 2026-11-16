@@ -9,9 +9,6 @@ import {
   SlidersHorizontalIcon,
   TrendingUpIcon,
 } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { compactUsd } from "@/features/portfolio/money";
-import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import {
   DEFAULT_CONFIG,
@@ -26,7 +23,7 @@ import {
   screenerMatches,
   type VolumeAgentView,
 } from "../agents";
-import { PoolCell } from "./agent-layout";
+import { PoolsTable } from "./pools-table";
 
 type Source = Draft["source"];
 
@@ -118,74 +115,33 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
   );
 }
 
-const solFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
-
-/** USD with SOL under it at the footer's SOL price; a dash when that price is missing. */
-function Amount({ usd, solPrice }: { usd: number; solPrice: number | null }) {
-  return (
-    <>
-      <div>{compactUsd(usd)}</div>
-      <div className="text-[0.625rem] text-muted-foreground">
-        {solPrice ? `${solFmt.format(usd / solPrice)} SOL` : "—"}
-      </div>
-    </>
-  );
-}
-
 /** The screener pools a screener-source agent watches right now. */
-export function ScreenerMatches({ agent }: { agent: VolumeAgentView }) {
+export function ScreenerMatches({ agent, now }: { agent: VolumeAgentView; now: number }) {
   const { data } = useQuery(screenerQuery);
-  const { data: prices } = useQuery(pricesQuery);
   const matches = data ? (screenerMatches(agent.config, data.pools) ?? []) : null;
   return (
-    <div className="flex flex-col gap-2">
-      <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+    <div className="flex flex-col gap-3">
+      <p className="text-xs leading-relaxed text-muted-foreground">
         This agent watches every screener pool the {presetLabel(agent.config.preset)} filter passes, judged on a{" "}
         {formatMinutes(agent.config.baseline * 60)} baseline. Pools join and leave as they move in and out of the
         filter.
         {agent.pools.length > 0 &&
           ` Your ${agent.pools.length} hand-picked pools are kept for when you switch back in Settings.`}
       </p>
-      <div className="-mx-2 overflow-x-auto">
-        <Table className="min-w-[32rem]">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-3.25">Pool</TableHead>
-              <TableHead className="text-right">TVL</TableHead>
-              <TableHead className="pr-3.25 text-right">Volume 24h</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="tabular-nums">
-            {(matches === null || matches.length === 0) && (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
-                  {matches === null ? "Loading the screener…" : "No screener pool passes this filter right now."}
-                </TableCell>
-              </TableRow>
-            )}
-            {matches?.map((p) => (
-              <TableRow key={p.address}>
-                <TableCell className="pl-3.25">
-                  <PoolCell
-                    address={p.address}
-                    label={p.name}
-                    tokens={[
-                      { symbol: p.tokenX.symbol, icon: p.tokenX.icon },
-                      { symbol: p.tokenY.symbol, icon: p.tokenY.icon },
-                    ]}
-                  />
-                </TableCell>
-                <TableCell className="text-right">
-                  <Amount usd={p.tvl} solPrice={prices?.sol ?? null} />
-                </TableCell>
-                <TableCell className="pr-3.25 text-right">
-                  <Amount usd={p.volume["24h"]} solPrice={prices?.sol ?? null} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <PoolsTable
+        agentId={agent.id}
+        now={now}
+        empty={matches === null ? "Loading the screener…" : "No screener pool passes this filter right now."}
+        rows={(matches ?? []).map((p) => ({
+          address: p.address,
+          label: p.name,
+          tokens: [
+            { symbol: p.tokenX.symbol, icon: p.tokenX.icon },
+            { symbol: p.tokenY.symbol, icon: p.tokenY.icon },
+          ],
+          lastAlertAt: null,
+        }))}
+      />
     </div>
   );
 }

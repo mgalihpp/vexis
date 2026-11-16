@@ -4,6 +4,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { TriangleAlertIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { SolIcon } from "@/components/icons";
 import {
   AlertDialog,
@@ -276,11 +277,9 @@ function ModeSetting({ dryRun, onChange }: { dryRun: boolean; onChange: (dryRun:
 
 export function RebalanceRuleSection({
   agent,
-  onSaved,
   onDirty,
 }: {
   agent: RebalanceAgentView;
-  onSaved: (message: string) => void;
   onDirty: (dirty: boolean) => void;
 }) {
   const initial = rebalanceFields(agent.config);
@@ -328,7 +327,7 @@ export function RebalanceRuleSection({
               {
                 onSuccess: () => {
                   onDirty(false);
-                  onSaved("Rule saved");
+                  toast.success("Rule saved");
                 },
               },
             )
@@ -403,7 +402,12 @@ function RpcForm({ onDone }: { onDone: () => void }) {
       className="space-y-1.5"
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate(url.trim(), { onSuccess: onDone });
+        save.mutate(url.trim(), {
+          onSuccess: () => {
+            toast.success("RPC URL saved");
+            onDone();
+          },
+        });
       }}
     >
       <div className="flex items-center gap-2">
@@ -459,6 +463,7 @@ export function WalletPanel() {
     }
     setInputError(null);
     await save.mutateAsync({ secretKey: secret.trim(), rpcUrl: rpcUrl.trim() });
+    toast.success("Wallet saved");
     setSecret("");
     setRpcUrl("");
   };
@@ -667,9 +672,11 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
 export function RebalanceHistory({ agentId }: { agentId: string }) {
   const { data } = useSuspenseQuery(rebalancesQuery(agentId));
   return (
-    <div className="-mx-2 overflow-x-auto">
-      <RebalanceTable rows={data.rebalances} feeMode={data.feeMode} now={data.now} />
-    </div>
+    <Panel title="Rebalances" className="overflow-hidden rounded-xl border">
+      <div className="overflow-x-auto border-t">
+        <RebalanceTable rows={data.rebalances} feeMode={data.feeMode} now={data.now} />
+      </div>
+    </Panel>
   );
 }
 

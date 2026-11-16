@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { BellIcon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,9 +40,15 @@ export function AlertButton({ filter }: { filter: PoolFilter }) {
 
   return (
     <>
-      <Button variant="outline" size="sm" disabled={!data || save.isPending} onClick={start}>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        disabled={!data || save.isPending}
+        onClick={start}
+        aria-label="Alert on pools like these"
+        title="Alert on pools like these"
+      >
         {save.isPending ? <Spinner /> : <BellIcon />}
-        Alert on pools like these
       </Button>
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
@@ -64,6 +71,7 @@ export function AlertButton({ filter }: { filter: PoolFilter }) {
                   {
                     onSuccess: ({ id }) => {
                       setConfirming(false);
+                      toast.success("Volume agent switched to this filter");
                       navigate({ to: "/agents/$agentId", params: { agentId: id }, search: { tab: "pools" } });
                     },
                   },

@@ -1,19 +1,23 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
+  ArrowRightIcon,
+  BellIcon,
   BotIcon,
   ChevronRightIcon,
-  ExternalLinkIcon,
+  ClockIcon,
   PauseIcon,
+  PencilIcon,
   PlayIcon,
   PowerIcon,
   SendIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
   WalletIcon,
-  XIcon,
+  WavesIcon,
 } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,24 +31,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Notice } from "@/features/portfolio/components/notice";
-import {
-  Pagination,
-  PoolFilter,
-  SCROLL_TABLE,
-  type Sort,
-  sortBy,
-} from "@/features/portfolio/components/table-controls";
-import { timeAgo } from "@/features/portfolio/money";
+import { Pagination, PoolFilter, type Sort, sortBy } from "@/features/portfolio/components/table-controls";
+import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import {
+  type AgentStatus,
   type AgentView,
   agentName,
   agentStatus,
-  compactUsd,
   configFields,
   formatMinutes,
+  hourlyCounts,
   parseConfigFields,
   pickSource,
   presetLabel,
@@ -68,20 +66,14 @@ import {
   type AlertSortKey,
   AlertsTable,
   BarPill,
+  KpiCard,
+  MiniBars,
   Panel,
-  PoolCell,
-  StatCard,
+  Ring,
+  type Tone,
 } from "./agent-layout";
-import {
-  ConfigForm,
-  FormError,
-  PoolPicker,
-  poolName,
-  RemovePoolButton,
-  STATUS_STYLE,
-  TelegramPanel,
-  useAgentMutation,
-} from "./agent-ui";
+import { ConfigForm, FormError, PoolPicker, STATUS_STYLE, TelegramPanel, useAgentMutation } from "./agent-ui";
+import { PoolsTable } from "./pools-table";
 import { RebalanceHistory, RebalanceOverview, RebalanceRuleSection, WalletPanel } from "./rebalance-ui";
 import { ScreenerMatches, SourcePicker } from "./screener-source";
 
@@ -119,9 +111,9 @@ function NotFound() {
 
 function Rows({ rows }: { rows: [string, ReactNode][] }) {
   return (
-    <dl className="space-y-2 px-3.25 pb-3.25 text-xs">
+    <dl className="divide-y border-t px-4 text-xs">
       {rows.map(([label, value]) => (
-        <div key={label} className="flex justify-between gap-2.5">
+        <div key={label} className="flex justify-between gap-2.5 py-3">
           <dt className="text-muted-foreground">{label}</dt>
           <dd className="text-right font-medium tabular-nums">{value}</dd>
         </div>
@@ -133,9 +125,6 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   const hint = statusHint(agent);
-  const [notice, setNotice] = useState<string | null>(null);
-  // Like the portfolio's tables, the alert history fills the viewport and scrolls inside its table.
-  const fixedHeight = tab === "alerts";
   return (
     <div className="flex h-full flex-col">
       <AgentsBar
@@ -178,23 +167,11 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
         ))}
       </nav>
 
-      <div className={`flex min-h-0 flex-1 flex-col ${fixedHeight ? "overflow-hidden" : "overflow-y-auto"}`}>
-        <div className={`flex min-h-0 flex-1 flex-col px-2 pt-2 ${fixedHeight ? "" : "pb-3.25"}`}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-[110rem] flex-col px-4 pt-5 pb-8 md:px-6">
+          <PageHeader agent={agent} tab={tab} />
           {hint && <Notice>{hint}</Notice>}
           <FormError error={toggle.error} />
-          {notice && (
-            <div className="mb-2 flex items-center justify-between gap-3 rounded-md border border-brand/30 bg-brand/10 px-2.5 py-1.5 text-xs text-foreground/80">
-              <span>{notice}</span>
-              <button
-                type="button"
-                aria-label="Dismiss"
-                onClick={() => setNotice(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </div>
-          )}
           {tab === "overview" &&
             (agent.kind === "auto-rebalance" ? (
               <RebalanceOverview agent={agent} now={now} />
@@ -204,63 +181,137 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
           {tab === "pools" && <PoolsTab agent={agent} now={now} />}
           {tab === "alerts" &&
             (agent.kind === "auto-rebalance" ? <RebalanceHistory agentId={agent.id} /> : <AlertsTab now={now} />)}
-          {tab === "settings" && <SettingsTab agent={agent} onSaved={setNotice} />}
+          {tab === "settings" && <SettingsTab agent={agent} />}
         </div>
       </div>
     </div>
   );
 }
 
+function PageHeader({ agent, tab }: { agent: AgentView; tab: DetailTab }) {
+  return (
+    <h1 className="shrink-0 truncate pb-4 font-brand text-xl font-bold tracking-tight md:text-2xl">
+      {tabLabel(tab, agent)}
+    </h1>
+  );
+}
+
+const DAY = 86_400_000;
+
+const STATUS_TONE: Record<AgentStatus, Tone> = { live: "brand", paused: "sky", attention: "amber", off: "sky" };
+
+const STATUS_SUB: Record<AgentStatus, string> = {
+  live: "Checking every minute",
+  paused: "Paused, nothing is checked",
+  attention: "Needs your action",
+  off: "Turned off",
+};
+
 function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
   const { data } = useSuspenseQuery(alertsQuery);
   const status = agentStatus(agent);
-  const tabLink = (tab: DetailTab, label: string) => (
-    <Link
-      to="/agents/$agentId"
-      params={{ agentId: agent.id }}
-      search={{ tab }}
-      className="text-xs font-medium text-brand hover:underline"
-    >
-      {label}
-    </Link>
-  );
   const c = agent.config;
-  const r = c;
   const { data: screener } = useQuery({ ...screenerQuery, enabled: c.source === "screener" });
+  const mine = data.alerts.filter((a) => a.agentId === agent.id);
+  const perPool = agent.pools.map(
+    (p) => mine.filter((a) => a.poolAddress === p.address && data.now - a.at < DAY).length,
+  );
+  const cooldownMs = c.cooldownSec * 1000;
+  const left = agent.lastAlertAt ? Math.max(0, agent.lastAlertAt + cooldownMs - now) : 0;
   return (
-    <div className="flex flex-col gap-2">
-      <div className="grid grid-cols-2 gap-2 xl:grid-cols-5">
-        <StatCard label="Status" value={STATUS_LABEL[status]} tone={STATUS_STYLE[status].text} />
-        <StatCard
-          label="Pools watched"
-          value={c.source === "pools" || screener ? watchedCount(agent, screener?.pools) : "—"}
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          icon={<PlayIcon className="size-4 fill-current" />}
+          tone={STATUS_TONE[status]}
+          label="Status"
+          value={<span className={status === "live" ? "" : STATUS_STYLE[status].text}>{STATUS_LABEL[status]}</span>}
+          hint={STATUS_SUB[status]}
+          visual={<span className={`block size-2.5 rounded-full ${STATUS_STYLE[status].dot}`} />}
         />
-        <StatCard label="Alerts, 24h" value={agent.alerts24h} />
-        <StatCard label="Last alert" value={agent.lastAlertAt ? timeAgo(agent.lastAlertAt, now) : "None yet"} />
-        <StatCard label="Cooldown" value={formatMinutes(c.cooldownSec)} />
+        <KpiCard
+          icon={<WavesIcon className="size-4" />}
+          tone="sky"
+          label="Pools"
+          value={c.source === "pools" || screener ? watchedCount(agent, screener?.pools) : "—"}
+          hint={c.source === "pools" ? "Picked by hand" : `${presetLabel(c.preset)} screener`}
+          visual={c.source === "pools" && <MiniBars values={perPool} tone="sky" />}
+        />
+        <KpiCard
+          icon={<BellIcon className="size-4" />}
+          tone="violet"
+          label="Alerts 24h"
+          value={agent.alerts24h}
+          hint={agent.lastAlertAt ? `Last ${timeAgo(agent.lastAlertAt, now)}` : "None yet"}
+          visual={
+            <MiniBars
+              values={hourlyCounts(
+                mine.map((a) => a.at),
+                data.now,
+                12,
+                2,
+              )}
+              tone="violet"
+              max={24}
+            />
+          }
+        />
+        <KpiCard
+          icon={<ClockIcon className="size-4" />}
+          tone="amber"
+          label="Cooldown"
+          value={formatMinutes(c.cooldownSec)}
+          hint={
+            left > 0 ? `${formatMinutes(Math.ceil(left / 1000))} left on the last pool` : "Per pool, after an alert"
+          }
+          visual={<Ring value={cooldownMs ? left / cooldownMs : 0} tone="amber" />}
+        />
       </div>
-      <div className="grid gap-2 xl:grid-cols-[1fr_2fr]">
-        <div className="flex flex-col gap-2">
-          <Panel title="Spike rule" action={tabLink("settings", "Edit")}>
+      <div className="grid gap-4 xl:grid-cols-[1fr_2fr]">
+        <div className="flex flex-col gap-4">
+          <Panel
+            title="Spike rule"
+            className="rounded-xl border"
+            action={
+              <Button asChild variant="outline" size="sm">
+                <Link to="/agents/$agentId" params={{ agentId: agent.id }} search={{ tab: "settings" }}>
+                  <PencilIcon /> Edit
+                </Link>
+              </Button>
+            }
+          >
             <Rows
               rows={[
                 ["Pools", c.source === "pools" ? "Picked by hand" : `${presetLabel(c.preset)} screener`],
-                ["Spike", `≥ ${r.mult}× the median`],
-                ["Baseline", formatMinutes(r.baseline * 60)],
-                ["Min volume", `${compactUsd(r.minUsd)}/min`],
+                ["Spike", `≥ ${c.mult}× the median`],
+                ["Baseline", formatMinutes(c.baseline * 60)],
+                ["Min volume", `${compactUsd(c.minUsd)}/min`],
                 ["Cooldown", formatMinutes(c.cooldownSec)],
               ]}
             />
           </Panel>
-          <Panel title="Telegram">
-            <div className="px-3.25 pb-3.25">
+          <Panel title="Telegram" className="rounded-xl border">
+            <div className="px-4 pb-4">
               <TelegramPanel kind="volume-watch" />
             </div>
           </Panel>
         </div>
-        <Panel title="Recent alerts" action={tabLink("alerts", "View all")} className="overflow-hidden">
+        <Panel
+          title="Recent alerts"
+          className="self-start overflow-hidden rounded-xl border"
+          action={
+            <Link
+              to="/agents/$agentId"
+              params={{ agentId: agent.id }}
+              search={{ tab: "alerts" }}
+              className="flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+            >
+              View all <ArrowRightIcon className="size-3.5" />
+            </Link>
+          }
+        >
           <div className="overflow-x-auto border-t">
-            <AlertsTable alerts={data.alerts.slice(0, 8)} now={data.now} empty="No alerts yet" />
+            <AlertsTable alerts={mine.slice(0, 8)} now={data.now} empty="No alerts yet" />
           </div>
         </Panel>
       </div>
@@ -269,7 +320,8 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
 }
 
 function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
-  if (agent.kind === "volume-watch" && agent.config.source === "screener") return <ScreenerMatches agent={agent} />;
+  if (agent.kind === "volume-watch" && agent.config.source === "screener")
+    return <ScreenerMatches agent={agent} now={now} />;
   return <PickedPools agent={agent} now={now} />;
 }
 
@@ -279,73 +331,37 @@ function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
   // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
   const editable = agent.kind === "volume-watch";
   return (
-    <div className="flex flex-col gap-2">
-      <div className="-mx-2 overflow-x-auto">
-        <Table className="min-w-[40rem]">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-3.25">Pool</TableHead>
-              <TableHead className="text-right">
-                {agent.kind === "auto-rebalance" ? "Last out of range" : "Last alert"}
-              </TableHead>
-              <TableHead className="w-20 pr-3.25" />
-            </TableRow>
-          </TableHeader>
-          <TableBody className="tabular-nums">
-            {agent.pools.length === 0 && (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={3} className="py-10 text-center text-muted-foreground">
-                  No pools yet. Add one below.
-                </TableCell>
-              </TableRow>
-            )}
-            {agent.pools.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="pl-3.25">
-                  <PoolCell address={p.address} label={p.label} tokens={p.tokens} />
-                </TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {p.lastAlertAt ? timeAgo(p.lastAlertAt, now) : "None yet"}
-                </TableCell>
-                <TableCell className="pr-3.25">
-                  <div className="flex items-center justify-end gap-3">
-                    <Link
-                      to="/analytics"
-                      search={{ pool: p.address }}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <ExternalLinkIcon className="size-3.5" />
-                      <span className="sr-only">Open analytics</span>
-                    </Link>
-                    {editable && (
-                      <RemovePoolButton
-                        name={poolName(p)}
-                        disabled={remove.isPending}
-                        pending={remove.isPending && remove.variables?.data.poolId === p.id}
-                        onClick={() => remove.mutate({ data: { agentId: agent.id, poolId: p.id } })}
-                      />
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+    <div className="flex flex-col gap-4">
+      <PoolsTable
+        agentId={editable ? agent.id : undefined}
+        lastLabel={editable ? "Last alert" : "Last out of range"}
+        now={now}
+        empty="No pools yet. Add one below."
+        rows={agent.pools.map((p) => ({
+          address: p.address,
+          label: p.label,
+          tokens: p.tokens,
+          lastAlertAt: p.lastAlertAt,
+          removing: remove.isPending && remove.variables?.data.poolId === p.id,
+          onRemove: editable ? () => remove.mutate({ data: { agentId: agent.id, poolId: p.id } }) : undefined,
+        }))}
+      />
       {editable ? (
-        <Panel title="Add a pool">
-          <div className="px-3.25 pb-3.25">
+        <Panel title="Add a pool" className="rounded-xl border">
+          <div className="px-4 pb-4">
             <PoolPicker
               taken={agent.pools.map((p) => p.address)}
               count={agent.pools.length}
               busy={add.isPending}
-              onPick={(pool) => add.mutate({ data: { ...pool, agentId: agent.id } })}
+              onPick={(pool) =>
+                add.mutate({ data: { ...pool, agentId: agent.id } }, { onSuccess: () => toast.success("Pool added") })
+              }
             />
             <FormError error={add.error ?? remove.error} />
           </div>
         </Panel>
       ) : (
-        <p className="px-1 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           An auto-rebalance agent keeps the pool it was created for. Create another agent for another pool, or delete
           this one in Settings.
         </p>
@@ -375,45 +391,48 @@ function AlertsTab({ now }: { now: number }) {
   const empty = data.alerts.length === 0 ? "No alerts yet" : `No pools match “${query.trim()}”.`;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <PoolFilter
-        value={query}
-        onChange={(q) => {
-          setQuery(q);
-          setPage(0);
-        }}
-      />
-      <div className="-mx-2 flex min-h-0 flex-1 flex-col">
-        <div className={SCROLL_TABLE}>
-          <AlertsTable
-            alerts={shown}
-            now={now}
-            empty={empty}
-            sort={sort}
-            onSort={(s) => {
-              setSort(s);
-              setPage(0);
-            }}
-          />
-        </div>
-        <Pagination
-          total={rows.length}
-          page={current}
-          pages={pages}
-          pageSize={pageSize}
-          sizes={PAGE_SIZES}
-          onPage={setPage}
-          onPageSize={(size) => {
-            setPageSize(size);
+    <Panel
+      title="All alerts"
+      className="overflow-hidden rounded-xl border"
+      action={
+        <PoolFilter
+          value={query}
+          onChange={(q) => {
+            setQuery(q);
+            setPage(0);
+          }}
+        />
+      }
+    >
+      <div className="overflow-x-auto border-t">
+        <AlertsTable
+          alerts={shown}
+          now={now}
+          empty={empty}
+          sort={sort}
+          onSort={(s) => {
+            setSort(s);
             setPage(0);
           }}
         />
       </div>
-    </div>
+      <Pagination
+        total={rows.length}
+        page={current}
+        pages={pages}
+        pageSize={pageSize}
+        sizes={PAGE_SIZES}
+        onPage={setPage}
+        onPageSize={(size) => {
+          setPageSize(size);
+          setPage(0);
+        }}
+      />
+    </Panel>
   );
 }
 
-function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: string) => void }) {
+function SettingsTab({ agent }: { agent: AgentView }) {
   const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { agentId: agent.id, enabled } }));
   const [dirty, setDirty] = useState(false);
   const [section, setSection] = useState<SettingsSectionId>("rule");
@@ -426,7 +445,10 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
 
   return (
     <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6">
-      <nav aria-label="Settings" className="-mx-1 flex gap-1 overflow-x-auto px-1 md:mx-0 md:flex-col md:px-0">
+      <nav
+        aria-label="Settings"
+        className="-mx-1 flex gap-1 overflow-x-auto px-1 md:sticky md:top-4 md:mx-0 md:flex-col md:self-start md:px-0"
+      >
         {sections.map((s) => {
           const on = s.id === section;
           return (
@@ -455,9 +477,9 @@ function SettingsTab({ agent, onSaved }: { agent: AgentView; onSaved: (message: 
 
         {section === "rule" &&
           (agent.kind === "auto-rebalance" ? (
-            <RebalanceRuleSection agent={agent} onSaved={onSaved} onDirty={setDirty} />
+            <RebalanceRuleSection agent={agent} onDirty={setDirty} />
           ) : (
-            <VolumeRuleSection agent={agent} onSaved={onSaved} onDirty={setDirty} />
+            <VolumeRuleSection agent={agent} onDirty={setDirty} />
           ))}
 
         {section === "telegram" && (
@@ -542,15 +564,7 @@ function DeleteAgent({ agent }: { agent: AgentView }) {
   );
 }
 
-function VolumeRuleSection({
-  agent,
-  onSaved,
-  onDirty,
-}: {
-  agent: VolumeAgentView;
-  onSaved: (message: string) => void;
-  onDirty: (dirty: boolean) => void;
-}) {
+function VolumeRuleSection({ agent, onDirty }: { agent: VolumeAgentView; onDirty: (dirty: boolean) => void }) {
   const saved = { fields: configFields(agent.config), source: sourceOf(agent.config) };
   const [form, setForm] = useState(saved);
   const save = useAgentMutation(saveAgentConfig);
@@ -593,7 +607,7 @@ function VolumeRuleSection({
               {
                 onSuccess: () => {
                   onDirty(false);
-                  onSaved("Rule saved");
+                  toast.success("Rule saved");
                 },
               },
             )

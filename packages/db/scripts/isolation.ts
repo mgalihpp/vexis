@@ -6,6 +6,25 @@ import { randomUUID } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
 import {
+  closeJournal,
+  enableOffice,
+  expireProposals,
+  getOfficeConfig,
+  getProposal,
+  insertJournal,
+  insertMessage,
+  insertProposal,
+  insertRun,
+  latestRuns,
+  listJournal,
+  listMessages,
+  listProposals,
+  llmSpendToday,
+  moveProposal,
+  rejectUnexecuted,
+  updateOfficeConfig,
+} from "../src/office.server.ts";
+import {
   addAgentPool,
   addWallet,
   deleteAgent,
@@ -122,6 +141,62 @@ try {
     rejected = true;
   }
   check("an invalid config is rejected", rejected);
+
+  // The office tables.
+  await enableOffice(A, 1);
+  check("B has no office", (await getOfficeConfig(B)) === undefined);
+  check("B cannot update A's office", (await updateOfficeConfig(B, { paused: true })) === false);
+  check("A's office is not paused", (await getOfficeConfig(A))?.paused === false);
+
+  const draft = {
+    kind: "open" as const,
+    poolAddress: "PoolA111111111111111111111111111111111111111",
+    poolName: "A-SOL",
+    params: { strategy: "Spot", activeBin: 0, lowerBin: -1, upperBin: 1, amountSol: 1, solUsd: null },
+    rationale: "isolation",
+    proposedBy: "strategist" as const,
+    expiresAt: new Date(Date.now() - 1000),
+  };
+  const proposalA = await insertProposal(A, draft);
+  const proposalB = await insertProposal(B, draft);
+  if (!proposalA || !proposalB) throw new Error("proposal insert returned nothing");
+  check("a second open proposal on one pool is dropped", (await insertProposal(A, draft)) === undefined);
+  check(
+    "A lists only A's proposals",
+    (await listProposals(A)).every((p) => p.userId === ids.a),
+  );
+  check("A cannot read B's proposal", (await getProposal(A, proposalB.id)) === undefined);
+  check("A cannot move B's proposal", (await moveProposal(A, proposalB.id, "draft", "risk_checked")) === undefined);
+  await moveProposal(B, proposalB.id, "draft", "risk_checked");
+  check("A's expiry leaves B's proposal alone", (await expireProposals(A, new Date())).length === 0);
+  check("A's kill switch leaves B's proposal alone", (await rejectUnexecuted(A, "kill_switch")) === 1);
+  check("B's proposal is still risk_checked", (await getProposal(B, proposalB.id))?.status === "risk_checked");
+
+  await insertMessage(B, { agent: "scout", text: "B only" });
+  check("A sees none of B's messages", (await listMessages(A)).length === 0);
+
+  const run = {
+    agent: "scout" as const,
+    provider: "claude" as const,
+    model: "claude-haiku-5-5",
+    keySource: "vexis" as const,
+  };
+  await insertRun(B, { ...run, promptVersion: "isolation", durationMs: 1, costUsd: 0.5 });
+  check("A sees none of B's runs", (await latestRuns(A)).length === 0);
+  check("A's spend leaves out B's", (await llmSpendToday(A, new Date())).length === 0);
+
+  const journalB = await insertJournal(B, {
+    poolAddress: "PoolB",
+    simulated: true,
+    amountSol: 1,
+    openReason: "isolation",
+  });
+  if (!journalB) throw new Error("journal insert returned nothing");
+  check("A sees none of B's journal", (await listJournal(A)).length === 0);
+  check(
+    "A cannot close B's position",
+    (await closeJournal(A, journalB.id, { closeReason: "manual", pnlSol: null, pnlUsd: null })) === undefined,
+  );
 } finally {
   await db.delete(users).where(inArray(users.id, [ids.a, ids.b]));
   await closeDb(db);

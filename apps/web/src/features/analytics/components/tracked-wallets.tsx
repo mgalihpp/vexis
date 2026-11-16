@@ -33,7 +33,7 @@ import {
   type TrackedResult,
   type TrackedWallet,
 } from "../tracked";
-import { amount, CollapsiblePanel, NA, short, sol, sol3, solAmount, tone, Updated, usd } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
@@ -158,7 +158,7 @@ function PoolTotals({ data }: { data: Extract<TrackedResult, { ok: true }> }) {
       </Tile>
       <Tile label="Unrealized PnL">
         <Big className={tone(t.pnlUsd)}>{usd(t.pnlUsd, true)}</Big>
-        <span className={`tabular-nums ${tone(sol3(t.pnlSol))}`}>{sol(t.pnlSol)}</span>
+        <span className={`tabular-nums ${tone(solRound(t.pnlSol))}`}>{sol(t.pnlSol)}</span>
         {note}
       </Tile>
     </div>
@@ -307,7 +307,7 @@ function PositionRow({
       </Cell>
       <Cell label="PnL" className="@2xl:items-end">
         <span className={`font-semibold ${tone(p.pnlUsd)}`}>{usd(p.pnlUsd, true)}</span>
-        <span className={tone(sol3(p.pnlSol))}>{sol(p.pnlSol)}</span>
+        <span className={tone(solRound(p.pnlSol))}>{sol(p.pnlSol)}</span>
       </Cell>
       <Cell label="Created" className="@2xl:items-end">
         {p.createdAt == null ? (
@@ -388,7 +388,7 @@ function WalletCard({
           usd={usd(t.pnlUsd, true)}
           sol={sol(t.pnlSol)}
           usdClassName={tone(t.pnlUsd)}
-          solClassName={tone(sol3(t.pnlSol))}
+          solClassName={tone(solRound(t.pnlSol))}
         />
         <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
       </summary>

@@ -10,17 +10,13 @@ function Bar() {
 /** Shown while the agents list loads, in the fleet page's layout. */
 export function FleetSkeleton() {
   return (
-    <div>
-      <Bar />
-      <div className="space-y-2 p-2">
-        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[6rem] animate-pulse rounded-lg bg-card" />
-          ))}
-        </div>
-        <div className="h-40 animate-pulse rounded-lg bg-card" />
-        <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
+    <div className="mx-auto flex max-w-[110rem] flex-col gap-5 px-4 pt-6 pb-8 md:px-6">
+      <div className="flex items-center justify-between gap-3">
+        <div className="h-8 w-28 animate-pulse rounded-md bg-card" />
+        <div className="h-7 w-28 animate-pulse rounded-md bg-card" />
       </div>
+      <div className="h-64 animate-pulse rounded-xl bg-card" />
+      <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
     </div>
   );
 }

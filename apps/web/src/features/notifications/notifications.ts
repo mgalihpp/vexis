@@ -1,6 +1,7 @@
 // Client-safe notification model. There is no notification backend: the browser polls the favorite wallets and
 // pools, and `diffWatch` turns the change since the last poll into notices.
 
+import { compactSol, compactUsd } from "@/features/portfolio/money";
 import type { Currency } from "@/features/portfolio/portfolio";
 import { shortAddr } from "@/lib/format";
 
@@ -105,11 +106,8 @@ export function volumeSpike(bars: VolumeBar[], multiplier: SpikeMultiplier, minU
   return { kind: "multiple", t: current.t, volume: current.volume, average };
 }
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact" });
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-
 const volumeIn = (amountUsd: number, currency: Currency, solPrice: number | null) =>
-  currency === "sol" && solPrice ? `${compact.format(amountUsd / solPrice)} SOL` : usd.format(amountUsd);
+  currency === "sol" && solPrice ? compactSol(amountUsd / solPrice) : compactUsd(amountUsd);
 
 /**
  * The next `Seen` and the notices since `seen`. A wallet seen for the first time only sets the baseline, so adding a

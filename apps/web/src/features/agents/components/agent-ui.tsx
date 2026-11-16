@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, UnlinkIcon, XIcon, ZapIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { findPools } from "@/features/analytics/analytics.functions";
@@ -649,6 +650,7 @@ export function TelegramPanel({ kind }: { kind: AgentKind }) {
     setTokenError(null);
     await connect.mutateAsync(token);
     setToken("");
+    toast.success("Bot connected");
   };
 
   // No padding of its own: the card or box around it sets the inset, so it never nests a second frame.
