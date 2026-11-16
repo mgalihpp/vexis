@@ -45,6 +45,8 @@ export const SIM_RETRY_DELAY_MS = 1000;
 export type SendInput = {
   readonly connection: Connection;
   readonly signer: Keypair;
+  /** Keys that co-sign where an instruction asks for them, like a new position's keypair. */
+  readonly extraSigners?: readonly Keypair[];
   readonly tx: Transaction;
   readonly label: string;
   readonly log: SendLog;
@@ -187,6 +189,10 @@ export function isRetryableSimulationError(error: unknown): boolean {
 /** Rebuild with a fresh blockhash and re-sign. Anything else throws `SendFailure` and aborts. */
 class Retryable extends Error {}
 
+/** The extra keys some instruction marks as a signer; web3.js refuses to sign with a key the message does not need. */
+export const cosigners = (instructions: readonly TransactionInstruction[], extra: readonly Keypair[]) =>
+  extra.filter((k) => instructions.some((ix) => ix.keys.some((m) => m.isSigner && m.pubkey.equals(k.publicKey))));
+
 const landed = (status: SignatureStatus | null | undefined) =>
   status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized";
 
@@ -199,6 +205,7 @@ export async function sendTransaction(input: SendInput): Promise<string> {
   const payer = signer.publicKey;
   const base = stripComputeBudgetInstructions(input.tx.instructions);
   if (base.length === 0) throw new SendFailure(`[${label}] transaction has no instructions`);
+  const signers = [signer, ...cosigners(base, input.extraSigners ?? [])];
 
   let lastSignature: string | undefined;
   const sendOnce = async (attempt: number): Promise<string> => {
@@ -228,7 +235,7 @@ export async function sendTransaction(input: SendInput): Promise<string> {
     const probeTx = new Transaction().add(...simInstructions);
     probeTx.feePayer = payer;
     probeTx.recentBlockhash = simBlockhash;
-    probeTx.sign(signer);
+    probeTx.sign(...signers);
     const microLamports = await fetchPriorityFeeEstimate(
       connection.rpcEndpoint,
       bs58.encode(probeTx.serialize()),
@@ -243,7 +250,7 @@ export async function sendTransaction(input: SendInput): Promise<string> {
     const finalTx = new Transaction().add(...buildComputeBudgetInstructions(cuLimit, microLamports), ...base);
     finalTx.feePayer = payer;
     finalTx.recentBlockhash = blockhash;
-    finalTx.sign(signer);
+    finalTx.sign(...signers);
     const raw = finalTx.serialize();
     let signature: string;
     try {

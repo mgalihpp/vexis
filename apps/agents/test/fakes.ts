@@ -23,7 +23,9 @@ import { ScreenerHistory } from "../src/services/screener-history-store.ts";
 import { Telegram } from "../src/services/telegram.ts";
 import {
   type ClaimRequest,
+  type CloseRequest,
   type CompoundRequest,
+  type OpenRequest,
   type SweepRequest,
   Zap,
   type ZapRequest,
@@ -386,6 +388,8 @@ export function fakeZap() {
     claims: [] as ClaimRequest[],
     compounds: [] as CompoundRequest[],
     sweeps: [] as SweepRequest[],
+    opens: [] as OpenRequest[],
+    closes: [] as CloseRequest[],
     fail: null as string | null,
     failClaim: null as string | null,
     failFees: null as string | null,
@@ -412,6 +416,24 @@ export function fakeZap() {
       compound: (_rpcUrl, _signer, request) =>
         feeStep(state.compounds, request, `COMPOUND${state.compounds.length + 1}`),
       sweep: (_rpcUrl, _signer, request) => feeStep(state.sweeps, request, `SWEEP${state.sweeps.length + 1}`),
+      open: (_rpcUrl, _signer, request) =>
+        Effect.suspend(() => {
+          state.opens.push(request);
+          if (state.fail !== null) return Effect.fail(new ZapError({ message: state.fail }));
+          const n = state.opens.length;
+          return Effect.succeed({ positionAddress: `NEWPOS${n}`, signature: `OPEN${n}` });
+        }),
+      close: (_rpcUrl, _signer, request) =>
+        Effect.suspend(() => {
+          state.closes.push(request);
+          if (state.fail !== null) return Effect.fail(new ZapError({ message: state.fail }));
+          return Effect.succeed({
+            signature: `CLOSE${state.closes.length}`,
+            received: { x: 0n, y: 0n },
+            swapSignature: null,
+            swapError: null,
+          });
+        }),
       rebalance: (rpcUrl, signer, request) =>
         Effect.gen(function* () {
           state.calls.push({ rpcUrl, owner: signer.publicKey.toBase58(), request });

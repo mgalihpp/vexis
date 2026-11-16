@@ -97,7 +97,7 @@ const send = (ctx: ZapContext, tx: Transaction, label: string) =>
  * DLMM's rebalance needs both user token accounts to exist; a wallet that never held one side fails simulation
  * with AccountNotInitialized (3012). The SDK helper resolves Token-2022 mints to the right program.
  */
-async function ensureUserTokenAccounts(ctx: ZapContext, lbPair: PublicKey) {
+export async function ensureUserTokenAccounts(ctx: ZapContext, lbPair: PublicKey) {
   const owner = ctx.signer.publicKey;
   const pair = await getLbPairState(ctx.connection, lbPair);
   const instructions: TransactionInstruction[] = [];
@@ -116,14 +116,14 @@ async function ensureUserTokenAccounts(ctx: ZapContext, lbPair: PublicKey) {
  * never reaches it. An uninitialized one is owned by the System program and DLMM rejects the zap with Custom(3007),
  * not a missing-account error. Built right before zap-in, after the SDK's own init leg, so it never double-inits.
  */
-async function missingBinArrayTransaction(ctx: ZapContext, lbPair: PublicKey, halfWidth: number) {
+export async function missingBinArrayTransaction(
+  ctx: ZapContext,
+  lbPair: PublicKey,
+  range: (activeId: number) => readonly [lower: number, upper: number],
+) {
   const pair = await getLbPairState(ctx.connection, lbPair);
-  const required = getBinArraysRequiredByPositionRange(
-    lbPair,
-    new BN(pair.activeId - halfWidth),
-    new BN(pair.activeId + halfWidth),
-    DLMM_PROGRAM_ID,
-  );
+  const [lower, upper] = range(pair.activeId);
+  const required = getBinArraysRequiredByPositionRange(lbPair, new BN(lower), new BN(upper), DLMM_PROGRAM_ID);
   const infos = await ctx.connection.getMultipleAccountsInfo(required.map((r) => r.key));
   const missing = required.filter((_, i) => infos[i] == null);
   if (missing.length === 0) return null;
@@ -180,7 +180,8 @@ export async function executeZapRebalance(ctx: ZapContext, request: ZapRequest):
     const tx = response[LEG_FIELD[leg]];
     if (!tx) continue;
     if (leg === "zap-in") {
-      const extra = await missingBinArrayTransaction(ctx, lbPair, request.halfWidth);
+      const { halfWidth } = request;
+      const extra = await missingBinArrayTransaction(ctx, lbPair, (active) => [active - halfWidth, active + halfWidth]);
       if (extra) last = await send(ctx, extra, "init-bin-array-extra");
     }
     last = await send(ctx, tx, leg);

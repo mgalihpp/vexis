@@ -9,6 +9,7 @@ import {
   buildComputeBudgetInstructions,
   COMPUTE_BUDGET_PROGRAM_ID,
   computeUnitLimitWithBuffer,
+  cosigners,
   isRetryableSimulationError,
   parsePriorityFeeEstimate,
   priorityFeeOptions,
@@ -54,6 +55,20 @@ describe("compute unit limit", () => {
     const both = buildComputeBudgetInstructions(200_000, 5000);
     expect(both.map((ix) => ix.programId.toBase58())).toEqual([COMPUTE_BUDGET_PROGRAM_ID, COMPUTE_BUDGET_PROGRAM_ID]);
     expect(() => buildComputeBudgetInstructions(0, 0)).toThrow(SendFailure);
+  });
+});
+
+describe("co-signers", () => {
+  test("only keys an instruction marks as a signer co-sign", () => {
+    const position = Keypair.generate();
+    const stranger = Keypair.generate();
+    const ix = (pubkey: PublicKey, isSigner: boolean) => ({
+      programId: PublicKey.default,
+      keys: [{ pubkey, isSigner, isWritable: true }],
+      data: Buffer.alloc(0),
+    });
+    expect(cosigners([ix(position.publicKey, true)], [position, stranger])).toEqual([position]);
+    expect(cosigners([ix(position.publicKey, false)], [position])).toEqual([]);
   });
 });
 
