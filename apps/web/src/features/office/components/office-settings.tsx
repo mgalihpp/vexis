@@ -163,12 +163,15 @@ function PoolsPage({ config }: { config: ConfigView }) {
         save.mutate({ data: { preset } }, { onSuccess: () => toast.success("Pool filter saved") });
       }}
     >
-      <PresetPicker
-        selected={preset}
-        custom={config.screen.custom}
-        onPick={(id) => id !== "pools" && setPreset(id)}
-        customHint="Filter the screener, then press “Scout pools like these” to hand the filter to the office."
-      />
+      <section className="flex flex-col gap-1.5">
+        <h3 className="px-3 text-xs font-medium text-muted-foreground">Screener filter</h3>
+        <PresetPicker
+          selected={preset}
+          custom={config.screen.custom}
+          onPick={(id) => id !== "pools" && setPreset(id)}
+          customHint="Filter the screener, then press “Scout pools like these” to hand the filter to the office."
+        />
+      </section>
       <FormError error={save.error} />
       <Save disabled={preset === config.screen.preset} pending={save.isPending}>
         Save pool filter
