@@ -12,6 +12,7 @@ import {
   describeRule,
   draftConfig,
   draftIssues,
+  hourlyCounts,
   LOW_SOL,
   MAX_POOLS,
   type PoolView,
@@ -266,6 +267,12 @@ describe("wizard draft", () => {
 });
 
 describe("fleet", () => {
+  test("buckets alert times by hour, oldest first, and drops what is outside the window", () => {
+    const now = 10 * 3_600_000;
+    const at = (hoursAgo: number) => now - hoursAgo * 3_600_000;
+    expect(hourlyCounts([at(0.5), at(0.2), at(2.5), at(3.5), at(4), at(-1)], now, 4)).toEqual([1, 1, 0, 2]);
+    expect(hourlyCounts([at(0.5), at(1.5), at(3.5)], now, 2, 2)).toEqual([1, 2]);
+  });
   test("summarizes watching, attention, pools and alerts", () => {
     const s = summarizeFleet([
       agent({ pools: [{ id: "1", address: "A", label: null, lastAlertAt: null, tokens: null }], alerts24h: 3 }),

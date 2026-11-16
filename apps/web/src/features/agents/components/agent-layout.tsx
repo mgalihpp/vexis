@@ -40,6 +40,95 @@ export function StatCard({ label, value, tone = "" }: { label: string; value: Re
   );
 }
 
+const STAT_TONE = {
+  brand: { card: "from-brand/10", icon: "bg-brand/15 text-brand", bar: "bg-brand" },
+  sky: { card: "from-sky-500/10", icon: "bg-sky-500/15 text-sky-500", bar: "bg-sky-500" },
+  violet: { card: "from-violet-500/10", icon: "bg-violet-500/15 text-violet-500", bar: "bg-violet-500" },
+  amber: { card: "from-amber-500/10", icon: "bg-amber-500/15 text-amber-500", bar: "bg-amber-500" },
+};
+
+export type Tone = keyof typeof STAT_TONE;
+
+export function KpiCard({
+  icon,
+  tone,
+  label,
+  value,
+  hint,
+  visual,
+}: {
+  icon: ReactNode;
+  tone: Tone;
+  label: string;
+  value: ReactNode;
+  hint: string;
+  visual: ReactNode;
+}) {
+  const t = STAT_TONE[tone];
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-xl border bg-linear-to-br ${t.card} to-card to-60% bg-card px-4 py-5`}
+    >
+      <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${t.icon}`}>{icon}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="mt-1 truncate text-2xl leading-tight font-bold tabular-nums">{value}</div>
+        <div className="mt-0.5 truncate text-[0.7rem] text-muted-foreground">{hint}</div>
+      </div>
+      <div className="shrink-0">{visual}</div>
+    </div>
+  );
+}
+
+/** Share of agents running, as a ring. */
+const RING_STROKE: Record<Tone, string> = {
+  brand: "stroke-brand",
+  sky: "stroke-sky-500",
+  violet: "stroke-violet-500",
+  amber: "stroke-amber-500",
+};
+
+export function Ring({ value, tone = "brand" }: { value: number; tone?: Tone }) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg viewBox="0 0 36 36" className="size-11 -rotate-90" aria-hidden>
+      <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3.5" className="stroke-muted" />
+      {value > 0 && (
+        <circle
+          cx="18"
+          cy="18"
+          r={r}
+          fill="none"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeDasharray={`${c * value} ${c}`}
+          className={RING_STROKE[tone]}
+        />
+      )}
+    </svg>
+  );
+}
+
+/** Bars scaled to the largest, at most `max` of them; none for fewer than two, which compare nothing. */
+export function MiniBars({ values, tone, max: most = 8 }: { values: number[]; tone: Tone; max?: number }) {
+  const shown = values.slice(-most);
+  if (shown.length < 2) return null;
+  const max = Math.max(1, ...shown);
+  return (
+    <div className={`flex h-11 items-end ${shown.length > 8 ? "gap-0.5" : "gap-1"}`} aria-hidden>
+      {shown.map((v, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: bars follow the agent order
+          key={i}
+          className={`${shown.length > 8 ? "w-1" : "w-1.5"} rounded-full ${v ? STAT_TONE[tone].bar : "bg-muted"}`}
+          style={{ height: `${Math.max(12, (v / max) * 100)}%`, opacity: v ? 0.4 + 0.6 * (v / max) : 1 }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function Panel({
   title,
   action,

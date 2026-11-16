@@ -12,6 +12,7 @@ import {
   WALLET_SOURCES,
 } from "@vexis/db/office";
 import { type ReactNode, useState } from "react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,8 +80,6 @@ function Choice<T extends string>({
     </fieldset>
   );
 }
-
-const Saved = ({ ok }: { ok: boolean }) => (ok ? <span className="text-xs text-profit">Saved</span> : null);
 
 /** Everything the owner sets: models, keys, wallet and guardrails. Every write is checked by its zod schema. */
 export function OfficeSettings({ config }: { config: ConfigView }) {
@@ -153,12 +152,14 @@ function ModelsBlock({ config }: { config: ConfigView }) {
         <Button
           size="sm"
           disabled={!parsed.success || save.isPending}
-          onClick={() => parsed.success && save.mutate({ data: { models: parsed.data } })}
+          onClick={() =>
+            parsed.success &&
+            save.mutate({ data: { models: parsed.data } }, { onSuccess: () => toast.success("Models saved") })
+          }
         >
           {save.isPending && <Spinner />}
           Save models
         </Button>
-        <Saved ok={save.isSuccess} />
       </div>
       <FormError error={save.error} />
     </Block>
@@ -221,7 +222,15 @@ function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) 
             className="flex min-w-0 flex-1 gap-1.5"
             onSubmit={(e) => {
               e.preventDefault();
-              save.mutate({ data: { provider, key } }, { onSuccess: () => setKey("") });
+              save.mutate(
+                { data: { provider, key } },
+                {
+                  onSuccess: () => {
+                    setKey("");
+                    toast.success("Key saved");
+                  },
+                },
+              );
             }}
           >
             <Input
@@ -303,6 +312,7 @@ function WalletBlock({ config }: { config: ConfigView }) {
                   source.reset();
                   setSecret("");
                   setRpc("");
+                  toast.success("Wallet saved");
                 },
               },
             );
@@ -369,7 +379,8 @@ function GuardrailsBlock({ config }: { config: ConfigView }) {
         className="flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (parsed.success) save.mutate({ data: { guardrails: parsed.data } });
+          if (parsed.success)
+            save.mutate({ data: { guardrails: parsed.data } }, { onSuccess: () => toast.success("Guardrails saved") });
         }}
       >
         {GUARDRAIL_FIELDS.map((f) => (
@@ -396,7 +407,6 @@ function GuardrailsBlock({ config }: { config: ConfigView }) {
             {save.isPending && <Spinner />}
             Save guardrails
           </Button>
-          <Saved ok={save.isSuccess} />
         </div>
         <FormError error={save.error} />
       </form>

@@ -584,3 +584,15 @@ export function summarizeFleet(agents: AgentView[], screener: AlertPool[] = []):
     alerts24h: agents.reduce((n, a) => n + a.alerts24h, 0),
   };
 }
+
+const HOUR = 3_600_000;
+
+/** How many of `times` fall in each of the last `buckets` spans of `hoursEach` hours before `now`, oldest first. */
+export function hourlyCounts(times: number[], now: number, buckets = 24, hoursEach = 1): number[] {
+  const out = Array.from({ length: buckets }, () => 0);
+  for (const t of times) {
+    const ago = Math.floor((now - t) / (HOUR * hoursEach));
+    if (ago >= 0 && ago < buckets) out[buckets - 1 - ago] = (out[buckets - 1 - ago] ?? 0) + 1;
+  }
+  return out;
+}

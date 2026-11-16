@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { BellIcon } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,7 @@ export function AlertButton({ filter }: { filter: PoolFilter }) {
                   {
                     onSuccess: ({ id }) => {
                       setConfirming(false);
+                      toast.success("Volume agent switched to this filter");
                       navigate({ to: "/agents/$agentId", params: { agentId: id }, search: { tab: "pools" } });
                     },
                   },
