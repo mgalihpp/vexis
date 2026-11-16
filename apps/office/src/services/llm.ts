@@ -1,4 +1,4 @@
-import type { LlmAgent, LlmProvider } from "@vexis/db/office";
+import type { LlmAgent, LlmProvider } from "@vexis/shared/office";
 import { Context, Effect, Layer } from "effect";
 import { LlmError } from "../errors.ts";
 import { claude } from "../providers/claude.ts";

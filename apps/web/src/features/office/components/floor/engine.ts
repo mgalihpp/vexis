@@ -1,4 +1,4 @@
-import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
+import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/shared/office";
 import { type Actor, createScene, ROOMS, type SceneData } from "./scene";
 import { canvas, clamp, findPath, type Spot, STROLLS, seatOf, T, WH, WW } from "./world";
 

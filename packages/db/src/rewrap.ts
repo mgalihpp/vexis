@@ -1,4 +1,11 @@
-import { decryptSecret, decryptSecretExact, encryptSecret, isSealed, openWalletSecret, sealSecret } from "./secret.ts";
+import {
+  decryptSecret,
+  decryptSecretExact,
+  encryptSecret,
+  isSealed,
+  openWalletSecret,
+  sealSecret,
+} from "@vexis/shared/secret";
 
 export type Rewrap =
   | { readonly state: "current"; readonly plain?: string }

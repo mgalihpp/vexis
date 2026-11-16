@@ -1,4 +1,4 @@
-import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
+import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/shared/office";
 import { CrosshairIcon, Maximize2Icon, MinusIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, PlusIcon } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,

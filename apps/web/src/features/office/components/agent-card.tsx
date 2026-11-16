@@ -1,5 +1,5 @@
-import { type OfficeAgent, PROVIDER_LABEL } from "@vexis/db/office";
-import { PROMPT_TEXT } from "@vexis/db/office-prompts";
+import { type OfficeAgent, PROVIDER_LABEL } from "@vexis/shared/office";
+import { PROMPT_TEXT } from "@vexis/shared/office-prompts";
 import { CrosshairIcon, GripHorizontalIcon, ListIcon, XIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";

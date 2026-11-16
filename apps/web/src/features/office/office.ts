@@ -25,7 +25,7 @@ import {
   type Proposer,
   type RiskNotes,
   type WalletSource,
-} from "@vexis/db/office";
+} from "@vexis/shared/office";
 import { money } from "@/features/portfolio/money";
 import { LIVE_MS } from "@/lib/query";
 

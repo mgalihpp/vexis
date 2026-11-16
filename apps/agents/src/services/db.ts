@@ -1,18 +1,6 @@
 import type { Keypair } from "@solana/web3.js";
-import {
-  type AgentKind,
-  LOW_SOL,
-  REBALANCE_FAILING,
-  REBALANCE_FAILURE_LIMIT,
-  type RebalanceAction,
-  TELEGRAM_NOT_LINKED,
-  TELEGRAM_RELINK,
-  WALLET_UNREADABLE,
-} from "@vexis/db/agents";
 import { closeDb, createDb } from "@vexis/db/client";
-import type { Beat } from "@vexis/db/heartbeat";
 import { listHeartbeats, recordTick, setAlerted } from "@vexis/db/heartbeat-queries";
-import type { WalletSource } from "@vexis/db/office";
 import {
   agentAlerts,
   agentPools,
@@ -23,7 +11,19 @@ import {
   rebalanceWallets,
   telegramLinks,
 } from "@vexis/db/schema";
-import { decryptSecret, openWalletSecret } from "@vexis/db/secret";
+import {
+  type AgentKind,
+  LOW_SOL,
+  REBALANCE_FAILING,
+  REBALANCE_FAILURE_LIMIT,
+  type RebalanceAction,
+  TELEGRAM_NOT_LINKED,
+  TELEGRAM_RELINK,
+  WALLET_UNREADABLE,
+} from "@vexis/shared/agents";
+import type { Beat } from "@vexis/shared/heartbeat";
+import type { WalletSource } from "@vexis/shared/office";
+import { decryptSecret, openWalletSecret } from "@vexis/shared/secret";
 import { and, desc, eq, gt, inArray, isNull, lt, type SQL, sql } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "../errors.ts";

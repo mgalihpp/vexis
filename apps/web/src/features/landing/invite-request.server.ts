@@ -1,6 +1,6 @@
 import { getDb } from "@vexis/db/client";
-import { sendMail } from "@vexis/db/mail";
 import { requestInvite } from "@vexis/db/queries";
+import { sendMail } from "@vexis/shared/mail";
 import { INVITE_REQUEST_LIMIT, type InviteRequestResult, rateLimit } from "./invite-request";
 
 const requestsByIp = new Map<string, number[]>();

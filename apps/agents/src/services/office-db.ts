@@ -1,5 +1,4 @@
 import { closeDb, createDb } from "@vexis/db/client";
-import type { ProposalStatus } from "@vexis/db/office";
 import {
   bookClose,
   closeJournal,
@@ -25,7 +24,8 @@ import {
 } from "@vexis/db/office-queries";
 import { forUser, listPoolsOfKind } from "@vexis/db/queries";
 import { type officeJournal, type officeMessages, rebalanceWallets } from "@vexis/db/schema";
-import { decryptSecret } from "@vexis/db/secret";
+import type { ProposalStatus } from "@vexis/shared/office";
+import { decryptSecret } from "@vexis/shared/secret";
 import { eq } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Redacted } from "effect";
 import { DbError } from "../errors.ts";

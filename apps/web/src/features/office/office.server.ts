@@ -1,25 +1,5 @@
 import { getDb } from "@vexis/db/client";
 import {
-  AgentModel,
-  activeModels,
-  type Guardrails,
-  type KeySource,
-  LLM_AGENTS,
-  LLM_PROVIDERS,
-  type LlmProvider,
-  type OfficeAgent,
-  type OfficeModels,
-  type OfficeScreen,
-  OPEN_STATUSES,
-  PROPOSAL_PARAMS,
-  parseGuardrails,
-  parseScreen,
-  REFUSAL_TEXT,
-  RiskNotes,
-  utcDayStart,
-  type WalletSource,
-} from "@vexis/db/office";
-import {
   closeJournal,
   decideProposal as decide,
   getOfficeConfig,
@@ -40,7 +20,27 @@ import {
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser, getRebalanceWallet } from "@vexis/db/queries";
-import { encryptSecret, sealSecret } from "@vexis/db/secret";
+import {
+  AgentModel,
+  activeModels,
+  type Guardrails,
+  type KeySource,
+  LLM_AGENTS,
+  LLM_PROVIDERS,
+  type LlmProvider,
+  type OfficeAgent,
+  type OfficeModels,
+  type OfficeScreen,
+  OPEN_STATUSES,
+  PROPOSAL_PARAMS,
+  parseGuardrails,
+  parseScreen,
+  REFUSAL_TEXT,
+  RiskNotes,
+  utcDayStart,
+  type WalletSource,
+} from "@vexis/shared/office";
+import { encryptSecret, sealSecret } from "@vexis/shared/secret";
 import { checkRpcUrl, keypairOf } from "@/features/agents/wallet.server";
 import type { ConfigView, MessageView, OfficeData, ProposalView } from "./office";
 

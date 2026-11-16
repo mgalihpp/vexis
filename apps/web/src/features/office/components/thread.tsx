@@ -1,4 +1,4 @@
-import { PROVIDER_LABEL } from "@vexis/db/office";
+import { PROVIDER_LABEL } from "@vexis/shared/office";
 import { timeAgo } from "@/features/portfolio/money";
 import { prettyReply, type ThreadView, tokenCount } from "../office";
 import { cost, DASH, utcClock } from "./office-ui";

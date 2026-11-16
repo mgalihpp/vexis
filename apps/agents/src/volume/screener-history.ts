@@ -1,4 +1,4 @@
-import { SCREENER_MAX_BASELINE } from "@vexis/db/screen";
+import { SCREENER_MAX_BASELINE } from "@vexis/shared/screen";
 import type { StoredReading } from "../services/db.ts";
 import { type MinuteVolume, volumeDelta } from "./spike.ts";
 

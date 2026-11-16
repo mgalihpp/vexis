@@ -1,11 +1,3 @@
-import {
-  type AgentKind,
-  AutoRebalanceConfig,
-  parseAgentConfig,
-  TELEGRAM_KINDS,
-  type TelegramKind,
-  VolumeWatchConfig,
-} from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   addAgentPool,
@@ -24,7 +16,15 @@ import {
   removeAgentPool,
   updateAgent,
 } from "@vexis/db/queries";
-import { decryptSecret } from "@vexis/db/secret";
+import {
+  type AgentKind,
+  AutoRebalanceConfig,
+  parseAgentConfig,
+  TELEGRAM_KINDS,
+  type TelegramKind,
+  VolumeWatchConfig,
+} from "@vexis/shared/agents";
+import { decryptSecret } from "@vexis/shared/secret";
 import { poolTokens } from "@/features/analytics/analytics.server";
 import {
   type AgentsData,

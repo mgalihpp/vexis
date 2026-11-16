@@ -1,5 +1,5 @@
-import { type Decision, PROPOSAL_PARAMS, RiskNotes } from "@vexis/db/office";
 import type { ProposalRow } from "@vexis/db/office-queries";
+import { type Decision, PROPOSAL_PARAMS, RiskNotes } from "@vexis/shared/office";
 import { z } from "zod";
 
 // The office's Telegram card and what comes back from it. Pure: the runtime sends, polls and decides.

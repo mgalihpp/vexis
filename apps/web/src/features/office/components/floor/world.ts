@@ -1,4 +1,4 @@
-import type { OfficeAgent } from "@vexis/db/office";
+import type { OfficeAgent } from "@vexis/shared/office";
 
 // The office floor's map: a 30×18 grid of 16 px tiles, the desks, the spots agents walk to and the tiles they
 // cannot cross. Plain data and a path finder; nothing here draws.

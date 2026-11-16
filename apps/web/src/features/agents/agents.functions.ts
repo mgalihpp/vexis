@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { AutoRebalanceConfig, TELEGRAM_KINDS, VolumeWatchConfig } from "@vexis/db/agents";
-import { PoolFilter } from "@vexis/db/screen";
+import { AutoRebalanceConfig, TELEGRAM_KINDS, VolumeWatchConfig } from "@vexis/shared/agents";
+import { PoolFilter } from "@vexis/shared/screen";
 import { z } from "zod";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { requireViewer } from "@/features/auth/auth.middleware";

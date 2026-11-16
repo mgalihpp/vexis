@@ -1,7 +1,7 @@
 import { Keypair } from "@solana/web3.js";
-import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/db/agents";
-import type { Beat } from "@vexis/db/heartbeat";
-import type { PositionPnl } from "@vexis/db/pnl";
+import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/shared/agents";
+import type { Beat } from "@vexis/shared/heartbeat";
+import type { PositionPnl } from "@vexis/shared/pnl";
 import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";

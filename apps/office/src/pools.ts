@@ -1,4 +1,4 @@
-import type { FilterPool } from "@vexis/db/screen";
+import type { FilterPool } from "@vexis/shared/screen";
 
 // Each office screens this list with its own filter (`office_config.pool_preset`, or `pool_filter` for custom),
 // resolved in `tick.ts`. The Scout and the Risk Manager's `pool_alertable` check read the same filter.

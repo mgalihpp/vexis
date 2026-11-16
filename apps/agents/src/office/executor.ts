@@ -1,5 +1,5 @@
 import type { Keypair } from "@solana/web3.js";
-import { checkManage, openMoneyChecks, storedDayCapital } from "@vexis/db/guardrails";
+import { checkManage, openMoneyChecks, storedDayCapital } from "@vexis/shared/guardrails";
 import {
   EXECUTION_FAILING,
   type GuardrailCheck,
@@ -11,7 +11,7 @@ import {
   pauseOf,
   RiskNotes,
   utcDayStart,
-} from "@vexis/db/office";
+} from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { lamportsToSol, solToLamports } from "../rebalance/fees.ts";
 import { Chain } from "../services/chain.ts";

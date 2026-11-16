@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import { Guardrails, KEY_SOURCES, LLM_PROVIDERS, OFFICE_AGENTS, OfficeModels, WALLET_SOURCES } from "@vexis/db/office";
-import { PoolFilter, PRESETS } from "@vexis/db/screen";
+import {
+  Guardrails,
+  KEY_SOURCES,
+  LLM_PROVIDERS,
+  OFFICE_AGENTS,
+  OfficeModels,
+  WALLET_SOURCES,
+} from "@vexis/shared/office";
+import { PoolFilter, PRESETS } from "@vexis/shared/screen";
 import { z } from "zod";
 import { RpcUrlInput, SecretKeyInput } from "@/features/agents/wallet.server";
 import { PoolAddress } from "@/features/analytics/analytics.functions";

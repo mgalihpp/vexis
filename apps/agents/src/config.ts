@@ -1,4 +1,4 @@
-import { walletPublicKeyOf } from "@vexis/db/secret";
+import { walletPublicKeyOf } from "@vexis/shared/secret";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 
 /** Settings that are not secrets or connections. */

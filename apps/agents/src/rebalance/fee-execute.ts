@@ -9,7 +9,7 @@ import {
   type ZapConfig,
 } from "@meteora-ag/zap-sdk";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import type { AutoRebalanceConfig } from "@vexis/db/agents";
+import type { AutoRebalanceConfig } from "@vexis/shared/agents";
 import BN from "bn.js";
 import { compoundSpendableBalance, compoundTopUpAmounts, planSweepLegs, type SweepLeg, WSOL_MINT } from "./fees.ts";
 import { SWAP_CU_BUFFER_MULTIPLIER, SWAP_CU_MIN_LIMIT, sendTransaction } from "./send.ts";

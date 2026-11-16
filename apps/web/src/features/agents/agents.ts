@@ -17,7 +17,7 @@ import {
   type TelegramKind,
   VolumeWatchConfig,
   WALLET_UNREADABLE,
-} from "@vexis/db/agents";
+} from "@vexis/shared/agents";
 import {
   alertable,
   type PoolFilter,
@@ -26,7 +26,7 @@ import {
   SCREENER_BASELINE,
   SCREENER_PRESETS,
   screenRule,
-} from "@vexis/db/screen";
+} from "@vexis/shared/screen";
 import { compactUsd, money } from "@/features/portfolio/money";
 import { type AlertPool, asFilterPool } from "@/features/screener/screener";
 import { shortAddr } from "@/lib/format";

@@ -1,4 +1,4 @@
-import { type PositionPnl, positionAmounts } from "@vexis/db/pnl";
+import { type PositionPnl, positionAmounts } from "@vexis/shared/pnl";
 import { Clock, Effect } from "effect";
 import { Meteora } from "../services/meteora.ts";
 import { type JournalRow, OfficeDb } from "../services/office-db.ts";

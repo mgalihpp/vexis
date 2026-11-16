@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { ADMIN_STOP, DAILY_LOSS, EXECUTION_FAILING, KILL_SWITCH, parseGuardrails } from "@vexis/db/office";
+import { ADMIN_STOP, DAILY_LOSS, EXECUTION_FAILING, KILL_SWITCH, parseGuardrails } from "@vexis/shared/office";
 import {
   BUBBLE_MS,
   bubbles,

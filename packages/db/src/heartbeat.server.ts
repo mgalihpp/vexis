@@ -1,6 +1,6 @@
+import type { Beat } from "@vexis/shared/heartbeat";
 import { eq } from "drizzle-orm";
 import type { Db } from "./client.server.ts";
-import type { Beat } from "./heartbeat.ts";
 import { serviceHeartbeats } from "./schema.ts";
 
 /** A finished tick, or the error a tick ended with. A failed tick leaves `last_tick_at` alone, except in a new row, where it starts the staleness clock. */

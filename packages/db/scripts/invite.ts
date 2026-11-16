@@ -6,10 +6,10 @@
 
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { sendMail } from "@vexis/shared/mail";
 import { eq } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
 import { inviteEmail } from "../src/emails.server.ts";
-import { sendMail } from "../src/mail.ts";
 import { createInvite, markInviteRequestSent, pendingInviteRequests } from "../src/queries.server.ts";
 import { users } from "../src/schema.ts";
 

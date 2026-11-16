@@ -20,10 +20,8 @@ Never edit a migration that has been applied; change `schema.ts` and generate a 
 ## Exports
 
 - `@vexis/db/schema`: tables and enums. Client-safe types (`typeof wallets.$inferSelect`).
-- `@vexis/db/agents`: agent kinds and their zod config schemas (`VolumeWatchConfig`, `AutoRebalanceConfig`). Client-safe.
 - `@vexis/db/client`: `createDb(url)`, `getDb()` (process-wide, from `DATABASE_URL`), `closeDb()`. Server-only.
 - `@vexis/db/queries`: user-scoped helpers. Server-only.
-- `@vexis/db/mail`: `sendMail({ to, subject, text, html? })` through Resend (`RESEND_API_KEY`, `MAIL_FROM`). Server-only.
 
 The web app imports `client` and `queries` only from its own `*.server.ts` files.
 

@@ -1,5 +1,5 @@
-import type { AutoRebalanceConfig } from "@vexis/db/agents";
-import type { Guardrails } from "@vexis/db/office";
+import type { AutoRebalanceConfig } from "@vexis/shared/agents";
+import type { Guardrails } from "@vexis/shared/office";
 
 // What the Monitor asks the owner to do with one office position, from one on-chain read. Pure: the runner reads the
 // chain and writes the proposal.

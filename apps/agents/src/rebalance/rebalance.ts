@@ -1,5 +1,5 @@
 import type { Keypair } from "@solana/web3.js";
-import { type AgentConfig, parseAgentConfig } from "@vexis/db/agents";
+import { type AgentConfig, parseAgentConfig } from "@vexis/shared/agents";
 import { Clock, Effect, Option } from "effect";
 import { AppConfig } from "../config.ts";
 import { BadAgentConfig } from "../errors.ts";

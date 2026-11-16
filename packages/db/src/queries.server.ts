@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
+import { type AgentKind, defaultAgentConfig, parseAgentConfig, type TelegramKind } from "@vexis/shared/agents";
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
-import { type AgentKind, defaultAgentConfig, parseAgentConfig, type TelegramKind } from "./agents.ts";
 import type { Db } from "./client.server.ts";
 import {
   agentAlerts,

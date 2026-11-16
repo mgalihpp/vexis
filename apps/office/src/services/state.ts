@@ -1,4 +1,4 @@
-import { utcDayStart } from "@vexis/db/office";
+import { utcDayStart } from "@vexis/shared/office";
 import { Context, Effect, Layer, Ref } from "effect";
 
 // Memory the runtime keeps between ticks. A restart forgets it on purpose: Scout runs at once and each once-a-day

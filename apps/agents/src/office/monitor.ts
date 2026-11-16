@@ -1,5 +1,5 @@
-import { REBALANCE_STRATEGIES } from "@vexis/db/agents";
-import { Guardrails, isPaused, pauseOf } from "@vexis/db/office";
+import { REBALANCE_STRATEGIES } from "@vexis/shared/agents";
+import { Guardrails, isPaused, pauseOf } from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { feeValueInLamports, lamportsToSol } from "../rebalance/fees.ts";
 import { Chain, type PoolState } from "../services/chain.ts";

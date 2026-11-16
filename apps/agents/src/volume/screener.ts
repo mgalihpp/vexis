@@ -1,5 +1,5 @@
-import { parseAgentConfig } from "@vexis/db/agents";
-import { alertable, type ScreenRule, screenRule } from "@vexis/db/screen";
+import { parseAgentConfig } from "@vexis/shared/agents";
+import { alertable, type ScreenRule, screenRule } from "@vexis/shared/screen";
 import { Clock, Effect, Option } from "effect";
 import { AppConfig } from "../config.ts";
 import { BadAgentConfig } from "../errors.ts";

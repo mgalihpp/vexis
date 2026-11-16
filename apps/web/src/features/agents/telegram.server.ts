@@ -1,4 +1,3 @@
-import { TELEGRAM_PAUSES, type TelegramKind } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
@@ -8,7 +7,8 @@ import {
   resumeAgentsPausedFor,
   saveOwnBot,
 } from "@vexis/db/queries";
-import { decryptSecret, encryptSecret } from "@vexis/db/secret";
+import { TELEGRAM_PAUSES, type TelegramKind } from "@vexis/shared/agents";
+import { decryptSecret, encryptSecret } from "@vexis/shared/secret";
 import { z } from "zod";
 import { BOT_TOKEN_PATTERN } from "./agents";
 

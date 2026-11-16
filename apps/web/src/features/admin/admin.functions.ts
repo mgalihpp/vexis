@@ -1,8 +1,8 @@
 import { redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { getDb } from "@vexis/db/client";
-import { SCHEDULES } from "@vexis/db/heartbeat";
 import { listHeartbeats } from "@vexis/db/heartbeat-queries";
+import { SCHEDULES } from "@vexis/shared/heartbeat";
 import { requireViewer } from "@/features/auth/auth.middleware";
 
 /** Every schedule the runtimes write a heartbeat for; a schedule with no row yet has null times. */

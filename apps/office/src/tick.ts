@@ -1,4 +1,5 @@
-import { dailyLossHit, dailyLossPct, dayPnlSol, officeCapital, storedDayCapital } from "@vexis/db/guardrails";
+import type { OfficeConfigRow, ProposalRow } from "@vexis/db/office-queries";
+import { dailyLossHit, dailyLossPct, dayPnlSol, officeCapital, storedDayCapital } from "@vexis/shared/guardrails";
 import {
   activeModels,
   DAILY_LOSS,
@@ -7,8 +8,7 @@ import {
   parseModels,
   parseScreen,
   utcDayStart,
-} from "@vexis/db/office";
-import type { OfficeConfigRow, ProposalRow } from "@vexis/db/office-queries";
+} from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
 import { type Floor, presentChecked, reviewDrafts, scoutAndDraft } from "./desks.ts";

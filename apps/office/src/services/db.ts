@@ -1,7 +1,5 @@
 import { closeDb, createDb } from "@vexis/db/client";
-import type { Beat } from "@vexis/db/heartbeat";
 import { listHeartbeats, recordTick, setAlerted } from "@vexis/db/heartbeat-queries";
-import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/db/office";
 import {
   decideProposal,
   expireProposals,
@@ -37,7 +35,9 @@ import {
   type officeThreads,
   rebalanceWallets,
 } from "@vexis/db/schema";
-import { decryptSecret } from "@vexis/db/secret";
+import type { Beat } from "@vexis/shared/heartbeat";
+import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/shared/office";
+import { decryptSecret } from "@vexis/shared/secret";
 import { eq } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Redacted } from "effect";
 import { DbError } from "../errors.ts";

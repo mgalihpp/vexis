@@ -1,5 +1,5 @@
-import { REFUSAL_TEXT } from "@vexis/db/office";
 import type { ProposalRow } from "@vexis/db/office-queries";
+import { REFUSAL_TEXT } from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
 import { Db, type PolledBot } from "./services/db.ts";

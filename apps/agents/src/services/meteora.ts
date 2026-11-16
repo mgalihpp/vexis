@@ -1,6 +1,6 @@
-import { datapiBackgroundFetch } from "@vexis/db/datapi-budget";
-import { PnlPage, type PositionPnl } from "@vexis/db/pnl";
-import { type FilterPool, filterPool } from "@vexis/db/screen";
+import { datapiBackgroundFetch } from "@vexis/shared/datapi-budget";
+import { PnlPage, type PositionPnl } from "@vexis/shared/pnl";
+import { type FilterPool, filterPool } from "@vexis/shared/screen";
 import { Config, Context, Effect, flow, Layer, Option, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { MeteoraError } from "../errors.ts";

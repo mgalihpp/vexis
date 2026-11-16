@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
+import { encryptSecret, generateWalletKeypair, openWalletSecret } from "@vexis/shared/secret";
 import { rewrapSymmetric, rewrapWalletSecret } from "./rewrap.ts";
-import { encryptSecret, generateWalletKeypair, openWalletSecret } from "./secret.ts";
 
 const NAMES = [
   "TOKEN_ENC_KEY",
