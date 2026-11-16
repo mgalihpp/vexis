@@ -9,11 +9,28 @@ import {
   executeSweepToSol,
   type SweepRequest,
 } from "../rebalance/fee-execute.ts";
+import {
+  type CloseRequest,
+  type CloseResult,
+  executeClosePosition,
+  executeOpenPosition,
+  type OpenRequest,
+  type OpenResult,
+} from "../rebalance/open-close-execute.ts";
 import { connections, redactRpc } from "../rebalance/rpc.ts";
 import { DEFAULT_PRIORITY_LEVEL, type SendLog } from "../rebalance/send.ts";
 import { executeZapRebalance, type ZapContext, type ZapRequest } from "../rebalance/zap-execute.ts";
 
-export type { ClaimRequest, CompoundRequest, SweepRequest, ZapRequest };
+export type {
+  ClaimRequest,
+  CloseRequest,
+  CloseResult,
+  CompoundRequest,
+  OpenRequest,
+  OpenResult,
+  SweepRequest,
+  ZapRequest,
+};
 
 /**
  * Signs and sends with the agent wallet, over the RPC the user gave. The only service that moves funds; tests replace
@@ -31,6 +48,10 @@ export class Zap extends Context.Service<
     compound(rpcUrl: string, signer: Keypair, request: CompoundRequest): Effect.Effect<string | null, ZapError>;
     /** Swaps claimed fees to SOL. */
     sweep(rpcUrl: string, signer: Keypair, request: SweepRequest): Effect.Effect<string | null, ZapError>;
+    /** Opens a new position from SOL, never below the reserve. */
+    open(rpcUrl: string, signer: Keypair, request: OpenRequest): Effect.Effect<OpenResult, ZapError>;
+    /** Removes everything, claims fees and rewards and closes the position; optionally swaps the return to SOL. */
+    close(rpcUrl: string, signer: Keypair, request: CloseRequest): Effect.Effect<CloseResult, ZapError>;
   }
 >()("vexis/agents/Zap") {
   static readonly layer = Layer.effect(
@@ -69,6 +90,8 @@ export class Zap extends Context.Service<
         claimFees: run("claim", executeClaimFees, (r) => r.positionAddress),
         compound: run("compound", executeCompoundTopUp, (r) => r.positionAddress),
         sweep: run("sweep", executeSweepToSol, (r) => r.poolAddress),
+        open: run("open", executeOpenPosition, (r) => r.poolAddress),
+        close: run("close", executeClosePosition, (r) => r.positionAddress),
       });
     }),
   );

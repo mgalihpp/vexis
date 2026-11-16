@@ -59,7 +59,7 @@ const send = (ctx: ZapContext, tx: Transaction, label: string, swap = false) =>
   });
 
 /** The wallet's balance of one mint. The claim (or the zap before it) already created the account. */
-async function ataBalance(ctx: ZapContext, mint: PublicKey) {
+export async function ataBalance(ctx: ZapContext, mint: PublicKey) {
   const owner = ctx.signer.publicKey;
   const program = await getTokenProgramFromMint(ctx.connection, mint);
   const { ataPubkey } = await getOrCreateATAInstruction(ctx.connection, mint, owner, owner, false, program);
