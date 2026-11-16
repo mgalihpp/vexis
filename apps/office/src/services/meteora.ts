@@ -1,3 +1,4 @@
+import { datapiBackgroundFetch } from "@vexis/db/datapi-budget";
 import { filterPool } from "@vexis/db/screen";
 import { Clock, Config, Context, Effect, flow, Layer, Option, Ref, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
@@ -130,7 +131,17 @@ export class Meteora extends Context.Service<Meteora, { screener(): Effect.Effec
 
       return Meteora.of({ screener });
     }),
-  ).pipe(Layer.provide(FetchHttpClient.layer));
+  ).pipe(
+    Layer.provide(
+      FetchHttpClient.layer.pipe(
+        Layer.provide(
+          Layer.sync(FetchHttpClient.Fetch, () =>
+            datapiBackgroundFetch(new URL(process.env.METEORA_DATAPI_URL ?? "https://dlmm.datapi.meteora.ag").origin),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 /** How long one screener list serves every office's Scout and Risk Manager. */

@@ -1,3 +1,4 @@
+import { datapiFetch } from "@vexis/db/datapi-budget";
 import { num, PnlPage, type PositionPnl, positionAmounts } from "@vexis/db/pnl";
 import { z } from "zod";
 import type { WatchPosition } from "@/features/notifications/notifications";
@@ -92,12 +93,6 @@ const History = z.object({
 const ms = (t: number) => (t < 1e12 ? t * 1000 : t);
 const toMs = (t: number | null | undefined) => (t == null ? null : ms(t));
 
-// The API answers with x-ratelimit-remaining / x-ratelimit-reset (epoch seconds). Every request
-// shares this budget, and a 429 waits for the window to reset instead of failing the page.
-const budget = { remaining: Number.POSITIVE_INFINITY, resetAt: 0 };
-const MAX_ATTEMPTS = 6;
-// Background jobs stop here and wait for the next window, so pages someone has open never queue behind a job.
-const BACKGROUND_RESERVE = 60;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function get<T>(
@@ -108,22 +103,11 @@ export async function get<T>(
 ): Promise<T> {
   const url = new URL(path, API);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  const floor = opts.background ? BACKGROUND_RESERVE : 0;
-  for (let attempt = 1; ; attempt++) {
-    while (budget.remaining <= floor && Date.now() < budget.resetAt) await sleep(budget.resetAt - Date.now() + 100);
-    const res = await fetch(url, { headers: { accept: "application/json" } });
-    const remaining = res.headers.get("x-ratelimit-remaining");
-    const reset = res.headers.get("x-ratelimit-reset");
-    if (remaining !== null) budget.remaining = Number(remaining);
-    if (reset !== null) budget.resetAt = Number(reset) * 1000;
-    if (res.status === 429 && attempt < MAX_ATTEMPTS) {
-      budget.remaining = 0;
-      if (budget.resetAt <= Date.now()) budget.resetAt = Date.now() + 1000 * attempt;
-      continue;
-    }
-    if (!res.ok) throw new Error(`Meteora API ${res.status} for ${url.pathname}`);
-    return schema.parse(await res.json());
-  }
+  // Waits out a low budget or a 429 (shared with the runner and the office through the API's own headers). Background
+  // jobs stop BACKGROUND_RESERVE short of the limit, so pages someone has open never queue behind a job.
+  const res = await datapiFetch(url.href, { headers: { accept: "application/json" } }, opts);
+  if (!res.ok) throw new Error(`Meteora API ${res.status} for ${url.pathname}`);
+  return schema.parse(await res.json());
 }
 
 async function allPages<T>(fetchPage: (page: number) => Promise<{ hasNext: boolean; items: T[] }>): Promise<T[]> {
