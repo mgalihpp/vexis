@@ -27,7 +27,6 @@ export function officeRow(overrides: Partial<OfficeConfigRow> = {}): OfficeConfi
     keySource: "vexis",
     llmKeys: {},
     vexisDailyUsd: 1,
-    walletSource: "user",
     officePublicKey: null,
     officeSecretKey: null,
     officeRpcUrl: null,

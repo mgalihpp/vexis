@@ -23,10 +23,9 @@ import {
   usersWithApproved,
 } from "@vexis/db/office-queries";
 import { forUser, listPoolsOfKind } from "@vexis/db/queries";
-import { type officeJournal, type officeMessages, rebalanceWallets } from "@vexis/db/schema";
+import type { officeJournal, officeMessages } from "@vexis/db/schema";
 import type { ProposalStatus } from "@vexis/shared/office";
 import { decryptSecret } from "@vexis/shared/secret";
-import { eq } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Redacted } from "effect";
 import { DbError } from "../errors.ts";
 
@@ -141,15 +140,7 @@ export class OfficeDb extends Context.Service<
           ),
         unbookedCloses: (before) => run("unbookedCloses", () => unbookedCloses(db, before)),
         bookClose: (userId, id, pnl, at) => run("bookClose", () => bookClose(as(userId), id, pnl, at)),
-        wallet: (office) =>
-          office.walletSource === "office"
-            ? Effect.succeed(readRpc(office.officePublicKey, office.officeRpcUrl))
-            : run("wallet", () =>
-                db
-                  .select({ owner: rebalanceWallets.publicKey, rpcUrl: rebalanceWallets.rpcUrl })
-                  .from(rebalanceWallets)
-                  .where(eq(rebalanceWallets.userId, office.userId)),
-              ).pipe(Effect.map(([row]) => readRpc(row?.owner ?? null, row?.rpcUrl ?? null))),
+        wallet: (office) => Effect.succeed(readRpc(office.officePublicKey, office.officeRpcUrl)),
       });
     }),
   );

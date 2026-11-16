@@ -24,7 +24,6 @@ import {
   type ProposalStatus,
   type Proposer,
   type RiskNotes,
-  type WalletSource,
 } from "@vexis/shared/office";
 import { money } from "@/features/portfolio/money";
 import { LIVE_MS } from "@/lib/query";
@@ -134,10 +133,7 @@ export type ConfigView = PauseFields & {
   vexisDailyUsd: number;
   /** Providers with a saved own key. The keys themselves never leave the server. */
   savedKeys: LlmProvider[];
-  walletSource: WalletSource;
-  /** The auto-rebalance agent wallet, when the user has one. */
-  userWallet: { publicKey: string; rpcHost: string | null } | null;
-  /** The office's own wallet, when one was saved. */
+  /** The office's agent wallet, when one was saved. Separate from any auto-rebalance agent's wallet. */
   officeWallet: { publicKey: string; rpcHost: string | null } | null;
   /** Which screener pools the office scouts: a preset, or the custom filter the screener handed over. */
   screen: OfficeScreen;

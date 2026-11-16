@@ -32,7 +32,7 @@ const g = Guardrails.parse({});
 function setup(seed: Parameters<typeof fakeOfficeDb>[0] = {}, nativeLamports = 2n * SOL) {
   const office = fakeOfficeDb(seed);
   const db = fakeDb();
-  db.state.wallets.set("user-1", testWallet());
+  db.state.wallets.set("user-1/office", testWallet());
   const chain = fakeChain({
     [OFFICE_POOL]: poolState({ nativeLamports, positions: [chainPosition({ amountY: SOL / 5n })] }),
   });
@@ -136,44 +136,6 @@ describe("office executor", () => {
     await s.run(officeExecutor());
     expect(s.office.proposals.map((p) => p.status)).toEqual(["failed", "failed", "failed", "approved"]);
     expect(s.office.offices[0]).toMatchObject({ paused: true, pausedReason: EXECUTION_FAILING });
-  });
-
-  test("an auto-rebalance agent and the office never send on one wallet at once", async () => {
-    const office = fakeOfficeDb({
-      offices: [live()],
-      journal: [journalRow({ poolAddress: "POOL2" })],
-      proposals: [
-        officeProposal({
-          kind: "rebalance",
-          poolAddress: "POOL2",
-          positionAddress: "POS1",
-          params: { strategy: "Spot", activeBin: 130, lowerBin: 120, upperBin: 140 },
-        }),
-      ],
-    });
-    const db = fakeDb({
-      rebalances: [rebalanceWatch({ config: { strategy: "Curve", dryRun: false, cooldownSec: 300 } })],
-    });
-    db.state.chats.set(link("user-1", "auto-rebalance"), 42n);
-    db.state.wallets.set("user-1", testWallet());
-    const chain = fakeChain({
-      POOL1: poolState({ activeBinId: 130 }),
-      POOL2: poolState({ activeBinId: 130, nativeLamports: 2n * SOL }),
-    });
-    const zap = fakeZap();
-    const layer = Layer.mergeAll(
-      office.layer,
-      db.layer,
-      chain.layer,
-      zap.layer,
-      fakeTelegram().layer,
-      WalletLock.layer,
-      testConfig,
-    );
-    const both = Effect.all([rebalanceCycle(), officeExecutor()], { concurrency: "unbounded" });
-    await runAt(both.pipe(Effect.provide(layer)));
-    expect(zap.state.calls.map((c) => c.request.poolAddress).toSorted()).toEqual(["POOL1", "POOL2"]);
-    expect(zap.state.maxInFlight).toBe(1);
   });
 });
 

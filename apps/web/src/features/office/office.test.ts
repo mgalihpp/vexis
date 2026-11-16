@@ -51,8 +51,6 @@ const config = (over: Partial<ConfigView> = {}): ConfigView => ({
   keySource: "vexis",
   vexisDailyUsd: 2,
   savedKeys: [],
-  walletSource: "user",
-  userWallet: null,
   officeWallet: null,
   screen: { preset: "blue-chip", custom: null },
   ...over,

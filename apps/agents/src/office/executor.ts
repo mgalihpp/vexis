@@ -221,7 +221,7 @@ const simulate = (p: ProposalRow) =>
 /** Live: decrypts the office's wallet through `Db.walletSigner` and sends through `Zap`. */
 const send = (office: Office, p: ProposalRow) =>
   Effect.gen(function* () {
-    const signer = yield* (yield* Db).walletSigner(office.row.userId, office.row.walletSource);
+    const signer = yield* (yield* Db).walletSigner(office.row.userId, "office");
     if (signer._tag !== "ready") {
       const why = signer._tag === "missing" ? "no wallet secret is saved" : "the wallet secret does not decrypt";
       return failed(why);

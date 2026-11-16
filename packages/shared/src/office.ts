@@ -117,10 +117,6 @@ export const activeModels = (keySource: KeySource, models: OfficeModels): Office
 export const OFFICE_MODES = ["approval", "autopilot"] as const;
 export type OfficeMode = (typeof OFFICE_MODES)[number];
 
-/** `user` is the agent wallet saved for auto-rebalance; `office` is a wallet kept for the office alone. */
-export const WALLET_SOURCES = ["user", "office"] as const;
-export type WalletSource = (typeof WALLET_SOURCES)[number];
-
 /** Hard rules, checked in code by `guardrails.ts`. Only the owner changes them, from the web. */
 export const Guardrails = z.object({
   /** Largest share of the office's capital (free SOL plus open positions at cost) one position may take, in percent. */

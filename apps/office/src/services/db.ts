@@ -33,12 +33,10 @@ import {
   type officeMessages,
   type officeRuns,
   type officeThreads,
-  rebalanceWallets,
 } from "@vexis/db/schema";
 import type { Beat } from "@vexis/shared/heartbeat";
 import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/shared/office";
 import { decryptSecret } from "@vexis/shared/secret";
-import { eq } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Redacted } from "effect";
 import { DbError } from "../errors.ts";
 
@@ -193,15 +191,7 @@ export class Db extends Context.Service<
                 .map((r) => ({ poolAddress: r.poolAddress, ratio: r.ratio, vol1m: r.vol1m, at: r.at })),
             ),
           ),
-        wallet: (office) =>
-          office.walletSource === "office"
-            ? Effect.succeed(decryptRpc(office.officePublicKey, office.officeRpcUrl))
-            : run("wallet", () =>
-                db
-                  .select({ owner: rebalanceWallets.publicKey, rpcUrl: rebalanceWallets.rpcUrl })
-                  .from(rebalanceWallets)
-                  .where(eq(rebalanceWallets.userId, office.userId)),
-              ).pipe(Effect.map(([row]) => decryptRpc(row?.owner ?? null, row?.rpcUrl ?? null))),
+        wallet: (office) => Effect.succeed(decryptRpc(office.officePublicKey, office.officeRpcUrl)),
         setPause: (userId, pause) =>
           run("setPause", () =>
             updateOfficeConfig(

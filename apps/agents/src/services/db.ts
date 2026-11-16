@@ -22,12 +22,14 @@ import {
   WALLET_UNREADABLE,
 } from "@vexis/shared/agents";
 import type { Beat } from "@vexis/shared/heartbeat";
-import type { WalletSource } from "@vexis/shared/office";
 import { decryptSecret, openWalletSecret } from "@vexis/shared/secret";
 import { and, desc, eq, gt, inArray, isNull, lt, type SQL, sql } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 import { DbError } from "../errors.ts";
 import { walletSigner } from "../rebalance/wallet.ts";
+
+/** Whose wallet signs: an auto-rebalance agent's, or the office's own. They never share one. */
+export type WalletOwner = "rebalance" | "office";
 
 /** One (agent, pool) pair of a runnable volume-watch agent. `config` is raw jsonb. */
 export type Watch = {
@@ -153,12 +155,11 @@ export class Db extends Context.Service<
     settleTransaction(id: string, outcome: TxOutcome): Effect.Effect<void, DbError>;
     /** Failed live rebalances in a row, newest first, counting at most `REBALANCE_FAILURE_LIMIT`. Claims do not count. */
     failureStreak(agentId: string): Effect.Effect<number, DbError>;
-    /** Decrypts the agent wallet's secret. The only place anything decrypts it; the web app only writes it. */
     /**
-     * The signer for the user's agent wallet (`user`) or their office's own wallet (`office`). The only place a
-     * secret key is decrypted.
+     * The signer for an auto-rebalance agent's wallet (`rebalance`, the default) or the office's agent wallet
+     * (`office`). The only place a secret key is decrypted; the web app only writes it.
      */
-    walletSigner(userId: string, source?: WalletSource): Effect.Effect<WalletSigner, DbError>;
+    walletSigner(userId: string, owner?: WalletOwner): Effect.Effect<WalletSigner, DbError>;
     /** Newest stored reading per pool, for the next delta. Pools never seen are absent. */
     latestReadings(pools: ReadonlyArray<string>): Effect.Effect<ReadonlyMap<string, StoredReading>, DbError>;
     /** Existing `(pool, minute)` rows are kept. */
@@ -342,10 +343,10 @@ export class Db extends Context.Service<
               .limit(REBALANCE_FAILURE_LIMIT),
           ).pipe(Effect.map(leadingFailures)),
 
-        walletSigner: (userId, source = "user") =>
+        walletSigner: (userId, owner = "rebalance") =>
           run("walletSigner", async (): Promise<WalletSigner> => {
             const [row] =
-              source === "user"
+              owner === "rebalance"
                 ? await db
                     .select({ publicKey: rebalanceWallets.publicKey, secretKey: rebalanceWallets.secretKey })
                     .from(rebalanceWallets)
