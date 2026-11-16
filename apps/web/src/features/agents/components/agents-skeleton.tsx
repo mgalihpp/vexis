@@ -15,11 +15,6 @@ export function FleetSkeleton() {
         <div className="h-8 w-28 animate-pulse rounded-md bg-card" />
         <div className="h-7 w-28 animate-pulse rounded-md bg-card" />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-[6.5rem] animate-pulse rounded-xl bg-card" />
-        ))}
-      </div>
       <div className="h-64 animate-pulse rounded-xl bg-card" />
       <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
     </div>

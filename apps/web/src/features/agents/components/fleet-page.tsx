@@ -1,8 +1,6 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
-  BellIcon,
-  CheckIcon,
   EyeIcon,
   FilterIcon,
   MoreHorizontalIcon,
@@ -12,8 +10,6 @@ import {
   SearchIcon,
   SettingsIcon,
   TrendingUpIcon,
-  TriangleAlertIcon,
-  WavesIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +25,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
-import { screenerQuery } from "@/features/screener/screener.queries";
 import {
   AGENT_NAME,
   type AgentKind,
@@ -40,12 +35,10 @@ import {
   presetLabel,
   ruleSummary,
   screenerPreset,
-  summarizeFleet,
-  watchedCount,
 } from "../agents";
 import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
-import { KpiCard, MiniBars, PairLogo, Ring } from "./agent-layout";
+import { PairLogo } from "./agent-layout";
 import { AgentAvatar, FormError, poolName, STATUS_STYLE, StatusDot, useAgentMutation } from "./agent-ui";
 import { EmptyAgents } from "./empty-agents";
 
@@ -78,7 +71,6 @@ function matches(agent: AgentView, query: string) {
 
 export function FleetPage() {
   const { data } = useSuspenseQuery(agentsQuery);
-  const { data: screener } = useQuery({ ...screenerQuery, enabled: data.agents.some((a) => screenerPreset(a)) });
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [kinds, setKinds] = useState<AgentKind[]>(KINDS);
@@ -86,7 +78,6 @@ export function FleetPage() {
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0] ?? 10);
   if (data.agents.length === 0) return <EmptyAgents />;
 
-  const summary = summarizeFleet(data.agents, screener?.pools);
   const statuses = data.agents.map(agentStatus);
   const count = (t: Tab) => (t === "all" ? statuses.length : statuses.filter((s) => s === t).length);
   const shown = data.agents.filter(
@@ -111,49 +102,6 @@ export function FleetPage() {
             </Link>
           </Button>
         </header>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard
-            icon={<PlayIcon className="size-4 fill-current" />}
-            tone="brand"
-            label="Active"
-            value={`${summary.live} of ${summary.total}`}
-            hint={summary.live === 1 ? "Agent is running" : `${summary.live} agents running`}
-            visual={<Ring value={summary.total ? summary.live / summary.total : 0} />}
-          />
-          <KpiCard
-            icon={<WavesIcon className="size-4" />}
-            tone="sky"
-            label="Pools"
-            value={summary.pools}
-            hint="Total pools watched"
-            visual={<MiniBars values={data.agents.map((a) => watchedCount(a, screener?.pools))} tone="sky" />}
-          />
-          <KpiCard
-            icon={<BellIcon className="size-4" />}
-            tone="violet"
-            label="Alerts 24h"
-            value={summary.alerts24h}
-            hint="Across every agent"
-            visual={<MiniBars values={data.agents.map((a) => a.alerts24h)} tone="violet" />}
-          />
-          <KpiCard
-            icon={<EyeIcon className="size-4" />}
-            tone="amber"
-            label="Attention"
-            value={summary.attention}
-            hint={summary.attention ? "Needs your action" : "No action needed"}
-            visual={
-              <span
-                className={`flex size-9 items-center justify-center rounded-full ${
-                  summary.attention ? "bg-amber-500/15 text-amber-500" : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {summary.attention ? <TriangleAlertIcon className="size-4" /> : <CheckIcon className="size-4" />}
-              </span>
-            }
-          />
-        </div>
 
         <section className="overflow-hidden rounded-xl border bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4">

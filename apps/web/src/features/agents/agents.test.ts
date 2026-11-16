@@ -27,11 +27,11 @@ import {
   screenerMatches,
   sourceOf,
   statusHint,
-  summarizeFleet,
   TELEGRAM_NOT_LINKED,
   TELEGRAM_RELINK,
   type VolumeAgentView,
   WALLET_UNREADABLE,
+  watchedCount,
 } from "./agents";
 
 const agent = (over: Partial<VolumeAgentView> = {}): VolumeAgentView => ({
@@ -273,15 +273,6 @@ describe("fleet", () => {
     expect(hourlyCounts([at(0.5), at(0.2), at(2.5), at(3.5), at(4), at(-1)], now, 4)).toEqual([1, 1, 0, 2]);
     expect(hourlyCounts([at(0.5), at(1.5), at(3.5)], now, 2, 2)).toEqual([1, 2]);
   });
-  test("summarizes watching, attention, pools and alerts", () => {
-    const s = summarizeFleet([
-      agent({ pools: [{ id: "1", address: "A", label: null, lastAlertAt: null, tokens: null }], alerts24h: 3 }),
-      agent({ id: "a2", paused: true, pausedReason: TELEGRAM_NOT_LINKED, alerts24h: 1 }),
-    ]);
-    expect(s).toEqual({ total: 2, live: 1, attention: 1, pools: 1, alerts24h: 4 });
-    expect(summarizeFleet([])).toEqual({ total: 0, live: 0, attention: 0, pools: 0, alerts24h: 0 });
-  });
-
   test("a screener agent watches the screener pools its preset matches, not its kept hand-picked pools", () => {
     const kept = [{ id: "1", address: "A", label: null, lastAlertAt: null, tokens: null }];
     const screener = agent({ pools: kept, config: { ...DEFAULT_CONFIG, source: "screener", preset: "degen" } });
@@ -298,8 +289,8 @@ describe("fleet", () => {
     const list = [pool("deep", 100), pool("tight", 10), pool("banned", 100, true)];
     expect(screenerMatches(screener.config, list)?.map((p) => p.address)).toEqual(["deep"]);
     expect(screenerMatches(DEFAULT_CONFIG, list)).toBeNull();
-    expect(summarizeFleet([screener], list).pools).toBe(1);
-    expect(summarizeFleet([agent({ pools: kept })], list).pools).toBe(1);
+    expect(watchedCount(screener, list)).toBe(1);
+    expect(watchedCount(agent({ pools: kept }), list)).toBe(1);
   });
 
   test("formats volume and ratios", () => {

@@ -562,28 +562,9 @@ export function ruleSummary(a: AgentView): [string, string][] {
   ];
 }
 
-export interface FleetSummary {
-  total: number;
-  live: number;
-  attention: number;
-  pools: number;
-  alerts24h: number;
-}
-
 /** The pools an agent watches: its own, or the screener pools its preset matches (none until the list loads). */
 export const watchedCount = (a: AgentView, screener: AlertPool[] = []) =>
   (a.kind === "volume-watch" ? screenerMatches(a.config, screener)?.length : undefined) ?? a.pools.length;
-
-export function summarizeFleet(agents: AgentView[], screener: AlertPool[] = []): FleetSummary {
-  const statuses = agents.map(agentStatus);
-  return {
-    total: agents.length,
-    live: statuses.filter((s) => s === "live").length,
-    attention: statuses.filter((s) => s === "attention").length,
-    pools: agents.reduce((n, a) => n + watchedCount(a, screener), 0),
-    alerts24h: agents.reduce((n, a) => n + a.alerts24h, 0),
-  };
-}
 
 const HOUR = 3_600_000;
 
