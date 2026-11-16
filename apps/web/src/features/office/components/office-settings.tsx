@@ -10,11 +10,9 @@ import {
   OFFICE_SLIPPAGE_BPS,
   OfficeModels,
   PROVIDER_LABEL,
-  WALLET_SOURCES,
 } from "@vexis/shared/office";
 import { PROMPT_TEXT } from "@vexis/shared/office-prompts";
 import {
-  BotIcon,
   BrainIcon,
   CoinsIcon,
   GlobeIcon,
@@ -60,7 +58,6 @@ import {
   saveModelsFn,
   saveOfficeWalletFn,
   saveScreenFn,
-  saveWalletSourceFn,
 } from "../office.functions";
 import { Portrait } from "./agent-card";
 import { useOfficeMutation } from "./office-ui";
@@ -437,31 +434,19 @@ function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) 
 }
 
 function WalletPage({ config }: { config: ConfigView }) {
-  const source = useOfficeMutation(saveWalletSourceFn);
   const save = useOfficeMutation(saveOfficeWalletFn);
   const remove = useOfficeMutation(removeOfficeWalletFn);
   const [secretKey, setSecret] = useState("");
   const [rpcUrl, setRpc] = useState("");
-  const agentWallet = config.userWallet
-    ? `${shortAddr(config.userWallet.publicKey)}${config.userWallet.rpcHost ? ` · ${config.userWallet.rpcHost}` : ""}`
-    : "None saved yet. Add one in an auto-rebalance agent's settings.";
   return (
     <div className="flex flex-col gap-5">
       <ModeGroup config={config} />
-      <Group title="Source" footer="The wallet cannot change while the office holds real positions.">
-        <Row icon={icon(WalletIcon)} label="Trade from">
-          <SegmentedControl
-            value={config.walletSource}
-            onChange={(walletSource) => !source.isPending && source.mutate({ data: { walletSource } })}
-            options={WALLET_SOURCES.map((w) => ({ value: w, label: w === "user" ? "Agent wallet" : "Office wallet" }))}
-          />
-        </Row>
-        {config.walletSource === "user" && <Row icon={icon(BotIcon)} label="Agent wallet" description={agentWallet} />}
-      </Group>
-      <FormError error={source.error} />
 
       {config.officeWallet ? (
-        <Group title="Office wallet">
+        <Group
+          title="Agent wallet"
+          footer="The office's own wallet, separate from any auto-rebalance agent's. It cannot change while the office holds real positions."
+        >
           <Row
             icon={icon(WalletIcon)}
             label={<span className="font-mono">{shortAddr(config.officeWallet.publicKey)}</span>}
@@ -481,7 +466,6 @@ function WalletPage({ config }: { config: ConfigView }) {
               { data: { secretKey, rpcUrl } },
               {
                 onSuccess: () => {
-                  source.reset();
                   setSecret("");
                   setRpc("");
                   toast.success("Wallet saved");
@@ -490,12 +474,15 @@ function WalletPage({ config }: { config: ConfigView }) {
             );
           }}
         >
-          <Group title="Office wallet" footer="Both are encrypted on the server and never shown again.">
+          <Group
+            title="Agent wallet"
+            footer="The office's own wallet, separate from any auto-rebalance agent's. Both are encrypted on the server and never shown again."
+          >
             <Row icon={icon(KeyRoundIcon)} label="Secret key">
               <input
                 type="password"
                 autoComplete="off"
-                aria-label="Office wallet secret key"
+                aria-label="Agent wallet secret key"
                 placeholder="base58"
                 value={secretKey}
                 onChange={(e) => setSecret(e.target.value)}
@@ -515,7 +502,7 @@ function WalletPage({ config }: { config: ConfigView }) {
             </Row>
           </Group>
           <Save disabled={!secretKey.trim() || !rpcUrl.trim()} pending={save.isPending}>
-            Save office wallet
+            Save agent wallet
           </Save>
         </form>
       )}

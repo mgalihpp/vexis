@@ -26,8 +26,6 @@ import {
   type ProposalKind,
   type ProposalStatus,
   type Proposer,
-  WALLET_SOURCES,
-  type WalletSource,
 } from "@vexis/shared/office";
 import { PRESETS, type PresetChoice } from "@vexis/shared/screen";
 import { sql } from "drizzle-orm";
@@ -438,8 +436,7 @@ const openStatus = sql.raw(`status in (${OPEN_STATUSES.map((s) => `'${s}'`).join
 /**
  * The office's one row; having it is what turns the office on. `guardrails` and `models` are jsonb parsed with
  * `Guardrails` and `OfficeModels`. `llm_keys` maps a provider to the user's own API key, encrypted with
- * `TOKEN_ENC_KEY`. `wallet_source` `user` reads `rebalance_wallets`; `office` reads the office's own wallet below,
- * stored like `rebalance_wallets`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
+ * `TOKEN_ENC_KEY`. `vexis_daily_usd` is the admin's cap on Vexis-paid LLM calls (0 = none allowed).
  */
 export const officeConfig = pgTable(
   "office_config",
@@ -461,7 +458,6 @@ export const officeConfig = pgTable(
     keySource: text("key_source").$type<KeySource>().notNull().default("vexis"),
     llmKeys: jsonb("llm_keys").$type<Partial<Record<LlmProvider, string>>>().notNull().default({}),
     vexisDailyUsd: doublePrecision("vexis_daily_usd").notNull().default(0),
-    walletSource: text("wallet_source").$type<WalletSource>().notNull().default("user"),
     officePublicKey: text("office_public_key"),
     officeSecretKey: text("office_secret_key"),
     officeRpcUrl: text("office_rpc_url"),
@@ -475,7 +471,6 @@ export const officeConfig = pgTable(
   () => [
     enumCheck("office_config_mode_check", "mode", OFFICE_MODES),
     enumCheck("office_config_key_source_check", "key_source", KEY_SOURCES),
-    enumCheck("office_config_wallet_source_check", "wallet_source", WALLET_SOURCES),
     enumCheck("office_config_pool_preset_check", "pool_preset", PRESETS),
   ],
 ).enableRLS();

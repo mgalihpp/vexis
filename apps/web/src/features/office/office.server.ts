@@ -19,7 +19,7 @@ import {
   resumeOffice as resume,
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
-import { forUser, getRebalanceWallet } from "@vexis/db/queries";
+import { forUser } from "@vexis/db/queries";
 import {
   AgentModel,
   activeModels,
@@ -38,7 +38,6 @@ import {
   REFUSAL_TEXT,
   RiskNotes,
   utcDayStart,
-  type WalletSource,
 } from "@vexis/shared/office";
 import { encryptSecret, sealSecret } from "@vexis/shared/secret";
 import { checkRpcUrl, keypairOf } from "@/features/agents/wallet.server";
@@ -101,7 +100,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
   if (!config) return { enabled: false };
 
   const now = new Date();
-  const [open, recent, messages, runs, threads, positions, pnl, spend, counts, userWallet] = await Promise.all([
+  const [open, recent, messages, runs, threads, positions, pnl, spend, counts] = await Promise.all([
     listProposals(s, { statuses: OPEN_STATUSES, limit: 100 }),
     listProposals(s, { limit: 10 }),
     listMessages(s, { limit: 60 }),
@@ -111,7 +110,6 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     journalPnl(s, utcDayStart(now)),
     llmSpendToday(s, now),
     proposalCountsSince(s, utcDayStart(now)),
-    getRebalanceWallet(s),
   ]);
   const proposals = [...new Map([...open, ...recent].map((p) => [p.id, p])).values()];
 
@@ -126,8 +124,6 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     keySource: config.keySource,
     vexisDailyUsd: config.vexisDailyUsd,
     savedKeys: savedKeysOf(config.llmKeys),
-    walletSource: config.walletSource,
-    userWallet: userWallet ? { publicKey: userWallet.publicKey, rpcHost: userWallet.rpcHost } : null,
     officeWallet: config.officePublicKey ? { publicKey: config.officePublicKey, rpcHost: config.officeRpcHost } : null,
     screen: parseScreen(config),
   };
@@ -303,13 +299,12 @@ export async function removeLlmKey(userId: string, provider: LlmProvider) {
   await patch(userId, { llmKeys: rest });
 }
 
-/** Saves the office's own wallet and switches the office to it. Only the public key is ever read back. */
+/** Saves the office's agent wallet. Only the public key is ever read back. */
 export async function saveOfficeWallet(userId: string, secret: string, rpcUrl: string) {
   await refuseWithOpenPositions(userId);
   const publicKey = keypairOf(secret).publicKey.toBase58();
   await checkRpcUrl(rpcUrl);
   await patch(userId, {
-    walletSource: "office",
     officePublicKey: publicKey,
     officeSecretKey: sealSecret(secret),
     officeRpcUrl: encryptSecret(rpcUrl, "RPC_ENC_KEY"),
@@ -320,19 +315,9 @@ export async function saveOfficeWallet(userId: string, secret: string, rpcUrl: s
 export async function removeOfficeWallet(userId: string) {
   await refuseWithOpenPositions(userId);
   await patch(userId, {
-    walletSource: "user",
     officePublicKey: null,
     officeSecretKey: null,
     officeRpcUrl: null,
     officeRpcHost: null,
   });
-}
-
-export async function saveWalletSource(userId: string, walletSource: WalletSource) {
-  await refuseWithOpenPositions(userId);
-  if (walletSource === "office") {
-    const config = await getOfficeConfig(scope(userId));
-    if (!config?.officePublicKey) throw new Error("Save an office wallet first");
-  }
-  await patch(userId, { walletSource });
 }

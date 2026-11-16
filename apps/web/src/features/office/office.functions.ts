@@ -1,12 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import {
-  Guardrails,
-  KEY_SOURCES,
-  LLM_PROVIDERS,
-  OFFICE_AGENTS,
-  OfficeModels,
-  WALLET_SOURCES,
-} from "@vexis/shared/office";
+import { Guardrails, KEY_SOURCES, LLM_PROVIDERS, OFFICE_AGENTS, OfficeModels } from "@vexis/shared/office";
 import { PoolFilter, PRESETS } from "@vexis/shared/screen";
 import { z } from "zod";
 import { RpcUrlInput, SecretKeyInput } from "@/features/agents/wallet.server";
@@ -29,7 +22,6 @@ import {
   saveModels,
   saveOfficeWallet,
   saveScreen,
-  saveWalletSource,
 } from "./office.server";
 
 const Provider = z.object({ provider: z.enum(LLM_PROVIDERS) });
@@ -115,8 +107,3 @@ export const saveOfficeWalletFn = createServerFn({ method: "POST" })
 export const removeOfficeWalletFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
   .handler(({ context }) => removeOfficeWallet(context.viewer.id));
-
-export const saveWalletSourceFn = createServerFn({ method: "POST" })
-  .middleware([requireViewer])
-  .validator(z.object({ walletSource: z.enum(WALLET_SOURCES) }))
-  .handler(({ context, data }) => saveWalletSource(context.viewer.id, data.walletSource));

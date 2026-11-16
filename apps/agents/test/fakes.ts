@@ -131,8 +131,8 @@ export function fakeDb(
               .slice(0, REBALANCE_FAILURE_LIMIT),
           ),
         ),
-      walletSigner: (userId, source = "user") =>
-        Effect.succeed(state.wallets.get(source === "user" ? userId : `${userId}/office`) ?? { _tag: "missing" }),
+      walletSigner: (userId, owner = "rebalance") =>
+        Effect.succeed(state.wallets.get(owner === "rebalance" ? userId : `${userId}/office`) ?? { _tag: "missing" }),
       latestReadings: (pools) =>
         Effect.succeed(
           new Map(

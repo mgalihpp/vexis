@@ -127,6 +127,13 @@
       "when": 1794830189401,
       "tag": "0017_sharp_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1794838993501,
+      "tag": "0018_nice_stepford_cuckoos",
+      "breakpoints": true
     }
   ]
 }
