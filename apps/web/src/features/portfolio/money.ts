@@ -25,12 +25,16 @@ export const pct = (ratio: number, digits = 2) => `${fmt(digits).format(ratio * 
 
 export const tone = (value: number) => (value > 0 ? "text-profit" : value < 0 ? "text-loss" : "text-muted-foreground");
 
-/** `$950.12`, `$114.20K`, `$1.27M`. */
-export function compactUsd(value: number) {
-  const abs = Math.abs(value);
+function compactBody(abs: number) {
   const [div, suffix] = abs >= 1e9 ? [1e9, "B"] : abs >= 1e6 ? [1e6, "M"] : abs >= 1e3 ? [1e3, "K"] : [1, ""];
-  return `${value < 0 ? "-" : ""}$${fmt(2).format(abs / div)}${suffix}`;
+  return `${fmt(2).format(abs / div)}${suffix}`;
 }
+
+/** `$950.12`, `$114.20K`, `$1.27M`. */
+export const compactUsd = (value: number) => `${value < 0 ? "-" : ""}$${compactBody(Math.abs(value))}`;
+
+/** `950.12 SOL`, `114.20K SOL`: the SOL twin of `compactUsd`. */
+export const compactSol = (value: number) => `${value < 0 ? "-" : ""}${compactBody(Math.abs(value))} SOL`;
 
 const smallPrice = new Intl.NumberFormat("en-US", { maximumSignificantDigits: 3 });
 const largePrice = new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 });

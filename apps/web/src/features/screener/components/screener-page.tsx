@@ -36,7 +36,7 @@ import { Updated } from "@/features/analytics/components/ui";
 import { Badge, TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { PoolFilter } from "@/features/portfolio/components/table-controls";
-import { compactUsd, tone } from "@/features/portfolio/money";
+import { compactSol, compactUsd, tone } from "@/features/portfolio/money";
 import {
   alertFilter,
   apr,
@@ -99,7 +99,7 @@ const DASH = "—";
 
 const compactFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 const solText = (usd: number, solPrice: number | null) =>
-  solPrice ? `${compactFmt.format(usd / solPrice)} SOL` : DASH;
+  solPrice ? compactSol(usd / solPrice) : DASH;
 
 /** `12.4%`, `0.21%`, `0.004%`: enough digits that a small ratio never reads as zero. */
 function percent(v: number | null) {
@@ -113,7 +113,7 @@ const signedPct = (v: number | null) =>
 const toneOf = (v: number | null) => (v === null ? "text-muted-foreground" : tone(v));
 const signedUsd = (v: number) => `${v > 0 ? "+" : ""}${compactUsd(v)}`;
 const signedSol = (usd: number, solPrice: number | null) =>
-  solPrice ? `${usd > 0 ? "+" : ""}${compactFmt.format(usd / solPrice)} SOL` : DASH;
+  solPrice ? `${usd > 0 ? "+" : ""}${compactSol(usd / solPrice)}` : DASH;
 const count = (v: number | null) => (v === null ? DASH : compactFmt.format(v));
 const compact = (v: number) => compactFmt.format(v);
 

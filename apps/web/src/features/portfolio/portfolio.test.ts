@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { compactUsd, duration, formatPrice, fullDuration, timeAgo, utcStamp } from "./money";
+import { compactSol, compactUsd, duration, formatPrice, fullDuration, timeAgo, utcStamp } from "./money";
 import {
   type ActivePool,
   type ActivePosition,
@@ -267,6 +267,8 @@ test("active formatters", () => {
   expect(compactUsd(1_268_000)).toBe("$1.27M");
   expect(compactUsd(114_200)).toBe("$114.20K");
   expect(compactUsd(950.123)).toBe("$950.12");
+  expect(compactSol(-114_200)).toBe("-114.20K SOL");
+  expect(compactSol(0.5)).toBe("0.50 SOL");
   expect(formatPrice(0.00078366)).toBe("0.000784");
   expect(formatPrice(0.000058786)).toBe("0.0₄588");
   expect(formatPrice(0.000000058786)).toBe("0.0₇588");

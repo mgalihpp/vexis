@@ -88,14 +88,14 @@ describe("volumeSpike", () => {
   test("diffWatch reports a spike once per candle", () => {
     const first = diffWatch(EMPTY_SEEN, watch, prefs, { [POOL]: "SOL-USDC 10" }, 1);
     expect(first.notices.map((n) => n.title)).toEqual(["SOL-USDC 10"]);
-    expect(first.notices[0]?.body).toBe("$5K in the current 1h candle, 5.0× the average");
+    expect(first.notices[0]?.body).toBe("$5.00K in the current 1h candle, 5.0× the average");
     expect(diffWatch(first.seen, watch, prefs, {}, 2).notices).toEqual([]);
   });
 
   test("Off reports the minimum-volume condition without a multiplier", () => {
     const singleBar = { wallets: [], pools: [{ pool: POOL, bars: hours([1500]) }] };
     const result = diffWatch(EMPTY_SEEN, singleBar, { ...prefs, spikeMultiplier: "off" }, {}, 1);
-    expect(result.notices[0]?.body).toBe("$1.5K in the current 1h candle, minimum volume reached");
+    expect(result.notices[0]?.body).toBe("$1.50K in the current 1h candle, minimum volume reached");
   });
 
   test("pool-specific alert settings override global timeframe, level and minimum", () => {
@@ -105,13 +105,13 @@ describe("volumeSpike", () => {
       [POOL]: { timeframe: "5m" as const, multiplier: 2 as const, minVolume: 200, minCurrency: "usd" as const },
     };
     const result = diffWatch(EMPTY_SEEN, watch, { ...prefs, spikeMinUsd: 1000, spikeMultiplier: 10 }, {}, 1, override);
-    expect(result.notices[0]?.body).toBe("$250 in the current 5m candle, 2.5× the average");
+    expect(result.notices[0]?.body).toBe("$250.00 in the current 5m candle, 2.5× the average");
   });
 
   test("a SOL minimum shows the amount in SOL and needs a SOL price", () => {
     const sol = { ...prefs, currency: "sol" as const, solPrice: 100 };
     expect(diffWatch(EMPTY_SEEN, watch, sol, {}, 1).notices[0]?.body).toBe(
-      "50 SOL in the current 1h candle, 5.0× the average",
+      "50.00 SOL in the current 1h candle, 5.0× the average",
     );
     expect(diffWatch(EMPTY_SEEN, watch, { ...sol, spikeMinUsd: null }, {}, 1).notices).toEqual([]);
   });

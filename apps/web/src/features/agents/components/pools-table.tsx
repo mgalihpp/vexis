@@ -11,7 +11,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
-import { compactUsd, timeAgo } from "@/features/portfolio/money";
+import { compactSol, compactUsd, timeAgo } from "@/features/portfolio/money";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { apr, type ScreenerPool, warnings } from "@/features/screener/screener";
 import { screenerQuery } from "@/features/screener/screener.queries";
@@ -40,15 +40,13 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
-const solFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
-
 /** USD with SOL under it at the footer's SOL price; a dash when that price is missing. */
 function Amount({ usd, solPrice }: { usd: number; solPrice: number | null }) {
   return (
     <>
       <div>{compactUsd(usd)}</div>
       <div className="text-[0.625rem] text-muted-foreground">
-        {solPrice ? `${solFmt.format(usd / solPrice)} SOL` : "—"}
+        {solPrice ? compactSol(usd / solPrice) : "—"}
       </div>
     </>
   );

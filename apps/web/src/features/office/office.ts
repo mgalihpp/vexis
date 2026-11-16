@@ -21,6 +21,7 @@ import {
   type RiskNotes,
   type WalletSource,
 } from "@vexis/db/office";
+import { money } from "@/features/portfolio/money";
 import { LIVE_MS } from "@/lib/query";
 
 // The office page's view logic: what each desk is doing, what the owner may still do, and the numbers in the
@@ -262,8 +263,8 @@ const CLOSE_REASON: Record<ProposalParams<"close">["reason"], string> = {
 };
 
 const DASH = "—";
-const sol = (v: number) => `${v.toFixed(4)} SOL`;
-const usd = (v: number) => `$${v.toFixed(2)}`;
+const sol = (v: number) => money(v, "sol");
+const usd = (v: number) => money(v, "usd");
 
 /** The key/value grid of an approval card. A value the proposal does not carry is a dash. */
 export function proposalFacts(p: ProposalView): { label: string; value: string; sub?: string }[] {

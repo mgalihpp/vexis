@@ -3,6 +3,7 @@ import { type ReactNode, useLayoutEffect, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
+import { compactSol, compactUsd, money } from "@/features/portfolio/money";
 import { age } from "../analytics";
 
 /**
@@ -72,7 +73,7 @@ export function Updated({ at }: { at: number }) {
   );
 }
 
-export const NA = "-";
+export const NA = "—";
 
 const compactFmt = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 });
 
@@ -83,16 +84,14 @@ export const short = (address: string) => `${address.slice(0, 4)}…${address.sl
 export const amount = (v: number | null) =>
   v == null ? NA : Math.abs(v) >= 1e4 ? compact(v) : v.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 export const usd = (v: number | null, signed = false) =>
-  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}$${compact(Math.abs(v))}`;
-export const sol3 = (v: number | null) => (v == null ? null : Math.round(v * 1000) / 1000);
-export const sol = (v: number | null) => {
-  if (v == null) return NA;
-  // Sign from the rounded value, so a dust amount reads `0 SOL` instead of `+0 SOL`.
-  const r = Math.round(v * 1000) / 1000;
-  return `${r < 0 ? "-" : r > 0 ? "+" : ""}${Math.abs(r).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
-};
-export const solAmount = (v: number | null) =>
-  v == null ? NA : `${(Math.round(v * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 })} SOL`;
+  v == null ? NA : `${signed && v > 0 ? "+" : ""}${compactUsd(v)}`;
+// `|| 0` drops the -0 that rounding a negative dust amount leaves, which `money` would print as `-0.0000`.
+export const solRound = (v: number | null) => (v == null ? null : Math.round(v * 1e4) / 1e4 || 0);
+/** Signed, with the sign from the rounded value, so a dust amount reads `0.0000 SOL` instead of `+0.0000 SOL`. */
+export const sol = (v: number | null) => (v == null ? NA : money(solRound(v) ?? 0, "sol", { signed: true }));
+export const solAmount = (v: number | null) => (v == null ? NA : money(v, "sol"));
+export const solCompact = (v: number | null, signed = false) =>
+  v == null ? NA : `${signed && v > 0 ? "+" : ""}${compactSol(v)}`;
 export const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-profit" : "text-loss");
 
 export const signedPct = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;

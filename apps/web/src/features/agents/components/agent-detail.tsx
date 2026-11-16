@@ -33,14 +33,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Notice } from "@/features/portfolio/components/notice";
 import { Pagination, PoolFilter, type Sort, sortBy } from "@/features/portfolio/components/table-controls";
-import { timeAgo } from "@/features/portfolio/money";
+import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import {
   type AgentStatus,
   type AgentView,
   agentName,
   agentStatus,
-  compactUsd,
   configFields,
   formatMinutes,
   hourlyCounts,

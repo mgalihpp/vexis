@@ -26,6 +26,7 @@ import {
   SCREENER_PRESETS,
   screenRule,
 } from "@vexis/db/screen";
+import { compactUsd, money } from "@/features/portfolio/money";
 import { type AlertPool, asFilterPool } from "@/features/screener/screener";
 import { shortAddr } from "@/lib/format";
 
@@ -238,8 +239,6 @@ export const STATUS_HINT: Partial<Record<AgentStatus, string>> = {
 
 // --- rules -------------------------------------------------------------------------------------
 
-const usd = (v: number) => `$${v.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-
 export function formatMinutes(seconds: number) {
   const m = seconds / 60;
   return `${Number.isInteger(m) ? m : m.toFixed(1)} min`;
@@ -284,7 +283,7 @@ export function pickSource<T extends { fields: ConfigFields; source: Source }>(f
   return { ...form, source, fields };
 }
 
-const compactBound = (v: number) => compactUsd(v).replace(".0", "");
+const compactBound = (v: number) => compactUsd(v).replace(".00", "");
 
 /** A custom filter in one line, for the source picker. */
 export function describeFilter(f: PoolFilter) {
@@ -319,18 +318,12 @@ export function describeFilter(f: PoolFilter) {
 /** One line for cards: when an alert fires. */
 export function describeRule(c: SourceConfig & Pick<VolumeWatchConfig, "cooldownSec">) {
   const r = c;
-  const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${usd(r.minUsd)} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
+  const rule = `≥ ${r.mult}× the median of the last ${r.baseline} minutes, at least ${money(r.minUsd, "usd")} in a minute, then quiet for ${formatMinutes(c.cooldownSec)}`;
   return c.source === "pools" ? rule : `${presetLabel(c.preset)} screener pools: ${rule}`;
 }
 
 export const ratioText = (ratio: number) => (ratio >= 1_000_000 ? "from zero" : `${ratio.toFixed(1)}×`);
 
-/** `$18.4k`, `$1.2M`, `$850`. */
-export function compactUsd(v: number) {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(1)}k`;
-  return `$${Math.round(v)}`;
-}
 
 // --- config form -------------------------------------------------------------------------------
 
@@ -528,8 +521,7 @@ export const FEE_MODE_LABEL: Record<FeeMode, string> = {
   sweep: "Sweep to SOL",
 };
 
-/** `0.05 SOL`, up to 4 decimals. */
-export const solText = (v: number) => `${v.toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`;
+export const solText = (v: number) => money(v, "sol");
 
 /** What happens to the fees, and whether they are also claimed in range. */
 export function describeFees(c: Pick<AutoRebalanceConfig, "feeMode" | "feeClaimThresholdSol">) {

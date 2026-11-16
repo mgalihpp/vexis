@@ -36,7 +36,7 @@ import {
   WHALE_HOLD_USD,
   WHALE_TRADE_USD,
 } from "../traders";
-import { amount, CollapsiblePanel, compact, NA, short, sol, sol3, solAmount, tone, Updated, usd } from "./ui";
+import { amount, CollapsiblePanel, NA, short, sol, solAmount, solCompact, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -132,7 +132,7 @@ function Money({ usd: u, sol: s, signed = false }: { usd: number | null; sol: nu
   return (
     <span className="flex flex-col items-end tabular-nums">
       <span className={`font-semibold ${signed ? tone(u) : ""}`}>{usd(u, signed)}</span>
-      <span className={signed ? tone(sol3(s)) : "text-muted-foreground"}>{signed ? sol(s) : solAmount(s)}</span>
+      <span className={signed ? tone(solRound(s)) : "text-muted-foreground"}>{signed ? sol(s) : solAmount(s)}</span>
     </span>
   );
 }
@@ -430,8 +430,6 @@ function Side({
   );
 }
 
-const solCompact = (v: number | null, signed = false) =>
-  v == null ? NA : `${v < 0 ? "-" : signed && v > 0 ? "+" : ""}${compact(Math.abs(v))} SOL`;
 
 const SPLIT: { key: "holding" | "partial" | "sold" | "rebought" | "unknown"; label: string; className: string }[] = [
   { key: "holding", label: "Holding", className: "bg-profit" },
@@ -499,7 +497,7 @@ function GroupCard({ g, active, onClick }: { g: GroupFlow; active: boolean; onCl
             <span className={CAPTION}>Net flow</span>
             <span className="flex flex-wrap items-baseline gap-x-2 tabular-nums">
               <span className={`text-sm font-semibold ${tone(g.netUsd)}`}>{usd(g.netUsd, true)}</span>
-              <span className={tone(sol3(g.netSol))}>{solCompact(g.netSol, true)}</span>
+              <span className={tone(solRound(g.netSol))}>{solCompact(g.netSol, true)}</span>
             </span>
           </div>
           <div className="flex flex-col gap-1.5 border-t pt-2">

@@ -9,7 +9,8 @@ import { type Sort, SortHead } from "@/features/portfolio/components/table-contr
 import { timeAgo } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { shortAddr } from "@/lib/format";
-import { type AlertView, compactUsd, type PairTokens, ratioText } from "../agents";
+import { compactUsd } from "@/features/portfolio/money";
+import { type AlertView, type PairTokens, ratioText } from "../agents";
 
 /** The bar under the header: what this page is on the left, its actions on the right. */
 export function AgentsBar({ children, actions }: { children: ReactNode; actions?: ReactNode }) {

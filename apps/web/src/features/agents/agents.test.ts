@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   agentName,
   agentStatus,
-  compactUsd,
   configFields,
   DEFAULT_CONFIG,
   DEFAULT_REBALANCE_CONFIG,
@@ -116,10 +115,10 @@ describe("config form", () => {
 
   test("describes the rule in one line", () => {
     expect(describeRule(DEFAULT_CONFIG)).toBe(
-      "≥ 3× the median of the last 30 minutes, at least $5,000 in a minute, then quiet for 5 min",
+      "≥ 3× the median of the last 30 minutes, at least $5,000.00 in a minute, then quiet for 5 min",
     );
     expect(describeRule({ ...DEFAULT_CONFIG, source: "screener", preset: "degen", baseline: 60 })).toBe(
-      "Degen screener pools: ≥ 3× the median of the last 60 minutes, at least $5,000 in a minute, then quiet for 5 min",
+      "Degen screener pools: ≥ 3× the median of the last 60 minutes, at least $5,000.00 in a minute, then quiet for 5 min",
     );
   });
 
@@ -135,7 +134,7 @@ describe("config form", () => {
     expect(pickSource(edited, { ...edited.source, source: "pools" }).fields.mult).toBe("2");
     expect(pickSource(own, { ...own.source, source: "screener", preset: "custom" }).fields).toEqual(own.fields);
     expect(describeFilter(SCREENER_PRESETS["mid-cap"].filter)).toBe(
-      "TVL over $25k, 24h volume over $50k, mcap $1M to $100M, bin step 25 to 80, verified, organic 50+",
+      "TVL over $25K, 24h volume over $50K, mcap $1M to $100M, bin step 25 to 80, verified, organic 50+",
     );
   });
 });
@@ -176,7 +175,7 @@ describe("rebalance form", () => {
     });
     expect(describeFees({ feeMode: "keep", feeClaimThresholdSol: null })).toBe("Keep in wallet");
     expect(describeFees({ feeMode: "compound", feeClaimThresholdSol: null })).toBe("Compound on rebalance");
-    expect(describeFees({ feeMode: "sweep", feeClaimThresholdSol: 0.05 })).toBe("Sweep to SOL, claim at 0.05 SOL");
+    expect(describeFees({ feeMode: "sweep", feeClaimThresholdSol: 0.05 })).toBe("Sweep to SOL, claim at 0.0500 SOL");
   });
 
   test("the fleet summary names each kind's rule", () => {
@@ -184,7 +183,7 @@ describe("rebalance form", () => {
     expect(ruleSummary(agent({ config: { ...DEFAULT_CONFIG, source: "screener" } }))).toEqual([
       ["Screener", "Blue chip"],
       ["Spike", "≥ 3×"],
-      ["Min volume", "$5.0k/min"],
+      ["Min volume", "$5.00K/min"],
     ]);
     const rb = {
       ...agent(),
@@ -293,10 +292,7 @@ describe("fleet", () => {
     expect(watchedCount(agent({ pools: kept }), list)).toBe(1);
   });
 
-  test("formats volume and ratios", () => {
-    expect(compactUsd(850)).toBe("$850");
-    expect(compactUsd(18_400)).toBe("$18.4k");
-    expect(compactUsd(1_200_000)).toBe("$1.2M");
+  test("formats ratios", () => {
     expect(ratioText(6.24)).toBe("6.2×");
     expect(ratioText(1_000_000)).toBe("from zero");
   });
