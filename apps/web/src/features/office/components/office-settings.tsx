@@ -163,10 +163,6 @@ function PoolsPage({ config }: { config: ConfigView }) {
         save.mutate({ data: { preset } }, { onSuccess: () => toast.success("Pool filter saved") });
       }}
     >
-      <p className="px-3 text-xs text-muted-foreground">
-        The Scout reads only the screener pools this filter passes, and the Risk Manager vetoes any other. Blacklisted
-        pools and tokens whose freeze authority is still held never pass.
-      </p>
       <PresetPicker
         selected={preset}
         custom={config.screen.custom}
