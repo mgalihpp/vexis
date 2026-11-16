@@ -7,7 +7,6 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
-  SearchIcon,
   SettingsIcon,
   TrendingUpIcon,
 } from "lucide-react";
@@ -23,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination } from "@/features/portfolio/components/table-controls";
+import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
 import {
   AGENT_NAME,
@@ -38,7 +37,7 @@ import {
 } from "../agents";
 import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
-import { PairLogo } from "./agent-layout";
+import { MENU_TRIGGER, PairLogo } from "./agent-layout";
 import { AgentAvatar, FormError, poolName, STATUS_STYLE, StatusDot, useAgentMutation } from "./agent-ui";
 import { EmptyAgents } from "./empty-agents";
 
@@ -131,28 +130,15 @@ export function FleetPage() {
               ))}
             </div>
             <div className="flex w-full items-center gap-2 pb-3 sm:w-auto sm:py-2.5">
-              <label className="relative min-w-0 flex-1 sm:w-60 sm:flex-none">
-                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  value={query}
-                  onChange={(e) => pick(() => setQuery(e.target.value))}
-                  placeholder="Search agents..."
-                  aria-label="Search agents"
-                  className="h-9 w-full rounded-lg border bg-background/40 pr-3 pl-9 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
-                />
-              </label>
+              <PoolFilter value={query} onChange={(q) => pick(() => setQuery(q))} placeholder="Search agents" />
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-lg"
-                    aria-label="Filter by kind"
-                    className={kinds.length < KINDS.length ? "text-brand" : ""}
-                  >
-                    <FilterIcon />
-                  </Button>
+                <DropdownMenuTrigger
+                  aria-label="Filter by kind"
+                  className={`${MENU_TRIGGER} ${kinds.length < KINDS.length ? "border-brand/60 text-brand" : ""}`}
+                >
+                  <FilterIcon className="size-3.25" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-40">
                   <DropdownMenuLabel>Kind</DropdownMenuLabel>
                   {KINDS.map((k) => (
                     <DropdownMenuCheckboxItem
@@ -180,7 +166,7 @@ export function FleetPage() {
                 <TableHead className="text-center">Alerts 24h</TableHead>
                 <TableHead>Last alert</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="pr-4 text-right">Actions</TableHead>
+                <TableHead className="pr-4 text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody className="tabular-nums">
@@ -276,27 +262,26 @@ function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
           {pill.label}
         </span>
       </TableCell>
-      <TableCell className="pr-4 text-right">
+      <TableCell className="pr-4 text-center">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon-sm" aria-label="Agent actions" disabled={toggle.isPending}>
-              {toggle.isPending ? <Spinner /> : <MoreHorizontalIcon />}
-            </Button>
+          <DropdownMenuTrigger aria-label="Agent actions" disabled={toggle.isPending} className={MENU_TRIGGER}>
+            {toggle.isPending ? <Spinner className="size-3.25" /> : <MoreHorizontalIcon className="size-3.25" />}
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem asChild>
               <Link to="/agents/$agentId" params={{ agentId: agent.id }} search={{ tab: "overview" }}>
-                <EyeIcon /> Open
+                <EyeIcon className="size-3.5" /> Open
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link to="/agents/$agentId" params={{ agentId: agent.id }} search={{ tab: "settings" }}>
-                <SettingsIcon /> Settings
+                <SettingsIcon className="size-3.5" /> Settings
               </Link>
             </DropdownMenuItem>
             {agent.enabled && (
               <DropdownMenuItem onSelect={() => toggle.mutate(!agent.paused)}>
-                {agent.paused ? <PlayIcon /> : <PauseIcon />} {agent.paused ? "Resume" : "Pause"}
+                {agent.paused ? <PlayIcon className="size-3.5" /> : <PauseIcon className="size-3.5" />}{" "}
+                {agent.paused ? "Resume" : "Pause"}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

@@ -31,6 +31,10 @@ export function BarPill({ icon, children }: { icon?: ReactNode; children: ReactN
   );
 }
 
+/** The screener's small square menu trigger: an icon in a bordered 26px box. */
+export const MENU_TRIGGER =
+  "inline-flex size-6.5 items-center justify-center rounded-md border text-foreground/80 hover:bg-muted hover:text-foreground disabled:opacity-50";
+
 export function StatCard({ label, value, tone = "" }: { label: string; value: ReactNode; tone?: string }) {
   return (
     <div className="flex h-[6rem] flex-col justify-center rounded-lg bg-card px-3.25">

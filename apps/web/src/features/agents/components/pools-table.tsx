@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BadgeCheckIcon, ExternalLinkIcon, MoreHorizontalIcon, SearchIcon, XIcon } from "lucide-react";
+import { BadgeCheckIcon, ExternalLinkIcon, MoreHorizontalIcon, XIcon } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination } from "@/features/portfolio/components/table-controls";
+import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { apr, type ScreenerPool, warnings } from "@/features/screener/screener";
@@ -19,7 +18,7 @@ import { screenerQuery } from "@/features/screener/screener.queries";
 import { shortAddr } from "@/lib/format";
 import type { PairTokens } from "../agents";
 import { alertsQuery } from "../agents.queries";
-import { PairLogo } from "./agent-layout";
+import { MENU_TRIGGER, PairLogo } from "./agent-layout";
 
 export interface PoolRow {
   address: string;
@@ -143,16 +142,9 @@ export function PoolsTable({
             </button>
           ))}
         </div>
-        <label className="relative mb-3 w-full sm:my-2.5 sm:w-60">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => pick(() => setQuery(e.target.value))}
-            placeholder="Search pools..."
-            aria-label="Search pools"
-            className="h-9 w-full rounded-lg border bg-background/40 pr-3 pl-9 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
-          />
-        </label>
+        <div className="mb-3 flex w-full sm:my-2.5 sm:w-auto">
+          <PoolFilter value={query} onChange={(q) => pick(() => setQuery(q))} placeholder="Search pools" />
+        </div>
       </div>
 
       <Table className="min-w-[60rem]">
@@ -165,7 +157,7 @@ export function PoolsTable({
             <TableHead className="text-right">APR</TableHead>
             <TableHead>{lastLabel}</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="pr-4 text-right">Actions</TableHead>
+            <TableHead className="pr-4 text-center">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="tabular-nums">
@@ -226,22 +218,24 @@ export function PoolsTable({
               <TableCell>
                 <PoolStatus pool={r.pool} loaded={screener !== undefined} />
               </TableCell>
-              <TableCell className="pr-4 text-right">
+              <TableCell className="pr-4 text-center">
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon-sm" aria-label={`Actions for ${r.name}`} disabled={r.removing}>
-                      {r.removing ? <Spinner /> : <MoreHorizontalIcon />}
-                    </Button>
+                  <DropdownMenuTrigger
+                    aria-label={`Actions for ${r.name}`}
+                    disabled={r.removing}
+                    className={MENU_TRIGGER}
+                  >
+                    {r.removing ? <Spinner className="size-3.25" /> : <MoreHorizontalIcon className="size-3.25" />}
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem asChild>
                       <Link to="/analytics" search={{ pool: r.address }}>
-                        <ExternalLinkIcon /> Open analytics
+                        <ExternalLinkIcon className="size-3.5" /> Open analytics
                       </Link>
                     </DropdownMenuItem>
                     {r.onRemove && (
                       <DropdownMenuItem variant="destructive" onSelect={r.onRemove}>
-                        <XIcon /> Stop watching
+                        <XIcon className="size-3.5" /> Stop watching
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
