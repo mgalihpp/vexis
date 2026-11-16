@@ -31,8 +31,9 @@ restarts() {
   "$PM2" jlist | bun -e "const p = JSON.parse(await Bun.stdin.text()).find((x) => x.name === '$name'); console.log(p?.pm2_env.status === 'online' ? p.pm2_env.restart_time : 'down')"
 }
 
+# If the ecosystem file is broken, a plain restart still brings back the process as pm2 already knows it.
 restart() {
-  "$PM2" startOrRestart "$ECOSYSTEM" --only "$name" --update-env
+  "$PM2" startOrRestart "$ECOSYSTEM" --only "$name" --update-env || "$PM2" restart "$name" --update-env
 }
 
 # swap_in / swap_back move the artifact; the previous version is kept as .prev
