@@ -67,7 +67,7 @@ export const AgentModel = z
   });
 export type AgentModel = z.infer<typeof AgentModel>;
 
-/** The model each LLM agent runs on. There is no default: an agent with null does not run. */
+/** The model each LLM agent runs on under own keys. There is no default there: an agent with null does not run. */
 export const OfficeModels = z.object({
   scout: AgentModel.nullable().default(null),
   strategist: AgentModel.nullable().default(null),
@@ -79,6 +79,20 @@ export type OfficeModels = z.infer<typeof OfficeModels>;
 /** `vexis` bills Vexis's own keys under the admin's daily cap; `own` uses the keys the user saved. */
 export const KEY_SOURCES = ["vexis", "own"] as const;
 export type KeySource = (typeof KEY_SOURCES)[number];
+
+const VEXIS_MODEL: AgentModel = { provider: "claude", model: "claude-haiku-5-5" };
+
+/** Under the Vexis key Vexis picks every agent's model (the cheapest Claude, so the admin's cap goes furthest). */
+export const VEXIS_MODELS: OfficeModels = {
+  scout: VEXIS_MODEL,
+  strategist: VEXIS_MODEL,
+  risk: VEXIS_MODEL,
+  manager: VEXIS_MODEL,
+};
+
+/** The models the office actually runs on: Vexis's under the Vexis key, the owner's picks under own keys. */
+export const activeModels = (keySource: KeySource, models: OfficeModels): OfficeModels =>
+  keySource === "vexis" ? VEXIS_MODELS : models;
 
 /** `autopilot` (V2) approves proposals under a nominal limit on its own. */
 export const OFFICE_MODES = ["approval", "autopilot"] as const;

@@ -60,7 +60,7 @@ describe("office tick", () => {
 
   test("a proposal past its approval window expires", async () => {
     const s = setup({
-      offices: [office({ models: {} })],
+      offices: [office({ keySource: "own", models: {} })],
       proposals: [proposal({ status: "awaiting_approval", expiresAt: new Date(T0 - 1) })],
     });
     await s.run(tick());
@@ -68,8 +68,8 @@ describe("office tick", () => {
     expect(s.db.messages.map((m) => m.text)).toContain("JUP-SOL expired before anyone approved it.");
   });
 
-  test("an agent with no model never runs", async () => {
-    const s = setup({ offices: [office({ models: {} })], proposals: [proposal()] });
+  test("under own keys an agent with no model never runs", async () => {
+    const s = setup({ offices: [office({ keySource: "own", models: {} })], proposals: [proposal()] });
     await s.run(tick());
     expect(s.llm.calls).toHaveLength(0);
     expect(s.db.runs).toHaveLength(0);
@@ -80,7 +80,7 @@ describe("office tick", () => {
 
   test("a missing key posts one message a day and makes no call", async () => {
     const s = setup({
-      offices: [office({ models: { scout: { provider: "openai", model: "gpt-6-luna" } } })],
+      offices: [office({ keySource: "own", models: { scout: { provider: "openai", model: "gpt-6-luna" } } })],
     });
     await s.run(
       Effect.gen(function* () {

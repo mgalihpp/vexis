@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   AgentModel,
+  activeModels,
   canTransition,
   FINAL_STATUSES,
   PROPOSAL_STATUSES,
@@ -10,6 +11,7 @@ import {
   runCost,
   transition,
   utcDayStart,
+  VEXIS_MODELS,
 } from "./office.ts";
 
 describe("proposal lifecycle", () => {
@@ -56,8 +58,12 @@ describe("models and cost", () => {
     expect(AgentModel.safeParse({ provider: "openai", model: "gpt-6-luna" }).success).toBe(true);
   });
 
-  it("no agent has a default model", () => {
-    expect(parseModels(undefined)).toEqual({ scout: null, strategist: null, risk: null, manager: null });
+  it("under own keys no agent has a default model; under the Vexis key Vexis picks them all", () => {
+    const none = parseModels(undefined);
+    expect(none).toEqual({ scout: null, strategist: null, risk: null, manager: null });
+    expect(activeModels("own", none)).toEqual(none);
+    expect(activeModels("vexis", none)).toEqual(VEXIS_MODELS);
+    for (const m of Object.values(VEXIS_MODELS)) expect(AgentModel.safeParse(m).success).toBe(true);
   });
 });
 
