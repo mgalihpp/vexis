@@ -8,15 +8,13 @@ import { canvas, clamp, findPath, type Spot, STROLLS, seatOf, T, WH, WW } from "
 
 export type FloorInput = {
   data: SceneData;
-  /** The agent whose card is open; the overlay's `[data-floor-anchor]` box is moved to its head. */
+  /** The agent whose card is open; the floor highlights it. */
   selected: OfficeAgent | null;
   /** The agent the camera follows: the one picked last, whether or not its card is open. */
   focus: OfficeAgent;
   follow: boolean;
   /** Agents whose speech bubble is showing; they skip the small mark over their head. */
   talking: Set<string>;
-  /** While the card is dragged, the anchor stops following its agent so the card stays put. */
-  anchorLocked: boolean;
 };
 
 type Walker = Actor & {
@@ -311,11 +309,11 @@ export function createFloor(opts: {
       const k = view.width / vw;
       vg.drawImage(world, (vw / 2 - cam.x) * k, (vh / 2 - cam.y) * k, WW * k, WH * k);
     }
-    placeOverlay(input.selected, input.anchorLocked);
+    placeOverlay();
     raf = requestAnimationFrame(frame);
   };
 
-  function placeOverlay(selected: OfficeAgent | null, locked: boolean) {
+  function placeOverlay() {
     overlay.style.setProperty("--s", (view.clientWidth / span(cam.z)[0]).toFixed(3));
     for (const el of overlay.querySelectorAll<HTMLElement>("[data-floor-room]")) {
       const room = ROOMS[Number(el.dataset.floorRoom)];
@@ -331,13 +329,6 @@ export function createFloor(opts: {
       el.style.left = `${x}%`;
       el.style.top = `${y}%`;
       el.style.visibility = x < -10 || x > 110 || y < -5 || y > 115 ? "hidden" : "visible";
-    }
-    const anchor = overlay.querySelector<HTMLElement>("[data-floor-anchor]");
-    const sel = walkers.find((w) => w.id === selected);
-    if (anchor && sel && !locked) {
-      const [x, y] = toScreen(sel.x * T, sel.sitting ? sel.y * T - 18 : sel.y * T - 26);
-      anchor.style.left = `${x}%`;
-      anchor.style.top = `${y}%`;
     }
   }
 
