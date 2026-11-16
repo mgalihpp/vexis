@@ -162,7 +162,7 @@ export const tradeLinks = (x: string, y: string) => [
 
 export function PoolLinks({ pool }: { pool: PoolMeta }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {LINKS.map((l) => (
         <a
           key={l.name}
@@ -171,7 +171,7 @@ export function PoolLinks({ pool }: { pool: PoolMeta }) {
           rel="noreferrer"
           aria-label={`${pool.pair} on ${l.name}`}
           title={l.name}
-          className="opacity-90 transition-opacity hover:opacity-100"
+          className="shrink-0 opacity-90 transition-opacity hover:opacity-100"
         >
           <img src={`/links/${l.icon}.png`} alt="" className="size-3.5 rounded-[0.15rem]" />
         </a>
