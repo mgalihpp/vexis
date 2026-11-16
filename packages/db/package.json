@@ -7,6 +7,7 @@
     "./agents": "./src/agents.ts",
     "./screen": "./src/screen.ts",
     "./office": "./src/office.ts",
+    "./office-prompts": "./src/office-prompts.ts",
     "./office-queries": "./src/office.server.ts",
     "./guardrails": "./src/guardrails.ts",
     "./pnl": "./src/pnl.ts",

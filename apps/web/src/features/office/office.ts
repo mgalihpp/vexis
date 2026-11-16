@@ -11,6 +11,7 @@ import {
   type LlmAgent,
   type LlmProvider,
   type MessageTone,
+  MODEL_PRICES,
   OFFICE_AGENTS,
   type OfficeAgent,
   type OfficeMode,
@@ -65,6 +66,34 @@ export type RunView = {
   agent: LlmAgent;
   provider: LlmProvider;
   model: string;
+  /** The prompt version this call ran, so a behavior change traces back to a prompt change. */
+  promptVersion: string;
+  /** Null when the call failed before the provider reported usage. */
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  durationMs: number;
+  error: string | null;
+  at: number;
+};
+
+/** The last exchange with one LLM desk: the two messages it was sent, the raw answer and that call's metadata. */
+export type ThreadView = {
+  agent: LlmAgent;
+  provider: LlmProvider;
+  model: string;
+  keySource: KeySource;
+  promptVersion: string;
+  /** The system message exactly as sent. */
+  system: string;
+  /** The user message: this tick's pools, wallet and proposal. */
+  user: string;
+  /** The answer exactly as the provider sent it; null when the call failed before one arrived. */
+  reply: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  durationMs: number;
   error: string | null;
   at: number;
 };
@@ -86,7 +115,14 @@ export type PositionView = {
 /** A sum of PnL; null when no position in it has a known PnL. */
 export type Amount = { sol: number | null; usd: number | null };
 
-export type SpendRow = { provider: LlmProvider; keySource: KeySource; usd: number; runs: number };
+export type SpendRow = {
+  agent: LlmAgent;
+  provider: LlmProvider;
+  model: string;
+  keySource: KeySource;
+  usd: number;
+  runs: number;
+};
 
 export type ConfigView = PauseFields & {
   mode: OfficeMode;
@@ -116,6 +152,8 @@ export type OfficeData =
       proposals: ProposalView[];
       messages: MessageView[];
       runs: RunView[];
+      /** Each desk's last exchange, one row per desk; the newest call replaces it. */
+      threads: ThreadView[];
       positions: PositionView[];
       /** Realized PnL of closed positions, today (UTC) and all time. */
       pnl: { today: Amount; total: Amount };
@@ -356,8 +394,55 @@ export function spendVsCap(spend: readonly SpendRow[], config: Pick<ConfigView, 
   return {
     vexis: meter(total("vexis"), config.vexisDailyUsd),
     own: meter(total("own"), config.guardrails.dailyLlmUsd),
-    rows: [...spend].sort((a, b) => b.usd - a.usd),
   };
+}
+
+/** A model whose listed price is zero, so its calls bill nothing and never use up the cap. */
+export const freeModel = (m: { provider: LlmProvider; model: string }) => {
+  const price = MODEL_PRICES[m.provider][m.model];
+  return price !== undefined && price.input === 0 && price.output === 0;
+};
+
+/** Token counts read the same on the server and in the browser. */
+export const tokenCount = (n: number) => n.toLocaleString("en-US");
+
+/**
+ * A reply as indented JSON, since a desk answers with one object; anything else (a refusal, a truncated answer) stays
+ * exactly as it arrived. Same input, same output, so the server and the browser render it alike.
+ */
+export function prettyReply(text: string): string {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end < start) return text;
+  try {
+    return JSON.stringify(JSON.parse(text.slice(start, end + 1)), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+export type DeskUsage = {
+  agent: LlmAgent;
+  model: OfficeModels[LlmAgent];
+  /** Calls made today (UTC) and what they cost. */
+  runs: number;
+  usd: number;
+  free: boolean;
+};
+
+/** What each LLM desk ran on today: its model, its calls and their spend. Desks with no model show as off. */
+export function deskUsage(spend: readonly SpendRow[], models: OfficeModels): DeskUsage[] {
+  return LLM_AGENTS.map((agent) => {
+    const rows = spend.filter((r) => r.agent === agent);
+    const model = models[agent];
+    return {
+      agent,
+      model,
+      runs: rows.reduce((n, r) => n + r.runs, 0),
+      usd: rows.reduce((n, r) => n + r.usd, 0),
+      free: model !== null && freeModel(model),
+    };
+  });
 }
 
 /** LLM agents whose provider needs an own key that was not saved. */

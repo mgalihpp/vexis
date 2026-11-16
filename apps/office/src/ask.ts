@@ -9,13 +9,12 @@ import {
   PROVIDER_LABEL,
   runCost,
 } from "@vexis/db/office";
+import { type Prompt, parseDecision } from "@vexis/db/office-prompts";
 import type { OfficeConfigRow } from "@vexis/db/office-queries";
 import type { PoolFilter } from "@vexis/db/screen";
 import { Clock, Effect, Option, Result } from "effect";
 import { AppConfig, llmKey } from "./config.ts";
-import { parseDecision } from "./decision.ts";
-import type { Prompt } from "./prompts/prompts.ts";
-import { Db, type NewMessage } from "./services/db.ts";
+import { Db, type NewMessage, type NewThread } from "./services/db.ts";
 import { Llm } from "./services/llm.ts";
 import { OfficeState } from "./services/state.ts";
 
@@ -96,6 +95,8 @@ export const call = <I, A>(office: Office, { agent, model, apiKey }: Seat, promp
   Effect.gen(function* () {
     const db = yield* Db;
     const label = PROVIDER_LABEL[model.provider];
+    const system = prompt.system;
+    const user = prompt.user(input);
     const started = yield* Clock.currentTimeMillis;
     const result = yield* (yield* Llm)
       .complete({
@@ -103,8 +104,8 @@ export const call = <I, A>(office: Office, { agent, model, apiKey }: Seat, promp
         provider: model.provider,
         model: model.model,
         apiKey,
-        system: prompt.system,
-        user: prompt.user(input),
+        system,
+        user,
       })
       .pipe(Effect.result);
     const run = {
@@ -117,8 +118,20 @@ export const call = <I, A>(office: Office, { agent, model, apiKey }: Seat, promp
       at: new Date(office.now),
     };
 
+    // The thread is what the office page shows the owner: one request, its two messages and the raw answer. A failed
+    // write is logged and never stops the desk.
+    const keep = (exchange: Pick<NewThread, "reply" | "inputTokens" | "outputTokens" | "costUsd" | "error">) =>
+      db
+        .saveThread(office.userId, { ...run, system, userMessage: user, ...exchange })
+        .pipe(
+          Effect.catchTag("DbError", (e) =>
+            Effect.logWarning(`thread not saved (${e.operation}) for office ${office.userId}`),
+          ),
+        );
+
     if (Result.isFailure(result)) {
       yield* db.insertRun(office.userId, { ...run, error: result.failure.message });
+      yield* keep({ reply: null, inputTokens: null, outputTokens: null, costUsd: null, error: result.failure.message });
       yield* Effect.logWarning(`${agent} call failed for office ${office.userId}: ${result.failure.message}`);
       yield* sayOnce(office, `call-${agent}`, agent, `My ${label} call failed. I'll try again later.`, "warn");
       return Option.none<{ value: A; runId: string }>();
@@ -126,13 +139,10 @@ export const call = <I, A>(office: Office, { agent, model, apiKey }: Seat, promp
 
     const { text, inputTokens, outputTokens } = result.success;
     const parsed = parseDecision(prompt.schema, text);
-    const runId = yield* db.insertRun(office.userId, {
-      ...run,
-      inputTokens,
-      outputTokens,
-      costUsd: runCost(model.provider, model.model, inputTokens, outputTokens),
-      error: parsed.ok ? null : `invalid output: ${parsed.error}`.slice(0, 500),
-    });
+    const costUsd = runCost(model.provider, model.model, inputTokens, outputTokens);
+    const error = parsed.ok ? null : `invalid output: ${parsed.error}`.slice(0, 500);
+    const runId = yield* db.insertRun(office.userId, { ...run, inputTokens, outputTokens, costUsd, error });
+    yield* keep({ reply: text, inputTokens, outputTokens, costUsd, error });
     if (!parsed.ok) {
       yield* Effect.logWarning(`${agent} answered in the wrong shape for office ${office.userId}: ${parsed.error}`);
       return Option.none<{ value: A; runId: string }>();

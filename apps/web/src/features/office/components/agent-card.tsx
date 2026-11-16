@@ -1,12 +1,13 @@
 import { type OfficeAgent, PROVIDER_LABEL } from "@vexis/db/office";
-import { CrosshairIcon, ListIcon, XIcon } from "lucide-react";
+import { PROMPT_TEXT } from "@vexis/db/office-prompts";
+import { CrosshairIcon, GripHorizontalIcon, ListIcon, XIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { timeAgo } from "@/features/portfolio/money";
 import { AGENT_INFO, DESK_LABEL, type DeskStatus, isLlmAgent, type OfficeView } from "../office";
 import { STATUS_COLOR } from "./floor/scene";
 import { sprite } from "./floor/sprites";
-import { cost, DASH, utcClock } from "./office-ui";
+import { cost, utcClock } from "./office-ui";
+import { ThreadDetail } from "./thread";
 
 const SHOWN = 3;
 
@@ -46,8 +47,9 @@ export function AgentCard({
   onClose: () => void;
 }) {
   const model = isLlmAgent(agent) ? view.config.models[agent] : null;
+  const prompt = isLlmAgent(agent) ? PROMPT_TEXT[agent] : null;
+  const thread = isLlmAgent(agent) ? view.threads.find((t) => t.agent === agent) : undefined;
   const spent = model ? view.spend.filter((r) => r.provider === model.provider).reduce((a, r) => a + r.usd, 0) : null;
-  const run = view.runs.filter((r) => r.agent === agent).sort((a, b) => b.at - a.at)[0];
   const said = view.messages.filter((m) => m.agent === agent).slice(0, SHOWN);
   const color = STATUS_COLOR[stopped ? "error" : status];
 
@@ -55,12 +57,13 @@ export function AgentCard({
     ["Engine", isLlmAgent(agent) ? (model ? PROVIDER_LABEL[model.provider] : "No model") : "Code runner"],
   ];
   if (model) rows.push(["Model", model.model], [`${PROVIDER_LABEL[model.provider]} today`, cost(spent)]);
-  if (isLlmAgent(agent))
-    rows.push(["Last run", run ? timeAgo(run.at, now) : DASH, run?.error ? "text-loss" : undefined]);
 
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-start gap-2.5">
+      <div
+        data-card-grip
+        className="sticky top-0 z-10 -mx-2.5 -mt-2.5 flex cursor-grab touch-none items-start gap-2.5 border-b bg-popover px-2.5 pt-2.5 pb-2.5 active:cursor-grabbing"
+      >
         <div
           className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-md border"
           style={{ background: `radial-gradient(circle at 50% 70%, ${color}40, transparent 70%)` }}
@@ -75,6 +78,15 @@ export function AgentCard({
             {stopped ? "Stopped" : DESK_LABEL[status]}
           </div>
         </div>
+        <button
+          type="button"
+          data-card-grip
+          title="Drag card · double-click to re-anchor"
+          aria-label="Drag card (double-click to re-anchor, arrow keys to nudge)"
+          className="shrink-0 cursor-grab rounded p-0.5 text-muted-foreground/45 active:cursor-grabbing"
+        >
+          <GripHorizontalIcon className="size-3.5" />
+        </button>
         <Button variant="ghost" size="icon-xs" aria-label="Close" onClick={onClose}>
           <XIcon />
         </Button>
@@ -88,7 +100,26 @@ export function AgentCard({
           </div>
         ))}
       </dl>
-      {run?.error && <p className="text-[0.6875rem] text-loss [overflow-wrap:anywhere]">{run.error}</p>}
+
+      {thread ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase">
+            Last exchange
+          </span>
+          <ThreadDetail thread={thread} now={now} />
+        </div>
+      ) : (
+        prompt && (
+          <details className="rounded-md border bg-background/60 px-2.5 py-2">
+            <summary className="cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase select-none">
+              System prompt · {prompt.version}
+            </summary>
+            <pre className="m-0 mt-1.5 overflow-x-auto font-mono text-[0.625rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+              {prompt.system}
+            </pre>
+          </details>
+        )
+      )}
 
       <div className="flex flex-col gap-1">
         <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase">Last said</span>

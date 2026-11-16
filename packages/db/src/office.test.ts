@@ -74,6 +74,7 @@ describe("models and cost", () => {
     expect(runCost("claude", "claude-sonnet-5-5", 1_000_000, 100_000)).toBeCloseTo(3);
     expect(runCost("deepseek", "deepseek-flash", 10_000, 2_000)).toBeCloseTo(0.0054);
     expect(runCost("openrouter", "deepseek/deepseek-v4.1-flash", 1_000_000, 1_000_000)).toBeCloseTo(0.56);
+    expect(runCost("openrouter", "baidu/ernie-5.5-flash-preview:free", 1_000_000, 1_000_000)).toBe(0);
   });
 
   it("an unlisted model has no cost and cannot be picked", () => {

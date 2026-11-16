@@ -18,7 +18,15 @@ import {
   utcDayStart,
 } from "./office.ts";
 import { forUser, type UserScope } from "./queries.server.ts";
-import { officeConfig, officeJournal, officeMessages, officeProposals, officeRuns, telegramLinks } from "./schema.ts";
+import {
+  officeConfig,
+  officeJournal,
+  officeMessages,
+  officeProposals,
+  officeRuns,
+  officeThreads,
+  telegramLinks,
+} from "./schema.ts";
 
 // Office reads and writes. Like `queries.server.ts`, every helper for a user's office takes a `UserScope`; the two
 // cross-user reads at the bottom are for `apps/office`, which runs every office in turn.
@@ -27,6 +35,7 @@ export type OfficeConfigRow = typeof officeConfig.$inferSelect;
 export type ProposalRow = typeof officeProposals.$inferSelect;
 export type MessageRow = typeof officeMessages.$inferSelect;
 export type RunRow = typeof officeRuns.$inferSelect;
+export type ThreadRow = typeof officeThreads.$inferSelect;
 export type JournalRow = typeof officeJournal.$inferSelect;
 
 // --- config ----------------------------------------------------------------------------------
@@ -352,19 +361,39 @@ export async function insertRun({ db, userId }: UserScope, r: Omit<typeof office
 export async function llmSpendToday({ db, userId }: UserScope, now: Date) {
   return db
     .select({
+      agent: officeRuns.agent,
       provider: officeRuns.provider,
+      model: officeRuns.model,
       keySource: officeRuns.keySource,
       usd: sql<number>`coalesce(sum(${officeRuns.costUsd}), 0)::float8`,
       runs: sql<number>`count(*)::int`,
     })
     .from(officeRuns)
     .where(and(eq(officeRuns.userId, userId), gte(officeRuns.at, utcDayStart(now))))
-    .groupBy(officeRuns.provider, officeRuns.keySource);
+    .groupBy(officeRuns.agent, officeRuns.provider, officeRuns.model, officeRuns.keySource);
 }
 
 /** The latest run per agent, for each desk's status. */
 export function latestRuns({ db, userId }: UserScope, limit = 50) {
   return db.select().from(officeRuns).where(eq(officeRuns.userId, userId)).orderBy(desc(officeRuns.at)).limit(limit);
+}
+
+// --- threads ---------------------------------------------------------------------------------
+
+/** Replaces one desk's stored exchange, so a thread is always its newest call and nothing piles up. */
+export async function saveThread(
+  { db, userId }: UserScope,
+  t: Omit<typeof officeThreads.$inferInsert, "userId" | "at"> & { at: Date },
+) {
+  await db
+    .insert(officeThreads)
+    .values({ userId, ...t })
+    .onConflictDoUpdate({ target: [officeThreads.userId, officeThreads.agent], set: t });
+}
+
+/** Every desk's last exchange, for the thread view on the office page. */
+export function listThreads({ db, userId }: UserScope) {
+  return db.select().from(officeThreads).where(eq(officeThreads.userId, userId));
 }
 
 // --- journal ---------------------------------------------------------------------------------

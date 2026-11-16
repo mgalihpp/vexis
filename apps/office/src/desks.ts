@@ -1,12 +1,5 @@
 import { checkManage, checkOpen, freeSol, officeCapital } from "@vexis/db/guardrails";
 import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/db/office";
-import type { ProposalRow } from "@vexis/db/office-queries";
-import { alertable } from "@vexis/db/screen";
-import { Effect, Option } from "effect";
-import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
-import type { DbError } from "./errors.ts";
-import { sendCard } from "./inbox.ts";
-import type { OfficePool } from "./pools.ts";
 import {
   managerPrompt,
   riskPrompt,
@@ -14,7 +7,14 @@ import {
   type StrategistCandidate,
   scoutPrompt,
   strategistPrompt,
-} from "./prompts/prompts.ts";
+} from "@vexis/db/office-prompts";
+import type { ProposalRow } from "@vexis/db/office-queries";
+import { alertable } from "@vexis/db/screen";
+import { Effect, Option } from "effect";
+import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
+import type { DbError } from "./errors.ts";
+import { sendCard } from "./inbox.ts";
+import type { OfficePool } from "./pools.ts";
 import { Chain } from "./services/chain.ts";
 import { Db, type JournalBook } from "./services/db.ts";
 import { SCREENER_WINDOW_MS, Screener } from "./services/meteora.ts";

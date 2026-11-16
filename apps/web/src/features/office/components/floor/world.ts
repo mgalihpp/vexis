@@ -136,6 +136,17 @@ export const ERRAND_SPOT = {
   cabinet: [28.5, 8.7, 3],
 } as const satisfies Record<string, Spot>;
 
+/** Where an idle agent drifts while the office has nothing to run; `stay` is how long it lingers, in ms. */
+export const STROLLS: readonly { spot: Spot; stay: readonly [number, number] }[] = [
+  { spot: [1.5, 12.3, 1], stay: [5_000, 9_000] },
+  { spot: [3.5, 12.3, 1], stay: [3_000, 6_000] },
+  { spot: [2.5, 15.8, 1], stay: [4_000, 7_000] },
+  { spot: [17.5, 12.3, 1], stay: [3_500, 7_000] },
+  { spot: [23.3, 14.4, 2], stay: [5_000, 9_000] },
+  { spot: [27.5, 12.2, 1], stay: [6_000, 12_000] },
+  { spot: [11.5, 3.8, 1], stay: [4_000, 8_000] },
+];
+
 export function seatOf(agent: OfficeAgent): Spot {
   if (agent === "executor") return EXECUTOR_PAD;
   const d = DESKS.find((q) => q.owner === agent);

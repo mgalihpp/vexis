@@ -20,6 +20,7 @@ import {
   type OfficeConfigRow,
   type ProposalRow,
   resumeOffice,
+  saveThread,
   setCardMessage,
   setDayCapital,
   settledCards,
@@ -27,7 +28,13 @@ import {
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser, getTelegramLink, listAlerts, listPoolsOfKind } from "@vexis/db/queries";
-import { type officeJournal, type officeMessages, type officeRuns, rebalanceWallets } from "@vexis/db/schema";
+import {
+  type officeJournal,
+  type officeMessages,
+  type officeRuns,
+  type officeThreads,
+  rebalanceWallets,
+} from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
 import { eq } from "drizzle-orm";
 import { Config, Context, Effect, Layer, Redacted } from "effect";
@@ -35,6 +42,7 @@ import { DbError } from "../errors.ts";
 
 export type NewMessage = Omit<typeof officeMessages.$inferInsert, "id" | "userId" | "at">;
 export type NewRun = Omit<typeof officeRuns.$inferInsert, "id" | "userId">;
+export type NewThread = Omit<typeof officeThreads.$inferInsert, "userId" | "at"> & { readonly at: Date };
 export type JournalBook = { readonly open: ReadonlyArray<JournalRow>; readonly closedToday: ReadonlyArray<JournalRow> };
 export type NewJournal = Omit<typeof officeJournal.$inferInsert, "id" | "userId" | "openedAt">;
 export type MovePatch = Parameters<typeof moveProposal>[4];
@@ -89,6 +97,8 @@ export class Db extends Context.Service<
     insertProposal(userId: string, p: NewProposal): Effect.Effect<ProposalRow | undefined, DbError>;
     message(userId: string, m: NewMessage): Effect.Effect<void, DbError>;
     insertRun(userId: string, r: NewRun): Effect.Effect<string, DbError>;
+    /** Replaces the desk's stored exchange, which is what the thread view reads. */
+    saveThread(userId: string, t: NewThread): Effect.Effect<void, DbError>;
     spendToday(userId: string, now: Date): Effect.Effect<ReadonlyArray<SpendRow>, DbError>;
     openJournal(userId: string): Effect.Effect<ReadonlyArray<JournalRow>, DbError>;
     /** Open positions and the ones closed since `since`. */
@@ -154,6 +164,7 @@ export class Db extends Context.Service<
         insertProposal: (userId, p) => run("insertProposal", () => insertProposal(as(userId), p)),
         message: (userId, m) => run("message", () => insertMessage(as(userId), m)),
         insertRun: (userId, r) => run("insertRun", () => insertRun(as(userId), r)),
+        saveThread: (userId, t) => run("saveThread", () => saveThread(as(userId), t)),
         spendToday: (userId, now) => run("spendToday", () => llmSpendToday(as(userId), now)),
         openJournal: (userId) => run("openJournal", () => listJournal(as(userId), { openOnly: true })),
         book: (userId, since) => run("book", () => journalBook(as(userId), since)),

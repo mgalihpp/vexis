@@ -1,6 +1,6 @@
 import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
 import { type Actor, createScene, ROOMS, type SceneData } from "./scene";
-import { canvas, clamp, findPath, type Spot, seatOf, T, WH, WW } from "./world";
+import { canvas, clamp, findPath, type Spot, STROLLS, seatOf, T, WH, WW } from "./world";
 
 // Runs the floor: the animation loop, the agents' walks, the camera (zoom, pan, follow) and clicks. React hands it
 // the latest data through `read()` every frame and owns the overlay's content; the engine only moves the overlay's
@@ -15,6 +15,8 @@ export type FloorInput = {
   follow: boolean;
   /** Agents whose speech bubble is showing; they skip the small mark over their head. */
   talking: Set<string>;
+  /** While the card is dragged, the anchor stops following its agent so the card stays put. */
+  anchorLocked: boolean;
 };
 
 type Walker = Actor & {
@@ -23,6 +25,12 @@ type Walker = Actor & {
   face: number;
   /** When a walker that arrived heads back to its seat. */
   backAt: number | null;
+  /** How long it lingers where it arrived before heading back. */
+  stay: number;
+  /** The earliest it may drift off again. */
+  strollAt: number;
+  /** The last spot it drifted to, so it does not pick the same one twice. */
+  went: number;
 };
 
 const MAX_ZOOM = 3.2;
@@ -57,17 +65,47 @@ export function createFloor(opts: {
       ph: i * 1.37,
       path: [],
       backAt: null,
+      stay: 1_500,
+      strollAt: 0,
+      went: -1,
     };
   });
 
   function moveTo(a: Walker, to: Spot, carry: boolean) {
-    const tiles = findPath([Math.floor(a.x), Math.floor(a.y)], [Math.floor(to[0]), Math.floor(to[1])]) ?? [];
+    const tiles = findPath([Math.floor(a.x), Math.floor(a.y)], [Math.floor(to[0]), Math.floor(to[1])]);
+    if (!tiles) return;
     a.path = tiles.slice(1).map(([x, y]) => [x + 0.5, y + 0.5]);
     a.path.push([to[0], to[1]]);
     a.face = to[2];
     a.sitting = false;
     a.moving = true;
     a.carry = carry;
+  }
+
+  /** The office is quiet: an agent at its seat gets up now and then for coffee, the arcade or the window. */
+  function stroll(a: Walker, input: FloorInput, now: number) {
+    if (reduced || input.data.stopped) return;
+    if (a.strollAt === 0) {
+      a.strollAt = now + 6_000 + a.ph * 2_600;
+      return;
+    }
+    if (now < a.strollAt) return;
+    a.strollAt = now + 45_000 + Math.random() * 60_000;
+    const busy = (id: OfficeAgent) => {
+      const st = input.data.statuses[id];
+      return st === "thinking" || st === "waiting";
+    };
+    if (a.moving || a.backAt !== null) return;
+    if (Math.hypot(a.x - a.seat[0], a.y - a.seat[1]) > 0.6 || busy(a.id)) return;
+    // One stroll at a time, and only while nothing runs: a working office keeps everyone at their desk.
+    if (OFFICE_AGENTS.some(busy) || walkers.some((w) => w.moving || w.backAt !== null)) return;
+    const i = Math.floor(Math.random() * (STROLLS.length - 1));
+    const k = a.went >= 0 && i >= a.went ? i + 1 : i;
+    const s = STROLLS[k];
+    if (!s) return;
+    a.went = k;
+    a.stay = s.stay[0] + Math.random() * (s.stay[1] - s.stay[0]);
+    moveTo(a, s.spot, false);
   }
 
   function step(a: Walker, dt: number, now: number) {
@@ -100,7 +138,7 @@ export function createFloor(opts: {
       const home = Math.hypot(a.x - a.seat[0], a.y - a.seat[1]) < 0.05;
       a.sitting = home && a.id !== "executor";
       if (!home) {
-        a.backAt = now + 1500;
+        a.backAt = now + a.stay;
       } else a.carry = false;
     }
   }
@@ -248,6 +286,7 @@ export function createFloor(opts: {
     const now = Date.now();
     const input = opts.read();
     for (const a of walkers) step(a, input.data.stopped ? 0 : dt, now);
+    for (const a of walkers) stroll(a, input, now);
 
     if (input.follow && !following && target.z < 1.8) zoomAt(1.9 / target.z);
     following = input.follow;
@@ -272,11 +311,11 @@ export function createFloor(opts: {
       const k = view.width / vw;
       vg.drawImage(world, (vw / 2 - cam.x) * k, (vh / 2 - cam.y) * k, WW * k, WH * k);
     }
-    placeOverlay(input.selected);
+    placeOverlay(input.selected, input.anchorLocked);
     raf = requestAnimationFrame(frame);
   };
 
-  function placeOverlay(selected: OfficeAgent | null) {
+  function placeOverlay(selected: OfficeAgent | null, locked: boolean) {
     overlay.style.setProperty("--s", (view.clientWidth / span(cam.z)[0]).toFixed(3));
     for (const el of overlay.querySelectorAll<HTMLElement>("[data-floor-room]")) {
       const room = ROOMS[Number(el.dataset.floorRoom)];
@@ -295,7 +334,7 @@ export function createFloor(opts: {
     }
     const anchor = overlay.querySelector<HTMLElement>("[data-floor-anchor]");
     const sel = walkers.find((w) => w.id === selected);
-    if (anchor && sel) {
+    if (anchor && sel && !locked) {
       const [x, y] = toScreen(sel.x * T, sel.sitting ? sel.y * T - 18 : sel.y * T - 26);
       anchor.style.left = `${x}%`;
       anchor.style.top = `${y}%`;
@@ -309,6 +348,7 @@ export function createFloor(opts: {
     walk(agent: OfficeAgent, to: Spot, carry: boolean) {
       const a = walkers.find((w) => w.id === agent);
       if (!a || a.moving || a.backAt !== null || reduced) return;
+      a.stay = 1_500;
       moveTo(a, to, carry);
     },
     zoom(f: number) {
