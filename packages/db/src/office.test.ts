@@ -11,6 +11,7 @@ import {
   parseModels,
   parseProposalParams,
   parseScreen,
+  refuseDecision,
   runCost,
   transition,
   utcDayStart,
@@ -42,6 +43,24 @@ describe("proposal lifecycle", () => {
     ["expired", "approved"],
   ] as const)("refuses %s → %s", (from, to) => {
     expect(() => transition(from, to)).toThrow();
+  });
+
+  const NOW = Date.UTC(2026, 10, 16, 12);
+  const running = { paused: false, pausedReason: null, pausedUntil: null };
+  const waiting = { status: "awaiting_approval" as const, expiresAt: new Date(NOW + 60_000) };
+  it.each([
+    ["approve", running, waiting, null],
+    ["reject", running, waiting, null],
+    ["approve", undefined, waiting, "no_office"],
+    ["approve", running, undefined, "not_found"],
+    ["approve", running, { ...waiting, status: "approved" as const }, "decided"],
+    ["reject", running, { ...waiting, status: "expired" as const }, "decided"],
+    ["approve", running, { ...waiting, expiresAt: new Date(NOW) }, "expired"],
+    ["reject", running, { ...waiting, expiresAt: new Date(NOW) }, null],
+    ["approve", { paused: true, pausedReason: "kill_switch", pausedUntil: null }, waiting, "paused"],
+    ["approve", { paused: true, pausedReason: "daily_loss", pausedUntil: NOW - 1 }, waiting, null],
+  ] as const)("the owner may %s (office %o, proposal %o): %s", (decision, office, proposal, refusal) => {
+    expect(refuseDecision(office, proposal, decision, NOW)).toBe(refusal);
   });
 
   it("final statuses go nowhere", () => {

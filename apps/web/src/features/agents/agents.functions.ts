@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { AGENT_KINDS, AutoRebalanceConfig, VolumeWatchConfig } from "@vexis/db/agents";
+import { AutoRebalanceConfig, TELEGRAM_KINDS, VolumeWatchConfig } from "@vexis/db/agents";
 import { PoolFilter } from "@vexis/db/screen";
 import { z } from "zod";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
@@ -22,7 +22,7 @@ import { BotToken, connectOwnBot, detectOwnBotChat, disconnectTelegram } from ".
 import { loadWallet, RpcUrlInput, removeWallet, SecretKeyInput, saveRpcUrl, saveWallet } from "./wallet.server";
 
 const PoolInput = z.object({ address: PoolAddress, label: z.string().trim().min(1).max(80) });
-const Kind = z.enum(AGENT_KINDS);
+const TelegramKind = z.enum(TELEGRAM_KINDS);
 const AgentId = z.object({ agentId: z.string().uuid() });
 const KindConfig = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("volume-watch"), config: VolumeWatchConfig }),
@@ -68,7 +68,7 @@ export const getTelegram = createServerFn({ method: "GET" })
 
 export const connectTelegramBot = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ kind: Kind, token: BotToken }))
+  .validator(z.object({ kind: TelegramKind, token: BotToken }))
   .handler(async ({ context, data }) => {
     await connectOwnBot(context.viewer.id, data.kind, data.token);
     return loadTelegram(context.viewer.id);
@@ -76,7 +76,7 @@ export const connectTelegramBot = createServerFn({ method: "POST" })
 
 export const detectTelegramChat = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ kind: Kind }))
+  .validator(z.object({ kind: TelegramKind }))
   .handler(async ({ context, data }) => {
     await detectOwnBotChat(context.viewer.id, data.kind);
     return loadTelegram(context.viewer.id);
@@ -84,7 +84,7 @@ export const detectTelegramChat = createServerFn({ method: "POST" })
 
 export const disconnectTelegramLink = createServerFn({ method: "POST" })
   .middleware([requireViewer])
-  .validator(z.object({ kind: Kind }))
+  .validator(z.object({ kind: TelegramKind }))
   .handler(async ({ context, data }) => {
     await disconnectTelegram(context.viewer.id, data.kind);
     return loadTelegram(context.viewer.id);

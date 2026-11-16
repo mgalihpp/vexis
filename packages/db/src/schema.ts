@@ -16,7 +16,14 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { AGENT_KINDS, type AgentKind, REBALANCE_ACTIONS, type RebalanceAction } from "./agents.ts";
+import {
+  AGENT_KINDS,
+  type AgentKind,
+  REBALANCE_ACTIONS,
+  type RebalanceAction,
+  TELEGRAM_KINDS,
+  type TelegramKind,
+} from "./agents.ts";
 import {
   type Decider,
   KEY_SOURCES,
@@ -232,28 +239,31 @@ export const wallets = pgTable(
 ).enableRLS();
 
 /**
- * A user's Telegram setup, one per agent kind. There is no shared bot: the user brings their own (`bot_token`,
- * AES-GCM encrypted, see `secret.ts`). The web app validates it with `getMe`, then reads `chat_id` from the
- * messages waiting on that bot once the user has sent /start. The runner sends that kind's alerts with this
- * token. A chat is linked to one user per kind, so alerts never reach someone else's chat.
+ * A user's Telegram setup, one per agent kind and one for the office. There is no shared bot: the user brings their
+ * own (`bot_token`, AES-GCM encrypted, see `secret.ts`). The web app validates it with `getMe`, then reads `chat_id`
+ * from the messages waiting on that bot once the user has sent /start. The runner sends that kind's alerts with this
+ * token; the office runtime sends approval cards and polls the office bot for button presses once a chat is linked.
+ * A chat is linked to one user per kind, so alerts never reach someone else's chat.
  */
 export const telegramLinks = pgTable(
   "telegram_links",
   {
     userId: userId(),
-    kind: text("kind").$type<AgentKind>().notNull(),
+    kind: text("kind").$type<TelegramKind>().notNull(),
     botToken: text("bot_token").notNull(),
     botUsername: text("bot_username").notNull(),
     chatId: bigint("chat_id", { mode: "bigint" }),
     username: text("username"),
     linkedAt: timestamp("linked_at", { withTimezone: true }),
+    /** Next `getUpdates` offset for a bot something polls (the office's); null until its first update. */
+    updateOffset: bigint("update_offset", { mode: "number" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.kind] }),
     unique("telegram_links_kind_chat_unique").on(t.kind, t.chatId),
-    check("telegram_links_kind_check", sql.raw(`kind in (${AGENT_KINDS.map((k) => `'${k}'`).join(", ")})`)),
+    check("telegram_links_kind_check", sql.raw(`kind in (${TELEGRAM_KINDS.map((k) => `'${k}'`).join(", ")})`)),
   ],
 ).enableRLS();
 
@@ -487,6 +497,8 @@ export const officeProposals = pgTable(
     signature: text("signature"),
     txError: text("tx_error"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** The approval card in the owner's office bot chat, until it is edited to show the outcome. */
+    telegramMessageId: bigint("telegram_message_id", { mode: "number" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

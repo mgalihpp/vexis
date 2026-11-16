@@ -1,4 +1,4 @@
-import { type AgentKind, TELEGRAM_PAUSES } from "@vexis/db/agents";
+import { TELEGRAM_PAUSES, type TelegramKind } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
@@ -12,8 +12,9 @@ import { decryptSecret, encryptSecret } from "@vexis/db/secret";
 import { z } from "zod";
 import { BOT_TOKEN_PATTERN } from "./agents";
 
-// A user's own Telegram bot, one per agent kind. The token is checked with `getMe`, stored encrypted, and the chat is read from the
-// messages waiting on that bot, so no per-bot polling is needed. The runner sends with the same token.
+// A user's own Telegram bot, one per agent kind and one for the office. The token is checked with `getMe`, stored
+// encrypted, and the chat is read from the messages waiting on that bot. The runner sends alerts with the same token;
+// the office runtime polls the office bot only once a chat is linked, so it never takes the /start this reads.
 
 export const BotToken = z.string().trim().regex(BOT_TOKEN_PATTERN, "That does not look like a bot token");
 
@@ -49,13 +50,13 @@ async function call<T>(token: string, method: string, schema: z.ZodType<T>, para
   return parsed.data;
 }
 
-export async function connectOwnBot(userId: string, kind: AgentKind, token: string) {
+export async function connectOwnBot(userId: string, kind: TelegramKind, token: string) {
   const me = await call(BotToken.parse(token), "getMe", Me);
   await saveOwnBot(forUser(getDb(), userId), kind, encryptSecret(token.trim()), me.result.username);
 }
 
 /** Reads the newest private chat on the kind's bot and links it. Throws when nobody has written to the bot yet. */
-export async function detectOwnBotChat(userId: string, kind: AgentKind) {
+export async function detectOwnBotChat(userId: string, kind: TelegramKind) {
   const s = forUser(getDb(), userId);
   const link = await getTelegramLink(s, kind);
   if (!link?.botToken) throw new Error("Connect your bot first");
@@ -70,10 +71,10 @@ export async function detectOwnBotChat(userId: string, kind: AgentKind) {
   const linked = await linkOwnBotChat(s, kind, BigInt(latest.chat.id), latest.from?.username);
   if (!linked) throw new Error("Connect your bot first");
   // The runner paused this kind's agents while they had no usable chat or token; now they have both. A pause the
-  // user chose stays.
-  await resumeAgentsPausedFor(s, kind, TELEGRAM_PAUSES);
+  // user chose stays. The office never pauses over Telegram: its web panel works without it.
+  if (kind !== "office") await resumeAgentsPausedFor(s, kind, TELEGRAM_PAUSES);
 }
 
-export async function disconnectTelegram(userId: string, kind: AgentKind) {
+export async function disconnectTelegram(userId: string, kind: TelegramKind) {
   await removeTelegramLink(forUser(getDb(), userId), kind);
 }

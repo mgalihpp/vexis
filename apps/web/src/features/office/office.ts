@@ -4,6 +4,7 @@ import {
   type Decider,
   EXECUTION_FAILING,
   type Guardrails,
+  isPaused,
   type KeySource,
   KILL_SWITCH,
   LLM_AGENTS,
@@ -15,6 +16,8 @@ import {
   type OfficeMode,
   type OfficeModels,
   type OfficeScreen,
+  ownerCanResume,
+  type PauseFields,
   type ProposalKind,
   type ProposalParams,
   type ProposalStatus,
@@ -82,8 +85,6 @@ export type PositionView = {
 export type Amount = { sol: number | null; usd: number | null };
 
 export type SpendRow = { provider: LlmProvider; keySource: KeySource; usd: number; runs: number };
-
-export type PauseFields = { paused: boolean; pausedReason: string | null; pausedUntil: number | null };
 
 export type ConfigView = PauseFields & {
   mode: OfficeMode;
@@ -321,21 +322,17 @@ const PAUSE_TEXT: Record<string, string> = {
   [ADMIN_STOP]: "Stopped by a Vexis admin. Ask an admin to start it again.",
 };
 
-/** Reasons the owner may lift; daily loss only once its `pausedUntil` passed, and an admin stop never. */
-const OWNER_CLEARS = new Set([KILL_SWITCH, DAILY_LOSS, EXECUTION_FAILING]);
-
 export type PauseView =
   | { state: "running" }
   | { state: "paused"; reason: string | null; text: string; until: number | null; canResume: boolean };
 
 /** A pause whose `pausedUntil` passed has cleared itself. */
 export function pauseView(c: PauseFields, now: number): PauseView {
-  if (!c.paused || (c.pausedUntil !== null && c.pausedUntil <= now)) return { state: "running" };
+  if (!isPaused(c, now)) return { state: "running" };
   const reason = c.pausedReason;
   const known = reason ? PAUSE_TEXT[reason] : undefined;
   const text = known ?? (reason ? `Paused (${reason}).` : "Paused.");
-  const canResume = reason !== null && OWNER_CLEARS.has(reason) && c.pausedUntil === null;
-  return { state: "paused", reason, text, until: c.pausedUntil, canResume };
+  return { state: "paused", reason, text, until: c.pausedUntil, canResume: ownerCanResume(c) };
 }
 
 // --- summary ----------------------------------------------------------------------------------

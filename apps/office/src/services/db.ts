@@ -1,13 +1,16 @@
 import { closeDb, createDb } from "@vexis/db/client";
-import type { ProposalStatus } from "@vexis/db/office";
+import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/db/office";
 import {
+  decideProposal,
   expireProposals,
   insertJournal,
   insertMessage,
   insertProposal,
   insertRun,
   type JournalRow,
+  killOffice,
   lastExecutionAt,
+  linkedOfficeBots,
   listJournal,
   listOffices,
   listProposals,
@@ -16,9 +19,13 @@ import {
   type NewProposal,
   type OfficeConfigRow,
   type ProposalRow,
+  resumeOffice,
+  setCardMessage,
+  settledCards,
+  setUpdateOffset,
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
-import { forUser, listAlerts, listPoolsOfKind } from "@vexis/db/queries";
+import { forUser, getTelegramLink, listAlerts, listPoolsOfKind } from "@vexis/db/queries";
 import { type officeJournal, type officeMessages, type officeRuns, rebalanceWallets } from "@vexis/db/schema";
 import { decryptSecret } from "@vexis/db/secret";
 import { eq } from "drizzle-orm";
@@ -40,6 +47,26 @@ export type WalletTarget =
   | { readonly _tag: "missing" }
   | { readonly _tag: "unreadable" }
   | { readonly _tag: "ready"; readonly owner: string; readonly rpcUrl: string };
+
+/** The owner's office bot: `unreadable` when the token does not decrypt with this `TOKEN_ENC_KEY`. */
+export type BotTarget =
+  | { readonly _tag: "missing" }
+  | { readonly _tag: "unreadable" }
+  | { readonly _tag: "ready"; readonly token: string; readonly chatId: number };
+
+/** A linked office bot to poll, with the offset that confirms what was already handled. */
+export type PolledBot = {
+  readonly userId: string;
+  readonly token: string;
+  readonly chatId: number;
+  readonly offset: number | null;
+};
+
+export type DecideResult =
+  | { readonly ok: true; readonly proposal: ProposalRow }
+  | { readonly ok: false; readonly refusal: DecisionRefusal };
+
+export type ResumeResult = Awaited<ReturnType<typeof resumeOffice>>;
 
 /** Everything the office runtime reads or writes in Postgres. Every per-office call is scoped to that user. */
 export class Db extends Context.Service<
@@ -71,6 +98,18 @@ export class Db extends Context.Service<
     wallet(office: OfficeConfigRow): Effect.Effect<WalletTarget, DbError>;
     /** `null` clears the pause. */
     setPause(userId: string, pause: { reason: string; until: Date | null } | null): Effect.Effect<void, DbError>;
+    officeBot(userId: string): Effect.Effect<BotTarget, DbError>;
+    /** Every office with a linked bot whose token decrypts. */
+    polledBots(): Effect.Effect<ReadonlyArray<PolledBot>, DbError>;
+    setUpdateOffset(userId: string, offset: number): Effect.Effect<void, DbError>;
+    setCard(userId: string, proposalId: string, messageId: number | null): Effect.Effect<void, DbError>;
+    /** Proposals whose card still has buttons but no longer waits. */
+    settledCards(userId: string): Effect.Effect<ReadonlyArray<ProposalRow>, DbError>;
+    /** The owner's decision, the same path as the web panel. */
+    decide(userId: string, proposalId: string, decision: Decision, now: Date): Effect.Effect<DecideResult, DbError>;
+    /** The kill switch, as on the web: how many proposals it rejected, null with no office. */
+    kill(userId: string): Effect.Effect<number | null, DbError>;
+    resume(userId: string, now: Date): Effect.Effect<ResumeResult, DbError>;
   }
 >()("vexis/office/Db") {
   static readonly layer = Layer.effect(
@@ -91,6 +130,14 @@ export class Db extends Context.Service<
           return { _tag: "ready", owner, rpcUrl: decryptSecret(rpcUrl, "WALLET_ENC_KEY") };
         } catch {
           return { _tag: "unreadable" };
+        }
+      };
+
+      const readToken = (blob: string) => {
+        try {
+          return decryptSecret(blob, "TOKEN_ENC_KEY");
+        } catch {
+          return null;
         }
       };
 
@@ -136,6 +183,30 @@ export class Db extends Context.Service<
                 : { paused: false, pausedReason: null, pausedUntil: null },
             ),
           ).pipe(Effect.asVoid),
+        officeBot: (userId) =>
+          run("officeBot", () => getTelegramLink(as(userId), "office")).pipe(
+            Effect.map((link): BotTarget => {
+              if (!link || link.chatId === null) return { _tag: "missing" };
+              const token = readToken(link.botToken);
+              return token === null ? { _tag: "unreadable" } : { _tag: "ready", token, chatId: Number(link.chatId) };
+            }),
+          ),
+        polledBots: () =>
+          run("polledBots", () => linkedOfficeBots(db)).pipe(
+            Effect.map((rows) =>
+              rows.flatMap((r) => {
+                const token = readToken(r.botToken);
+                if (token === null || r.chatId === null) return [];
+                return [{ userId: r.userId, token, chatId: Number(r.chatId), offset: r.updateOffset }];
+              }),
+            ),
+          ),
+        setUpdateOffset: (userId, offset) => run("setUpdateOffset", () => setUpdateOffset(as(userId), offset)),
+        setCard: (userId, id, messageId) => run("setCard", () => setCardMessage(as(userId), id, messageId)),
+        settledCards: (userId) => run("settledCards", () => settledCards(as(userId))),
+        decide: (userId, id, decision, now) => run("decide", () => decideProposal(as(userId), id, decision, now)),
+        kill: (userId) => run("kill", () => killOffice(as(userId))),
+        resume: (userId, now) => run("resume", () => resumeOffice(as(userId), now)),
       });
     }),
   );

@@ -1,16 +1,23 @@
-import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import type { Db } from "./client.server.ts";
 import {
   type Decider,
+  type Decision,
+  type DecisionRefusal,
+  isPaused,
+  KILL_SWITCH,
   type OfficeAgent,
+  ownerCanResume,
   type ProposalKind,
   type ProposalStatus,
   type Proposer,
+  pauseOf,
+  refuseDecision,
   transition,
   utcDayStart,
 } from "./office.ts";
-import type { UserScope } from "./queries.server.ts";
-import { officeConfig, officeJournal, officeMessages, officeProposals, officeRuns } from "./schema.ts";
+import { forUser, type UserScope } from "./queries.server.ts";
+import { officeConfig, officeJournal, officeMessages, officeProposals, officeRuns, telegramLinks } from "./schema.ts";
 
 // Office reads and writes. Like `queries.server.ts`, every helper for a user's office takes a `UserScope`; the two
 // cross-user reads at the bottom are for `apps/office`, which runs every office in turn.
@@ -152,6 +159,69 @@ export async function moveProposal(
     )
     .returning();
   return row;
+}
+
+// --- owner decisions (web panel and Telegram) ---------------------------------------------------
+
+/**
+ * The owner approves or rejects a waiting proposal. Every surface goes through here, so the web panel and the
+ * Telegram card refuse the same things (`refuseDecision`), and the move only lands while it still waits.
+ */
+export async function decideProposal(s: UserScope, proposalId: string, decision: Decision, now: Date) {
+  const [config, proposal] = await Promise.all([getOfficeConfig(s), getProposal(s, proposalId)]);
+  const refusal = refuseDecision(config && pauseOf(config), proposal, decision, now.getTime());
+  if (refusal) return { ok: false, refusal } as const;
+  const to = decision === "approve" ? "approved" : "rejected";
+  const moved = await moveProposal(s, proposalId, "awaiting_approval", to, { decidedBy: "owner" });
+  return moved
+    ? ({ ok: true, proposal: moved } as const)
+    : ({ ok: false, refusal: "decided" as DecisionRefusal } as const);
+}
+
+/** The owner's kill switch: pauses the office and rejects every proposal not yet executing. Null with no office. */
+export function killOffice({ db, userId }: UserScope) {
+  return db.transaction(async (tx) => {
+    const s = forUser(tx, userId);
+    const paused = await updateOfficeConfig(s, { paused: true, pausedReason: KILL_SWITCH, pausedUntil: null });
+    return paused ? rejectUnexecuted(s, "kill_switch") : null;
+  });
+}
+
+/**
+ * Lifts a pause the owner may lift. `locked` for an admin stop or a daily-loss pause before its time, `changed` when
+ * the pause moved in between.
+ */
+export async function resumeOffice(s: UserScope, now: Date) {
+  const config = await getOfficeConfig(s);
+  if (!config) return "no_office" as const;
+  const pause = pauseOf(config);
+  if (!isPaused(pause, now.getTime())) return "running" as const;
+  if (!ownerCanResume(pause) || !pause.pausedReason) return "locked" as const;
+  return (await clearPause(s, pause.pausedReason, now)) ? ("resumed" as const) : ("changed" as const);
+}
+
+// --- telegram cards --------------------------------------------------------------------------
+
+/** Remembers the approval card sent for a proposal; null once its outcome was shown. */
+export async function setCardMessage({ db, userId }: UserScope, proposalId: string, messageId: number | null) {
+  await db
+    .update(officeProposals)
+    .set({ telegramMessageId: messageId })
+    .where(and(eq(officeProposals.id, proposalId), eq(officeProposals.userId, userId)));
+}
+
+/** Proposals whose card still shows buttons although they no longer wait: decided, expired or killed. */
+export function settledCards({ db, userId }: UserScope) {
+  return db
+    .select()
+    .from(officeProposals)
+    .where(
+      and(
+        eq(officeProposals.userId, userId),
+        isNotNull(officeProposals.telegramMessageId),
+        ne(officeProposals.status, "awaiting_approval"),
+      ),
+    );
 }
 
 /** How many proposals reached each status since `since` (by their last update). */
@@ -338,4 +408,26 @@ export async function stopAllOffices(db: Db, reason: string) {
       .set({ status: "rejected", decidedBy: "kill_switch" })
       .where(inArray(officeProposals.status, ["draft", "risk_checked", "awaiting_approval", "approved"]));
   });
+}
+
+/** Every office bot with a linked chat, for the office runtime's update poll. Tokens are still encrypted. */
+export function linkedOfficeBots(db: Db) {
+  return db
+    .select({
+      userId: telegramLinks.userId,
+      botToken: telegramLinks.botToken,
+      chatId: telegramLinks.chatId,
+      updateOffset: telegramLinks.updateOffset,
+    })
+    .from(telegramLinks)
+    .innerJoin(officeConfig, eq(officeConfig.userId, telegramLinks.userId))
+    .where(and(eq(telegramLinks.kind, "office"), isNotNull(telegramLinks.chatId)));
+}
+
+/** Confirms every update below `offset` for the user's office bot. */
+export async function setUpdateOffset({ db, userId }: UserScope, offset: number) {
+  await db
+    .update(telegramLinks)
+    .set({ updateOffset: offset })
+    .where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, "office")));
 }

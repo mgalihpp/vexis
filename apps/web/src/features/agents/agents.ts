@@ -14,6 +14,7 @@ import {
   TELEGRAM_NOT_LINKED,
   TELEGRAM_PAUSES,
   TELEGRAM_RELINK,
+  type TelegramKind,
   VolumeWatchConfig,
   WALLET_UNREADABLE,
 } from "@vexis/db/agents";
@@ -30,7 +31,7 @@ import { compactUsd, money } from "@/features/portfolio/money";
 import { type AlertPool, asFilterPool } from "@/features/screener/screener";
 import { shortAddr } from "@/lib/format";
 
-export type { AgentKind, AutoRebalanceConfig, FeeMode, PoolFilter, PresetChoice, VolumeWatchConfig };
+export type { AgentKind, AutoRebalanceConfig, FeeMode, PoolFilter, PresetChoice, TelegramKind, VolumeWatchConfig };
 export {
   FEE_MODES,
   LOW_SOL,

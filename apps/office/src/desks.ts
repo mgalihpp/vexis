@@ -4,6 +4,7 @@ import { alertable } from "@vexis/db/screen";
 import { Effect, Option } from "effect";
 import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
 import { checkOpen } from "./guardrails.ts";
+import { sendCard } from "./inbox.ts";
 import type { OfficePool } from "./pools.ts";
 import {
   managerPrompt,
@@ -255,7 +256,7 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
     yield* say(floor, "risk", `${name} passed every check.${llm ? ` ${llm.note}` : ""}`, "good", where);
   });
 
-/** The Manager summarises each checked proposal and puts it in front of the owner. */
+/** The Manager summarises each checked proposal and puts it in front of the owner, on the web and on Telegram. */
 export const presentChecked = (floor: Floor) =>
   Effect.gen(function* () {
     if (!floor.models.manager) return;
@@ -281,6 +282,7 @@ export const presentChecked = (floor: Floor) =>
           poolAddress: proposal.poolAddress,
           proposalId: proposal.id,
         });
+        yield* sendCard(floor, moved);
       }
     }
   });

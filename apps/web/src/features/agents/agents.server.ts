@@ -1,8 +1,9 @@
 import {
-  AGENT_KINDS,
   type AgentKind,
   AutoRebalanceConfig,
   parseAgentConfig,
+  TELEGRAM_KINDS,
+  type TelegramKind,
   VolumeWatchConfig,
 } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
@@ -180,9 +181,9 @@ export async function loadAlerts(userId: string): Promise<AlertsData> {
   };
 }
 
-export async function loadTelegram(userId: string): Promise<Record<AgentKind, TelegramView>> {
+export async function loadTelegram(userId: string): Promise<Record<TelegramKind, TelegramView>> {
   const links = await getTelegramLinks(scope(userId));
-  const view = (kind: AgentKind): TelegramView => {
+  const view = (kind: TelegramKind): TelegramView => {
     const link = links.find((l) => l.kind === kind);
     if (!link) return { bot: null, relink: null };
     // A token saved under an older TOKEN_ENC_KEY can never be used again, so it counts as no bot: the page asks
@@ -193,7 +194,7 @@ export async function loadTelegram(userId: string): Promise<Record<AgentKind, Te
       relink: null,
     };
   };
-  return Object.fromEntries(AGENT_KINDS.map((k) => [k, view(k)])) as Record<AgentKind, TelegramView>;
+  return Object.fromEntries(TELEGRAM_KINDS.map((k) => [k, view(k)])) as Record<TelegramKind, TelegramView>;
 }
 
 function readable(encrypted: string) {
