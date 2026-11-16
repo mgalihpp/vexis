@@ -357,6 +357,17 @@ export async function insertJournal(
   return row;
 }
 
+/** Open positions and the ones closed since `since`: what the daily loss reads. */
+export async function journalBook({ db, userId }: UserScope, since: Date) {
+  const rows = await db
+    .select()
+    .from(officeJournal)
+    .where(
+      and(eq(officeJournal.userId, userId), or(isNull(officeJournal.closedAt), gte(officeJournal.closedAt, since))),
+    );
+  return { open: rows.filter((r) => r.closedAt === null), closedToday: rows.filter((r) => r.closedAt !== null) };
+}
+
 /**
  * Realized PnL of closed positions, all time and since `since`. A sum is null when no row in it has a PnL, so an
  * unpriced simulated close never reads as zero.

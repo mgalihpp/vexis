@@ -13,7 +13,7 @@ import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
 import { type Floor, presentChecked, reviewDrafts, scoutAndDraft } from "./desks.ts";
 import { BadOfficeConfig } from "./errors.ts";
-import { dailyLossHit, dailyLossPct } from "./guardrails.ts";
+import { dailyLossHit, dailyLossPct, dayPnlSol, officeCapital } from "./guardrails.ts";
 import { Chain } from "./services/chain.ts";
 import { Db } from "./services/db.ts";
 import { OfficeState } from "./services/state.ts";
@@ -71,10 +71,10 @@ const runOffice = Effect.fn("office.run")(function* (row: OfficeConfigRow) {
   yield* execute(office);
 
   const floor = yield* readFloor(office);
-  if (dailyLossHit(office.guardrails, floor.dayStartSol, floor.walletSol)) {
-    const loss = dailyLossPct(floor.dayStartSol, floor.walletSol).toFixed(1);
+  const loss = dailyLossPct(floor.dayStartCapital, dayPnlSol(floor.book, now));
+  if (dailyLossHit(office.guardrails, loss)) {
     yield* db.setPause(row.userId, { reason: DAILY_LOSS, until: new Date(utcDayStart(now).getTime() + DAY_MS) });
-    yield* say(office, "manager", `Wallet is down ${loss}% today. Pausing until 00:00 UTC.`, "bad");
+    yield* say(office, "manager", `The office is down ${loss?.toFixed(1)}% today. Pausing until 00:00 UTC.`, "bad");
     return;
   }
 
@@ -83,13 +83,15 @@ const runOffice = Effect.fn("office.run")(function* (row: OfficeConfigRow) {
   yield* presentChecked(floor);
 });
 
-/** The wallet as the desks see it this tick. One balance read on the user's RPC; no wallet means no read. */
+/** The wallet and the office's positions as the desks see them this tick. One balance read on the user's RPC. */
 const readFloor = (office: Office) =>
   Effect.gen(function* () {
-    const wallet = yield* (yield* Db).wallet(office.row);
+    const db = yield* Db;
+    const book = yield* db.book(office.userId, utcDayStart(office.now));
+    const wallet = yield* db.wallet(office.row);
     if (wallet._tag !== "ready") {
       if (wallet._tag === "unreadable") yield* Effect.logWarning(`office ${office.userId}: RPC URL does not decrypt`);
-      return { ...office, walletSol: null, dayStartSol: null, rpc: null } satisfies Floor;
+      return { ...office, walletSol: null, dayStartCapital: null, book, rpc: null } satisfies Floor;
     }
     const walletSol = yield* (yield* Chain).balanceSol(wallet.rpcUrl, wallet.owner).pipe(
       Effect.map((sol): number | null => sol),
@@ -97,8 +99,15 @@ const readFloor = (office: Office) =>
         Effect.logWarning(`office ${office.userId}: balance read failed: ${error.message}`).pipe(Effect.as(null)),
       ),
     );
-    const dayStartSol = yield* (yield* OfficeState).dayStartSol(office.userId, office.now, walletSol);
-    return { ...office, walletSol, dayStartSol, rpc: { owner: wallet.owner, url: wallet.rpcUrl } } satisfies Floor;
+    const capital = walletSol === null ? null : officeCapital(walletSol, book.open);
+    const dayStartCapital = yield* (yield* OfficeState).dayStartCapital(office.userId, office.now, capital);
+    return {
+      ...office,
+      walletSol,
+      dayStartCapital,
+      book,
+      rpc: { owner: wallet.owner, url: wallet.rpcUrl },
+    } satisfies Floor;
   });
 
 /** The MVP executor: every approved proposal is marked done without signing or sending anything. */

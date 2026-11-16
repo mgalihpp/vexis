@@ -575,6 +575,9 @@ export const officeJournal = pgTable(
     simulated: boolean("simulated").notNull(),
     amountSol: doublePrecision("amount_sol").notNull(),
     amountUsd: doublePrecision("amount_usd"),
+    /** The open position's last on-chain value in SOL, fees included, written by the runner's Monitor. */
+    valueSol: doublePrecision("value_sol"),
+    valuedAt: timestamp("valued_at", { withTimezone: true }),
     openReason: text("open_reason").notNull(),
     openedAt: timestamp("opened_at", { withTimezone: true }).notNull().defaultNow(),
     closeReason: text("close_reason"),
