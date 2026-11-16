@@ -6,22 +6,17 @@ import { BOOK_DELAY_MS, officeBookkeeper } from "../src/office/bookkeeper.ts";
 import { officeExecutor } from "../src/office/executor.ts";
 import { officeMonitor } from "../src/office/monitor.ts";
 import { type MonitorReading, monitorProposal } from "../src/office/monitor-rules.ts";
-import { rebalanceCycle } from "../src/rebalance/rebalance.ts";
 import { WalletLock } from "../src/services/wallet-lock.ts";
 import {
   chainPosition,
   fakeChain,
   fakeDb,
   fakeMeteora,
-  fakeTelegram,
   fakeZap,
-  link,
   poolState,
-  rebalanceWatch,
   runAt,
   T0,
   TEST_RPC,
-  testConfig,
   testWallet,
 } from "./fakes.ts";
 import { fakeOfficeDb, journalRow, OFFICE_POOL, officeProposal, officeRow } from "./office-fakes.ts";
