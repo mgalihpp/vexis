@@ -546,7 +546,7 @@ export function ConfigForm({
           />
           <label
             htmlFor="cfg-mult"
-            className={`flex h-7 shrink-0 items-center rounded-md bg-muted px-2 font-mono text-xs font-semibold tabular-nums ${
+            className={`flex h-7 shrink-0 items-center rounded-md bg-muted px-2 text-xs font-semibold tabular-nums ${
               errors.mult ? "text-loss" : "text-brand"
             }`}
           >

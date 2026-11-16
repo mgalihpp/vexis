@@ -44,7 +44,7 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
             {TODAY.map((t) => (
               <div key={t.status} className="flex flex-col-reverse items-center gap-0.5">
                 <dt className="text-[0.625rem] text-muted-foreground capitalize">{t.label}</dt>
-                <dd className="m-0 font-mono text-sm font-medium tabular-nums">{view.today[t.status] ?? 0}</dd>
+                <dd className="m-0 text-sm font-medium tabular-nums">{view.today[t.status] ?? 0}</dd>
               </div>
             ))}
           </dl>
@@ -78,7 +78,7 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
         <span className="font-mono text-[0.625rem] tracking-[0.08em] text-brand uppercase">
           Proposed by {AGENT_INFO[p.proposedBy].name}
         </span>
-        <span className={`font-mono font-medium tabular-nums ${left.expired ? "text-loss" : "text-amber-500"}`}>
+        <span className={`font-medium tabular-nums ${left.expired ? "text-loss" : "text-amber-500"}`}>
           {left.expired ? "Expired" : left.text}
           {!left.expired && <span className="sr-only"> left to decide</span>}
         </span>
