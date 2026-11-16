@@ -55,14 +55,23 @@ describe("approval card", () => {
   });
 
   test.each([
-    ["awaiting_approval", null, null],
-    ["approved", "owner", "✅ Approved."],
-    ["done", "owner", "✅ Approved."],
-    ["rejected", "owner", "❌ Rejected."],
-    ["rejected", "kill_switch", "🛑 Rejected by the kill switch."],
-    ["expired", "system", "⌛ Expired before anyone approved it."],
-  ] as const)("a %s card decided by %s ends with %s", (status, decidedBy, line) => {
-    expect(outcome({ status, decidedBy })).toBe(line);
+    ["awaiting_approval", null, {}, null],
+    ["approved", "owner", {}, "✅ Approved."],
+    ["done", "owner", {}, "✅ Approved. Preview: simulated, nothing was signed."],
+    ["done", "owner", { simulated: false, signature: "SIG1" }, "✅ Done: https://solscan.io/tx/SIG1"],
+    ["failed", "owner", { simulated: false, txError: "slippage" }, "⚠️ Failed: slippage"],
+    ["rejected", "owner", {}, "❌ Rejected."],
+    ["rejected", "risk", {}, "❌ Stopped by the guardrails."],
+    ["rejected", "kill_switch", {}, "🛑 Rejected by the kill switch."],
+    ["expired", "system", {}, "⌛ Expired before anyone approved it."],
+  ] as const)("a %s card decided by %s ends with %#", (status, decidedBy, tx, line) => {
+    expect(outcome({ status, decidedBy, simulated: true, signature: null, txError: null, ...tx })).toBe(line);
+  });
+
+  test("a Monitor card names the position and what it will do", () => {
+    const close = proposal({ kind: "close", positionAddress: "POS1", params: { reason: "stop_loss" } });
+    expect(cardText(close)).toContain("Position POS1");
+    expect(cardText(close)).toContain("Reason: stop loss");
   });
 
   test("the settled card keeps the details and adds the outcome", () => {

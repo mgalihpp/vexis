@@ -7,6 +7,7 @@ import {
   type LlmAgent,
   type LlmProvider,
   modelsOf,
+  OFFICE_SLIPPAGE_BPS,
   OfficeModels,
   PROVIDER_LABEL,
   WALLET_SOURCES,
@@ -26,6 +27,16 @@ import {
 import { type ReactNode, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { Group, Row, RowIcon, SegmentedControl } from "@/components/grouped-list";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -42,6 +53,7 @@ import {
   removeOfficeWalletFn,
   saveGuardrailsFn,
   saveKeySourceFn,
+  saveLiveFn,
   saveLlmKeyFn,
   saveModelsFn,
   saveOfficeWalletFn,
@@ -404,7 +416,8 @@ function WalletPage({ config }: { config: ConfigView }) {
     : "None saved yet. Add one in an auto-rebalance agent's settings.";
   return (
     <div className="flex flex-col gap-5">
-      <Group title="Source" footer="Simulation only: nothing is signed with it yet.">
+      <ModeGroup config={config} />
+      <Group title="Source" footer="The wallet cannot change while the office holds real positions.">
         <Row icon={icon(WalletIcon)} label="Trade from">
           <SegmentedControl
             value={config.walletSource}
@@ -480,6 +493,66 @@ function WalletPage({ config }: { config: ConfigView }) {
   );
 }
 
+/**
+ * Preview or Live. Turning Live on asks first: from then on every approved proposal is signed and sent from the
+ * office's wallet. Back to Preview needs no confirmation.
+ */
+function ModeGroup({ config }: { config: ConfigView }) {
+  const [confirming, setConfirming] = useState(false);
+  const save = useOfficeMutation(saveLiveFn);
+  const set = (live: boolean) => !save.isPending && save.mutate({ data: { live } });
+  return (
+    <>
+      <Group
+        title="Execution"
+        footer={
+          config.live
+            ? "Live: approved proposals are signed and sent from this wallet."
+            : "Preview: approved proposals are simulated; nothing is signed."
+        }
+      >
+        <Row icon={icon(ShieldCheckIcon)} label="Mode">
+          <SegmentedControl
+            value={config.live ? "live" : "preview"}
+            onChange={(v) => (v === "live" ? setConfirming(true) : set(false))}
+            options={[
+              { value: "preview", label: "Preview" },
+              { value: "live", label: "Live" },
+            ]}
+          />
+        </Row>
+      </Group>
+      <FormError error={save.error} />
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send real transactions?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Every proposal you approve will be checked against the guardrails again and then signed and sent from
+                  the office's wallet: opening positions, re-centering, claiming fees and closing. Each costs network
+                  and priority fees, and swaps can lose up to {OFFICE_SLIPPAGE_BPS / 100}% to slippage.
+                </p>
+                <p>
+                  Start with a small amount in a separate hot wallet. After {config.guardrails.maxConsecutiveFailures}{" "}
+                  failures in a row the office pauses itself.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep preview</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => set(true)}>
+              Turn live on
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 const GUARDRAIL_GROUPS: {
   title: string;
   fields: { key: keyof Guardrails; label: string; unit: string; step: string }[];
@@ -498,6 +571,14 @@ const GUARDRAIL_GROUPS: {
       { key: "maxDailyLossPct", label: "Daily loss limit", unit: "% of capital at 00:00 UTC", step: "0.5" },
       { key: "maxConsecutiveFailures", label: "Failures before pause", unit: "In a row", step: "1" },
       { key: "dailyLlmUsd", label: "Daily LLM budget", unit: "USD, own keys", step: "0.5" },
+    ],
+  },
+  {
+    title: "Monitor",
+    fields: [
+      { key: "tpPct", label: "Take profit", unit: "% gain on cost", step: "1" },
+      { key: "slPct", label: "Stop loss", unit: "% loss on cost", step: "0.5" },
+      { key: "claimFeePct", label: "Claim fees at", unit: "% of cost unclaimed", step: "0.5" },
     ],
   },
   {

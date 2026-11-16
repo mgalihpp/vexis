@@ -27,6 +27,7 @@ import {
   WALLET_UNREADABLE,
 } from "../services/db.ts";
 import { Telegram } from "../services/telegram.ts";
+import { WalletLock } from "../services/wallet-lock.ts";
 import { Zap } from "../services/zap.ts";
 import { feeValueInLamports, lamportsToSol, solToLamports } from "./fees.ts";
 import { halfWidthFor, outOfRange, pickPosition, targetRange } from "./range.ts";
@@ -44,32 +45,38 @@ const WALLET_CONCURRENCY = 4;
  */
 export const rebalanceCycle = Effect.fn("rebalanceCycle")(function* () {
   const db = yield* Db;
+  const lock = yield* WalletLock;
   const watches = yield* db.runnableRebalances();
   const byWallet = new Map<string, RebalanceWatch[]>();
   for (const w of watches) byWallet.set(w.owner, [...(byWallet.get(w.owner) ?? []), w]);
   yield* Effect.forEach(
-    byWallet.values(),
-    (group) =>
-      Effect.gen(function* () {
-        // An agent paused earlier in this tick is not acted on again for its other pools.
-        const paused = new Set<string>();
-        for (const watch of group) {
-          if (paused.has(watch.agentId)) continue;
-          const outcome = yield* checkPool(watch).pipe(
-            Effect.catchTags({
-              BadAgentConfig: (error) =>
-                Effect.logWarning(`skipping agent ${error.agentId}: bad config`, error.cause).pipe(Effect.as("ok")),
-              ChainError: (error) =>
-                Effect.logWarning(`chain read failed for pool ${error.poolAddress}`, error.cause).pipe(Effect.as("ok")),
-              DbError: (error) =>
-                Effect.logError(`rebalance for agent ${watch.agentId} failed: ${error.operation}`, error.cause).pipe(
-                  Effect.as("ok"),
-                ),
-            }),
-          );
-          if (outcome === "paused") paused.add(watch.agentId);
-        }
-      }),
+    byWallet,
+    ([owner, group]) =>
+      lock.withWallet(
+        owner,
+        Effect.gen(function* () {
+          // An agent paused earlier in this tick is not acted on again for its other pools.
+          const paused = new Set<string>();
+          for (const watch of group) {
+            if (paused.has(watch.agentId)) continue;
+            const outcome = yield* checkPool(watch).pipe(
+              Effect.catchTags({
+                BadAgentConfig: (error) =>
+                  Effect.logWarning(`skipping agent ${error.agentId}: bad config`, error.cause).pipe(Effect.as("ok")),
+                ChainError: (error) =>
+                  Effect.logWarning(`chain read failed for pool ${error.poolAddress}`, error.cause).pipe(
+                    Effect.as("ok"),
+                  ),
+                DbError: (error) =>
+                  Effect.logError(`rebalance for agent ${watch.agentId} failed: ${error.operation}`, error.cause).pipe(
+                    Effect.as("ok"),
+                  ),
+              }),
+            );
+            if (outcome === "paused") paused.add(watch.agentId);
+          }
+        }),
+      ),
     { concurrency: WALLET_CONCURRENCY, discard: true },
   );
 });

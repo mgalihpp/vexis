@@ -44,7 +44,7 @@ export function PnlCard({ view }: { view: OfficeView }) {
   );
 }
 
-/** Open journal rows. In the MVP every one is simulated, and closing one records no PnL. */
+/** Open journal rows: simulated ones from Preview, real ones the Executor opened. */
 export function PositionsCard({ view, now }: { view: OfficeView; now: number }) {
   const dep = deployed(view.positions);
   return (
@@ -86,11 +86,12 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
           {p.simulated && <Badge variant="info">Sim</Badge>}
         </ItemTitle>
         <ItemDescription className="truncate font-mono">
-          {sol(p.amountSol)} · {timeAgo(p.openedAt, now)}
+          {sol(p.amountSol)}
+          {!p.simulated && ` → ${p.valueSol === null ? "—" : sol(p.valueSol)}`} · {timeAgo(p.openedAt, now)}
         </ItemDescription>
         <FormError error={close.error} />
       </ItemContent>
-      {p.simulated && (
+      {
         <ItemActions>
           <Button
             variant="ghost"
@@ -102,19 +103,21 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
             <XIcon />
           </Button>
         </ItemActions>
-      )}
+      }
       <AlertDialog open={confirming} onOpenChange={setConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Close {name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The simulated position is marked closed. Its PnL stays unknown and is left out of the totals.
+              {p.simulated
+                ? "The simulated position is marked closed. Its PnL stays unknown and is left out of the totals."
+                : "A close proposal goes through the guardrails and comes back for your approval. Once approved, the position is withdrawn and swapped back to SOL."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep it open</AlertDialogCancel>
             <AlertDialogAction onClick={() => close.mutate({ data: { journalId: p.id } })}>
-              Close position
+              {p.simulated ? "Close position" : "Propose close"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

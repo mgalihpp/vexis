@@ -5,8 +5,13 @@ import { ChainError } from "../errors.ts";
 import type { OnChainPosition } from "../rebalance/range.ts";
 import { connections, redactRpc } from "../rebalance/rpc.ts";
 
-/** A position with its unclaimed fees, in raw token units. */
-export type ChainPosition = OnChainPosition & { readonly feeX: bigint; readonly feeY: bigint };
+/** A position with its liquidity and unclaimed fees, in raw token units. */
+export type ChainPosition = OnChainPosition & {
+  readonly amountX: bigint;
+  readonly amountY: bigint;
+  readonly feeX: bigint;
+  readonly feeY: bigint;
+};
 
 export type PoolState = {
   readonly activeBinId: number;
@@ -19,8 +24,10 @@ export type PoolState = {
   readonly nativeLamports: bigint;
 };
 
-// Amounts arrive as decimal strings; only "is anything left" matters here.
-const positive = (v: unknown) => /[1-9]/.test(String(v ?? "").split(".")[0] ?? "");
+// Amounts arrive as decimal strings of raw units; the fraction is below one raw unit.
+const whole = (v: unknown) => String(v ?? "").split(".")[0] ?? "";
+const positive = (v: unknown) => /[1-9]/.test(whole(v));
+const raw = (v: unknown) => (/^\d+$/.test(whole(v)) ? BigInt(whole(v)) : 0n);
 
 /** On-chain DLMM reads through the Meteora SDK, over the RPC the user gave. Reads only: nothing here signs or sends. */
 export class Chain extends Context.Service<
@@ -59,6 +66,8 @@ export class Chain extends Context.Service<
                 p.positionData.feeX,
                 p.positionData.feeY,
               ].some(positive),
+              amountX: raw(p.positionData.totalXAmount),
+              amountY: raw(p.positionData.totalYAmount),
               feeX: BigInt(p.positionData.feeX.toString()),
               feeY: BigInt(p.positionData.feeY.toString()),
             })),

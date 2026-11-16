@@ -1,5 +1,15 @@
-import type { GuardrailCheck, Guardrails, KeySource, ProposalParams } from "@vexis/db/office";
-import { alertable, type FilterPool, type PoolFilter } from "@vexis/db/screen";
+import {
+  type GuardrailCheck,
+  type Guardrails,
+  type KeySource,
+  type ProposalKind,
+  type ProposalParams,
+  utcDayStart,
+} from "./office.ts";
+import { alertable, type FilterPool, type PoolFilter } from "./screen.ts";
+
+// The office's hard rules, in code. The office runtime's Risk Manager runs them on every draft and the runner's
+// Executor runs them again right before it signs. A rule that cannot be evaluated fails.
 
 /** An office journal row as the money rules read it. */
 export type BookPosition = {
@@ -20,20 +30,25 @@ export type Book = {
   readonly closedToday: ReadonlyArray<BookPosition>;
 };
 
-/** Everything the code checks read about one open proposal, gathered by the runtime. */
-export type RiskFacts = {
-  readonly params: ProposalParams<"open">;
+/** What the money rules read, gathered by whichever runtime checks. */
+export type MoneyFacts = {
   /** Native SOL in the wallet now; null when it could not be read. */
   readonly walletSol: number | null;
   /** The office's capital at the first read of this UTC day (`officeCapital`); null when unknown. */
   readonly dayStartCapital: number | null;
   readonly book: Book;
-  /** The pool's screener row; null when it is not on the screener list (or the list is unknown). */
-  readonly pool: FilterPool | null;
   /** One of the user's auto-rebalance agents manages this pool. */
   readonly rebalanceManaged: boolean;
+  /** When the pool last had an execution finish. */
   readonly lastExecutionAt: Date | null;
   readonly now: number;
+};
+
+/** Everything the code checks read about one open proposal. */
+export type RiskFacts = MoneyFacts & {
+  readonly params: ProposalParams<"open">;
+  /** The pool's screener row; null when it is not on the screener list (or the list is unknown). */
+  readonly pool: FilterPool | null;
   /** LLM spend today for the office's key source, and the cap for it. */
   readonly llmSpentUsd: number;
   readonly llmCapUsd: number;
@@ -71,6 +86,12 @@ export function dayPnlSol(book: Book, now: number): number | null {
   return all.some((n) => n === null) ? null : sum(all as number[]);
 }
 
+/** The day-start capital as stored on the office row; null when it was taken on another UTC day or never. */
+export function storedDayCapital(row: { dayCapitalSol: number | null; dayCapitalAt: Date | null }, now: number) {
+  if (row.dayCapitalSol === null || row.dayCapitalAt === null) return null;
+  return utcDayStart(row.dayCapitalAt).getTime() === utcDayStart(now).getTime() ? row.dayCapitalSol : null;
+}
+
 /** Loss today in percent of the day's starting capital; 0 for a gain, null when either side is unknown. */
 export function dailyLossPct(dayStartCapital: number | null, pnlSol: number | null) {
   if (dayStartCapital === null || pnlSol === null || dayStartCapital <= 0) return null;
@@ -86,17 +107,30 @@ export const dailyCapUsd = (keySource: KeySource, vexisDailyUsd: number, g: Guar
 
 export const budgetLeft = (spentUsd: number, capUsd: number) => spentUsd < capUsd;
 
+const rebalanceCheck = (managed: boolean): GuardrailCheck => ({
+  rule: "not_rebalance_managed",
+  ok: !managed,
+  value: managed ? "an auto-rebalance agent manages this pool" : "free",
+});
+
+function cooldownCheck(g: Guardrails, f: Pick<MoneyFacts, "lastExecutionAt" | "now">): GuardrailCheck {
+  const sinceMs = f.lastExecutionAt === null ? null : f.now - f.lastExecutionAt.getTime();
+  return {
+    rule: "cooldown",
+    ok: sinceMs === null || sinceMs >= g.cooldownSec * 1000,
+    value: sinceMs === null ? "no execution yet" : `${Math.floor(sinceMs / 1000)}s since last, needs ${g.cooldownSec}s`,
+  };
+}
+
 /**
- * Every hard rule for an `open` proposal. A rule that cannot be evaluated (wallet unread, pool unknown) fails: the
- * code never guesses in the proposal's favor. The proposal passes only when every check is ok.
+ * The money and timing rules for an open of `amountSol`. The Executor runs these again right before it signs; the
+ * pool screen and the LLM budget were checked at review and would cost a screener request to read again.
  */
-export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts): GuardrailCheck[] {
-  const { amountSol } = f.params;
+export function openMoneyChecks(g: Guardrails, amountSol: number, f: MoneyFacts): GuardrailCheck[] {
   const { open } = f.book;
   const free = f.walletSol === null ? null : freeSol(f.walletSol, open);
   const cap = f.walletSol === null ? null : (officeCapital(f.walletSol, open) * g.maxPositionPct) / 100;
   const loss = dailyLossPct(f.dayStartCapital, dayPnlSol(f.book, f.now));
-  const sinceMs = f.lastExecutionAt === null ? null : f.now - f.lastExecutionAt.getTime();
   return [
     {
       rule: "max_position_pct",
@@ -118,27 +152,61 @@ export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts
       ok: loss !== null && loss < g.maxDailyLossPct,
       value: loss === null ? "PnL or capital unknown" : `${pct(loss)} of max ${pct(g.maxDailyLossPct)}`,
     },
+    rebalanceCheck(f.rebalanceManaged),
+    cooldownCheck(g, f),
+  ];
+}
+
+/**
+ * Every hard rule for an `open` proposal. A rule that cannot be evaluated (wallet unread, pool unknown) fails: the
+ * code never guesses in the proposal's favor. The proposal passes only when every check is ok.
+ */
+export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts): GuardrailCheck[] {
+  return [
+    ...openMoneyChecks(g, f.params.amountSol, f),
     {
       rule: "pool_alertable",
       ok: f.pool !== null && filter !== null && alertable(f.pool, filter),
       value: poolVerdict(f.pool, filter),
     },
     {
-      rule: "not_rebalance_managed",
-      ok: !f.rebalanceManaged,
-      value: f.rebalanceManaged ? "an auto-rebalance agent manages this pool" : "free",
-    },
-    {
-      rule: "cooldown",
-      ok: sinceMs === null || sinceMs >= g.cooldownSec * 1000,
-      value:
-        sinceMs === null ? "no execution yet" : `${Math.floor(sinceMs / 1000)}s since last, needs ${g.cooldownSec}s`,
-    },
-    {
       rule: "llm_budget",
       ok: budgetLeft(f.llmSpentUsd, f.llmCapUsd),
       value: `$${f.llmSpentUsd.toFixed(4)} of $${f.llmCapUsd.toFixed(2)} today`,
     },
+  ];
+}
+
+/** What the rules for a rebalance, claim or close read. */
+export type ManageFacts = Pick<MoneyFacts, "walletSol" | "book" | "rebalanceManaged" | "lastExecutionAt" | "now"> & {
+  readonly kind: Exclude<ProposalKind, "open">;
+  /** One of the office's open journal rows holds the proposal's position. */
+  readonly officePosition: boolean;
+};
+
+/**
+ * Every hard rule for acting on a position the office already holds. Only the office's own positions are touched,
+ * never one an auto-rebalance agent manages. A close is the way out, so the reserve and the cooldown never hold it.
+ */
+export function checkManage(g: Guardrails, f: ManageFacts): GuardrailCheck[] {
+  const checks: GuardrailCheck[] = [
+    {
+      rule: "office_position",
+      ok: f.officePosition,
+      value: f.officePosition ? "opened by the office" : "not an open office position",
+    },
+    rebalanceCheck(f.rebalanceManaged),
+  ];
+  if (f.kind === "close") return checks;
+  const free = f.walletSol === null ? null : freeSol(f.walletSol, f.book.open);
+  return [
+    ...checks,
+    {
+      rule: "sol_reserve",
+      ok: free !== null && free >= g.solReserve,
+      value: free === null ? "wallet unread" : `${sol(free)} free, reserve ${sol(g.solReserve)}`,
+    },
+    cooldownCheck(g, f),
   ];
 }
 

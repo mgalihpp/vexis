@@ -3,7 +3,6 @@ import type { Decision, DecisionRefusal, ProposalStatus } from "@vexis/db/office
 import {
   decideProposal,
   expireProposals,
-  insertJournal,
   insertMessage,
   insertProposal,
   insertRun,
@@ -22,6 +21,7 @@ import {
   type ProposalRow,
   resumeOffice,
   setCardMessage,
+  setDayCapital,
   settledCards,
   setUpdateOffset,
   updateOfficeConfig,
@@ -93,7 +93,8 @@ export class Db extends Context.Service<
     openJournal(userId: string): Effect.Effect<ReadonlyArray<JournalRow>, DbError>;
     /** Open positions and the ones closed since `since`. */
     book(userId: string, since: Date): Effect.Effect<JournalBook, DbError>;
-    insertJournal(userId: string, j: NewJournal): Effect.Effect<void, DbError>;
+    /** Stores today's starting capital unless one was taken on this UTC day already. */
+    setDayCapital(userId: string, capitalSol: number, now: Date): Effect.Effect<void, DbError>;
     lastExecutionAt(userId: string, poolAddress: string): Effect.Effect<Date | null, DbError>;
     /** Pools one of the user's auto-rebalance agents manages. */
     rebalancePools(userId: string): Effect.Effect<ReadonlySet<string>, DbError>;
@@ -156,7 +157,8 @@ export class Db extends Context.Service<
         spendToday: (userId, now) => run("spendToday", () => llmSpendToday(as(userId), now)),
         openJournal: (userId) => run("openJournal", () => listJournal(as(userId), { openOnly: true })),
         book: (userId, since) => run("book", () => journalBook(as(userId), since)),
-        insertJournal: (userId, j) => run("insertJournal", () => insertJournal(as(userId), j)).pipe(Effect.asVoid),
+        setDayCapital: (userId, capitalSol, now) =>
+          run("setDayCapital", () => setDayCapital(as(userId), capitalSol, now)),
         lastExecutionAt: (userId, pool) => run("lastExecutionAt", () => lastExecutionAt(as(userId), pool)),
         rebalancePools: (userId) =>
           run("rebalancePools", () => listPoolsOfKind(as(userId), "auto-rebalance")).pipe(

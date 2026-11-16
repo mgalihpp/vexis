@@ -62,13 +62,24 @@ export function office(overrides: Partial<OfficeConfigRow> = {}): OfficeConfigRo
     officeRpcUrl: null,
     poolPreset: "blue-chip",
     poolFilter: null,
+    live: false,
+    dayCapitalSol: null,
+    dayCapitalAt: null,
     createdAt: new Date(T0),
     updatedAt: new Date(T0),
     ...overrides,
   };
 }
 
-export const openParams = { strategy: "Spot", activeBin: 100, lowerBin: 90, upperBin: 110, amountSol: 1, solUsd: 150 };
+export const openParams = {
+  strategy: "Spot",
+  activeBin: 100,
+  lowerBin: 90,
+  upperBin: 110,
+  amountSol: 1,
+  solUsd: 150,
+  singleSidedSol: false,
+};
 
 export function proposal(overrides: Partial<ProposalRow> = {}): ProposalRow {
   return {
@@ -93,6 +104,31 @@ export function proposal(overrides: Partial<ProposalRow> = {}): ProposalRow {
     telegramMessageId: null,
     createdAt: new Date(T0),
     updatedAt: new Date(T0),
+    ...overrides,
+  };
+}
+
+/** An office journal row: a real 1 SOL position opened at T0 unless overridden. */
+export function journal(overrides: Partial<JournalRow> = {}): JournalRow {
+  return {
+    id: "journal-1",
+    userId: "user-1",
+    openProposalId: null,
+    closeProposalId: null,
+    poolAddress: POOL,
+    poolName: "JUP-SOL",
+    positionAddress: null,
+    simulated: false,
+    amountSol: 1,
+    amountUsd: null,
+    valueSol: null,
+    valuedAt: null,
+    openReason: "test",
+    openedAt: new Date(T0),
+    closeReason: null,
+    closedAt: null,
+    pnlSol: null,
+    pnlUsd: null,
     ...overrides,
   };
 }
@@ -165,25 +201,12 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
             closedToday: mineJ.filter((j) => j.closedAt && j.closedAt >= since),
           };
         }),
-      insertJournal: (userId, j) =>
+      setDayCapital: (userId, capitalSol, now) =>
         Effect.sync(() => {
-          state.journal.push({
-            id: id("journal"),
-            userId,
-            openedAt: new Date(),
-            openProposalId: null,
-            closeProposalId: null,
-            poolName: null,
-            positionAddress: null,
-            amountUsd: null,
-            valueSol: null,
-            valuedAt: null,
-            closeReason: null,
-            closedAt: null,
-            pnlSol: null,
-            pnlUsd: null,
-            ...j,
-          });
+          const row = state.offices.find((o) => o.userId === userId);
+          if (row && (row.dayCapitalAt === null || row.dayCapitalAt < utcDayStart(now))) {
+            Object.assign(row, { dayCapitalSol: capitalSol, dayCapitalAt: now });
+          }
         }),
       lastExecutionAt: () => Effect.succeed(null),
       rebalancePools: (userId) => Effect.sync(() => new Set(state.rebalancePools.get(userId) ?? [])),

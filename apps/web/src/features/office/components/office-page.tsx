@@ -165,6 +165,7 @@ function Office({
                 solUsd: prices?.sol ?? null,
               }}
               statuses={statuses}
+              live={view.config.live}
               bubbles={bubbles(view.messages, now)}
               messages={view.messages}
               selected={selected}

@@ -130,6 +130,12 @@ export const Guardrails = z.object({
   maxConsecutiveFailures: z.number().int().min(1).max(20).default(3),
   /** How long a proposal waits for approval before it expires, in seconds. */
   approvalTtlSec: z.number().int().min(60).max(86_400).default(900),
+  /** Gain on a position's cost, in percent, at which the Monitor proposes to take profit. */
+  tpPct: z.number().gt(0).max(1000).default(10),
+  /** Loss on a position's cost, in percent, at which the Monitor proposes to stop it out. */
+  slPct: z.number().gt(0).max(100).default(5),
+  /** Unclaimed fees, in percent of the position's cost, at which the Monitor proposes a claim. */
+  claimFeePct: z.number().gt(0).max(100).default(1),
   /** USD a day the office may spend on LLM calls with the user's own keys. The admin sets the Vexis-key cap. */
   dailyLlmUsd: z.number().min(0).max(1000).default(1),
 });
@@ -203,7 +209,8 @@ export function transition(from: ProposalStatus, to: ProposalStatus): ProposalSt
 export const DECIDERS = ["owner", "autopilot", "risk", "kill_switch", "system"] as const;
 export type Decider = (typeof DECIDERS)[number];
 
-export const PROPOSERS = ["strategist", "monitor"] as const;
+/** `owner` is a close the owner asked for by hand on `/office`. */
+export const PROPOSERS = ["strategist", "monitor", "owner"] as const;
 export type Proposer = (typeof PROPOSERS)[number];
 
 const Strategy = z.enum(REBALANCE_STRATEGIES);
@@ -223,6 +230,8 @@ export const PROPOSAL_PARAMS = {
       upperBin: Bin,
       amountSol: z.number().positive(),
       solUsd: z.number().positive().nullable(),
+      /** Deposit only SOL on its side of the pair, instead of swapping part of it for the other token. */
+      singleSidedSol: z.boolean().default(false),
     })
     .refine((p) => p.lowerBin <= p.activeBin && p.activeBin <= p.upperBin, {
       path: ["activeBin"],
@@ -257,6 +266,9 @@ export const KILL_SWITCH = "kill_switch";
 export const DAILY_LOSS = "daily_loss";
 export const EXECUTION_FAILING = "execution_failing";
 export const ADMIN_STOP = "admin_stop";
+
+/** Slippage the Executor allows on every swap and deposit, in basis points. */
+export const OFFICE_SLIPPAGE_BPS = 50;
 
 /** Reasons the owner may lift; daily loss only once its `pausedUntil` passed, and an admin stop never. */
 export const OWNER_CLEARS: ReadonlySet<string> = new Set([KILL_SWITCH, DAILY_LOSS, EXECUTION_FAILING]);

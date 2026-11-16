@@ -4,10 +4,21 @@ import { SCREENER_PRESETS } from "@vexis/db/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { pollInbox } from "../src/inbox.ts";
-import { Db } from "../src/services/db.ts";
 import { callbackData } from "../src/telegram.ts";
 import { tick } from "../src/tick.ts";
-import { BOT_TOKEN, CHAT, MINUTE, office, openParams, POOL, PROPOSAL_ID, proposal, setup, T0 } from "./fakes.ts";
+import {
+  BOT_TOKEN,
+  CHAT,
+  journal,
+  MINUTE,
+  office,
+  openParams,
+  POOL,
+  PROPOSAL_ID,
+  proposal,
+  setup,
+  T0,
+} from "./fakes.ts";
 
 const statuses = (s: ReturnType<typeof setup>) => s.db.proposals.map((p) => p.status);
 
@@ -52,14 +63,35 @@ describe("office tick", () => {
     expect(RiskNotes.parse(s.db.proposals[0]?.riskNotes).llm?.veto).toBe(true);
   });
 
-  test("an approved open is simulated: done, no signature, a simulated journal row", async () => {
+  test("the office runtime never executes: an approved proposal waits for the runner", async () => {
     const s = setup({ offices: [office({ models: {} })], proposals: [proposal({ status: "approved" })] });
     await s.run(tick());
-    expect(s.db.proposals[0]).toMatchObject({ status: "done", signature: null });
-    expect(s.db.journal).toMatchObject([
-      { simulated: true, amountSol: 1, amountUsd: 150, openReason: "Deep pool with steady fees.", pnlSol: null },
-    ]);
-    expect(s.db.messages.find((m) => m.agent === "executor")?.text).toContain("Nothing was signed");
+    expect(statuses(s)).toEqual(["approved"]);
+    expect(s.db.journal).toEqual([]);
+  });
+
+  test("a Monitor close is checked in code, never by an LLM, and reaches the owner", async () => {
+    const s = setup({
+      proposals: [
+        proposal({ kind: "close", proposedBy: "monitor", positionAddress: "POS1", params: { reason: "stop_loss" } }),
+      ],
+    });
+    s.db.journal.push(journal({ positionAddress: "POS1", valueSol: 0.9, valuedAt: new Date(T0) }));
+    await s.run(tick());
+    expect(s.db.proposals[0]).toMatchObject({ status: "awaiting_approval" });
+    expect(s.db.proposals[0]?.summary).toContain("Close the position");
+    expect(s.llm.calls.filter((c) => c.agent === "risk" || c.agent === "manager")).toHaveLength(0);
+  });
+
+  test("a Monitor proposal for a position the office did not open is vetoed", async () => {
+    const s = setup({
+      proposals: [
+        proposal({ kind: "claim", proposedBy: "monitor", positionAddress: "ELSEWHERE", params: { feeSol: 1 } }),
+      ],
+    });
+    await s.run(tick());
+    expect(s.db.proposals[0]).toMatchObject({ status: "rejected", decidedBy: "risk" });
+    expect(RiskNotes.parse(s.db.proposals[0]?.riskNotes).checks.find((c) => !c.ok)?.rule).toBe("office_position");
   });
 
   test("a proposal past its approval window expires", async () => {
@@ -167,20 +199,8 @@ describe("office tick", () => {
       }),
     );
     expect(s.db.offices[0]?.paused).toBe(false);
-    await s.run(
-      Effect.gen(function* () {
-        yield* (yield* Db).insertJournal("user-1", {
-          poolAddress: POOL,
-          simulated: false,
-          amountSol: 1,
-          openReason: "test",
-          closedAt: new Date(T0),
-          pnlSol: -0.6,
-        });
-        yield* tick();
-      }),
-      T0 + 2 * MINUTE,
-    );
+    s.db.journal.push(journal({ closedAt: new Date(T0), pnlSol: -0.6 }));
+    await s.run(tick(), T0 + 2 * MINUTE);
     expect(s.db.offices[0]).toMatchObject({
       paused: true,
       pausedReason: DAILY_LOSS,

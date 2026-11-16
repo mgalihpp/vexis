@@ -1,25 +1,49 @@
 import { describe, expect, test } from "bun:test";
-import { Guardrails } from "@vexis/db/office";
-import { SCREENER_PRESETS } from "@vexis/db/screen";
 import {
   type BookPosition,
+  checkManage,
   checkOpen,
   dailyCapUsd,
   dailyLossHit,
   dailyLossPct,
   dayPnlSol,
   freeSol,
+  type ManageFacts,
   officeCapital,
   type RiskFacts,
-} from "../src/guardrails.ts";
-import { pool, T0 } from "./fakes.ts";
+  storedDayCapital,
+} from "./guardrails.ts";
+import { Guardrails } from "./office.ts";
+import { type FilterPool, SCREENER_PRESETS } from "./screen.ts";
+
+const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+const pool = (overrides: Partial<FilterPool> = {}): FilterPool => ({
+  tvl: 2_000_000,
+  volume24h: 3_000_000,
+  binStep: 10,
+  blacklisted: false,
+  baseMcap: 1_000_000_000,
+  bothVerified: true,
+  baseOrganic: null,
+  freezable: false,
+  ...overrides,
+});
 
 // Defaults: 25% max position, 3 positions, 5% daily loss, 0.1 SOL reserve, 300 s cooldown, $1 own-key budget.
 const g = Guardrails.parse({});
 const BLUE_CHIP = SCREENER_PRESETS["blue-chip"].filter;
 
 const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
-  params: { strategy: "Spot", activeBin: 100, lowerBin: 90, upperBin: 110, amountSol: 1, solUsd: 150 },
+  params: {
+    strategy: "Spot",
+    activeBin: 100,
+    lowerBin: 90,
+    upperBin: 110,
+    amountSol: 1,
+    solUsd: 150,
+    singleSidedSol: false,
+  },
   walletSol: 10,
   dayStartCapital: 10,
   book: { open: [], closedToday: [] },
@@ -108,7 +132,42 @@ describe("checkOpen", () => {
   });
 });
 
+describe("checkManage", () => {
+  const manage = (o: Partial<ManageFacts> = {}): ManageFacts => ({
+    kind: "rebalance",
+    officePosition: true,
+    walletSol: 1,
+    book: { open: [], closedToday: [] },
+    rebalanceManaged: false,
+    lastExecutionAt: null,
+    now: T0,
+    ...o,
+  });
+  const ok = (f: ManageFacts) => checkManage(g, f).every((c) => c.ok);
+
+  test("only the office's own positions, never an auto-rebalance pool", () => {
+    expect(ok(manage())).toBe(true);
+    expect(ok(manage({ officePosition: false }))).toBe(false);
+    expect(ok(manage({ kind: "close", rebalanceManaged: true }))).toBe(false);
+  });
+
+  test("a rebalance or claim keeps the reserve and the cooldown; a close, the way out, does not", () => {
+    const tight = { walletSol: 0.05, lastExecutionAt: new Date(T0 - 1000) };
+    expect(ok(manage({ ...tight, kind: "rebalance" }))).toBe(false);
+    expect(ok(manage({ ...tight, kind: "claim" }))).toBe(false);
+    expect(ok(manage({ ...tight, kind: "close" }))).toBe(true);
+    expect(ok(manage({ kind: "claim", walletSol: null }))).toBe(false);
+  });
+});
+
 describe("daily loss and budget", () => {
+  test("the stored day-start capital counts only on its own UTC day", () => {
+    const at = new Date(T0 - 60_000);
+    expect(storedDayCapital({ dayCapitalSol: 3, dayCapitalAt: at }, T0)).toBe(3);
+    expect(storedDayCapital({ dayCapitalSol: 3, dayCapitalAt: at }, T0 + 86_400_000)).toBeNull();
+    expect(storedDayCapital({ dayCapitalSol: null, dayCapitalAt: null }, T0)).toBeNull();
+  });
+
   test("PnL is realized today plus unrealized now, simulated positions count zero", () => {
     const book = {
       open: [position({ amountSol: 2, valueSol: 2.3 }), position({ amountSol: 5, simulated: true, valueSol: null })],

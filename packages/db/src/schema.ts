@@ -447,6 +447,11 @@ export const officeConfig = pgTable(
     paused: boolean("paused").notNull().default(false),
     pausedReason: text("paused_reason"),
     pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    /** Preview (false) simulates every approved proposal; live signs and sends it from the office's wallet. */
+    live: boolean("live").notNull().default(false),
+    /** The office's capital (native SOL plus real positions at cost) at the first read of `day_capital_at`'s UTC day. */
+    dayCapitalSol: doublePrecision("day_capital_sol"),
+    dayCapitalAt: timestamp("day_capital_at", { withTimezone: true }),
     guardrails: jsonb("guardrails").$type<Record<string, unknown>>().notNull().default({}),
     models: jsonb("models").$type<Record<string, unknown>>().notNull().default({}),
     keySource: text("key_source").$type<KeySource>().notNull().default("vexis"),

@@ -77,6 +77,8 @@ export type PositionView = {
   simulated: boolean;
   amountSol: number;
   amountUsd: number | null;
+  /** The Monitor's last on-chain value in SOL; null for a simulated position or before the first read. */
+  valueSol: number | null;
   openReason: string;
   openedAt: number;
 };
@@ -88,6 +90,8 @@ export type SpendRow = { provider: LlmProvider; keySource: KeySource; usd: numbe
 
 export type ConfigView = PauseFields & {
   mode: OfficeMode;
+  /** Live signs and sends approved proposals; Preview (false) simulates them. */
+  live: boolean;
   guardrails: Guardrails;
   models: OfficeModels;
   keySource: KeySource;

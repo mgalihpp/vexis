@@ -23,6 +23,7 @@ import {
   closeJournal,
   decideProposal as decide,
   getOfficeConfig,
+  insertProposal,
   journalPnl,
   killOffice,
   latestRuns,
@@ -114,6 +115,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
 
   const view: ConfigView = {
     mode: config.mode,
+    live: config.live,
     paused: config.paused,
     pausedReason: config.pausedReason,
     pausedUntil: config.pausedUntil?.getTime() ?? null,
@@ -150,6 +152,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
       simulated: j.simulated,
       amountSol: j.amountSol,
       amountUsd: j.amountUsd,
+      valueSol: j.valueSol,
       openReason: j.openReason,
       openedAt: j.openedAt.getTime(),
     })),
@@ -191,15 +194,43 @@ export async function resumeOffice(userId: string) {
 
 // --- positions ---------------------------------------------------------------------------------
 
-/** Closes a simulated position by hand. Its PnL stays unknown: nothing was priced. */
-export async function closeSimulated(userId: string, journalId: string) {
+/**
+ * Closes a position by hand. A simulated one is marked closed at once, its PnL unknown. A real one becomes a close
+ * proposal that goes through the guardrails and comes back for approval, so only the runner ever signs.
+ */
+export async function closePosition(userId: string, journalId: string) {
   const s = scope(userId);
+  const config = await getOfficeConfig(s);
+  if (!config) throw new Error(NO_OFFICE);
   const open = await listJournal(s, { openOnly: true, limit: 500 });
   const row = open.find((j) => j.id === journalId);
   if (!row) throw new Error("This position is already closed");
-  if (!row.simulated) throw new Error("Only simulated positions can be closed here");
-  const closed = await closeJournal(s, journalId, { closeReason: "manual", pnlSol: null, pnlUsd: null });
-  if (!closed) throw new Error("This position is already closed");
+  if (row.simulated) {
+    const closed = await closeJournal(s, journalId, { closeReason: "manual", pnlSol: null, pnlUsd: null });
+    if (!closed) throw new Error("This position is already closed");
+    return;
+  }
+  if (!row.positionAddress) throw new Error("This position has no on-chain address");
+  const proposal = await insertProposal(s, {
+    kind: "close",
+    poolAddress: row.poolAddress,
+    poolName: row.poolName,
+    positionAddress: row.positionAddress,
+    params: { reason: "manual" },
+    rationale: "You asked to close it.",
+    proposedBy: "owner",
+    expiresAt: new Date(Date.now() + parseGuardrails(config.guardrails).approvalTtlSec * 1000),
+  });
+  if (!proposal) throw new Error("This pool already has a proposal in progress");
+}
+
+/** Preview or Live for the whole office; the Executor reads it before each approved proposal. */
+export const saveLive = (userId: string, live: boolean) => patch(userId, { live });
+
+/** The office's wallet cannot change under real open positions: the Monitor and the Executor would lose them. */
+async function refuseWithOpenPositions(userId: string) {
+  const open = await listJournal(scope(userId), { openOnly: true, limit: 500 });
+  if (open.some((j) => !j.simulated)) throw new Error("Close the office's real positions before changing its wallet");
 }
 
 // --- settings ----------------------------------------------------------------------------------
@@ -246,6 +277,7 @@ export async function removeLlmKey(userId: string, provider: LlmProvider) {
 
 /** Saves the office's own wallet and switches the office to it. Only the public key is ever read back. */
 export async function saveOfficeWallet(userId: string, secret: string, rpcUrl: string) {
+  await refuseWithOpenPositions(userId);
   const publicKey = keypairOf(secret).publicKey.toBase58();
   await checkRpcUrl(rpcUrl);
   await patch(userId, {
@@ -257,10 +289,12 @@ export async function saveOfficeWallet(userId: string, secret: string, rpcUrl: s
 }
 
 export async function removeOfficeWallet(userId: string) {
+  await refuseWithOpenPositions(userId);
   await patch(userId, { walletSource: "user", officePublicKey: null, officeSecretKey: null, officeRpcUrl: null });
 }
 
 export async function saveWalletSource(userId: string, walletSource: WalletSource) {
+  await refuseWithOpenPositions(userId);
   if (walletSource === "office") {
     const config = await getOfficeConfig(scope(userId));
     if (!config?.officePublicKey) throw new Error("Save an office wallet first");
