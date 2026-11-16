@@ -26,3 +26,8 @@ export class BadOfficeConfig extends Schema.TaggedError<BadOfficeConfig>()("BadO
   userId: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
+/** A Bot API call failed. The message never carries the bot token. */
+export class TelegramError extends Schema.TaggedError<TelegramError>()("TelegramError", {
+  message: Schema.String,
+}) {}

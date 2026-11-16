@@ -1,6 +1,7 @@
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { OFFICE_AGENTS } from "@vexis/db/office";
 import { z } from "zod";
+import { telegramQuery } from "@/features/agents/agents.queries";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { OfficePage } from "@/features/office/components/office-page";
 import { OfficeSkeleton } from "@/features/office/components/office-skeleton";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/office")({
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => {
     if (deps.agent || deps.pool) void context.queryClient.prefetchQuery(officeFeedQuery(deps));
+    void context.queryClient.prefetchQuery(telegramQuery);
     return context.queryClient.ensureQueryData(officeQuery);
   },
   head: () => ({ meta: [{ title: "Office | Vexis" }] }),

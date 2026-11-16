@@ -258,6 +258,58 @@ export const DAILY_LOSS = "daily_loss";
 export const EXECUTION_FAILING = "execution_failing";
 export const ADMIN_STOP = "admin_stop";
 
+/** Reasons the owner may lift; daily loss only once its `pausedUntil` passed, and an admin stop never. */
+export const OWNER_CLEARS: ReadonlySet<string> = new Set([KILL_SWITCH, DAILY_LOSS, EXECUTION_FAILING]);
+
+/** The pause columns, with `pausedUntil` in ms. */
+export type PauseFields = { paused: boolean; pausedReason: string | null; pausedUntil: number | null };
+
+/** A pause whose `pausedUntil` passed has cleared itself. */
+export const isPaused = (c: PauseFields, now: number) => c.paused && (c.pausedUntil === null || c.pausedUntil > now);
+
+export const ownerCanResume = (c: PauseFields) =>
+  c.pausedReason !== null && OWNER_CLEARS.has(c.pausedReason) && c.pausedUntil === null;
+
+// --- owner decisions ---------------------------------------------------------------------------
+
+export type Decision = "approve" | "reject";
+
+export type DecisionRefusal = "no_office" | "not_found" | "decided" | "expired" | "paused";
+
+/** Shown wherever the owner decides, so the web panel and the Telegram card say the same thing. */
+export const REFUSAL_TEXT: Record<DecisionRefusal, string> = {
+  no_office: "The office is not enabled for this account",
+  not_found: "Proposal not found",
+  decided: "This proposal was already decided",
+  expired: "This proposal expired",
+  paused: "The office is paused; nothing can be approved",
+};
+
+/**
+ * Why the owner may not make `decision` now, or null when they may. Only a waiting proposal is decided; an approval
+ * is refused once it expired or while the office is paused. A rejection is always allowed while it waits.
+ */
+export function refuseDecision(
+  office: PauseFields | undefined,
+  proposal: { status: ProposalStatus; expiresAt: Date } | undefined,
+  decision: Decision,
+  now: number,
+): DecisionRefusal | null {
+  if (!office) return "no_office";
+  if (!proposal) return "not_found";
+  if (proposal.status !== "awaiting_approval") return "decided";
+  if (decision === "reject") return null;
+  if (proposal.expiresAt.getTime() <= now) return "expired";
+  return isPaused(office, now) ? "paused" : null;
+}
+
+/** The pause columns of an `office_config` row, in ms. */
+export const pauseOf = (row: { paused: boolean; pausedReason: string | null; pausedUntil: Date | null }) => ({
+  paused: row.paused,
+  pausedReason: row.pausedReason,
+  pausedUntil: row.pausedUntil?.getTime() ?? null,
+});
+
 /** Start of the UTC day holding `at`, so the server, the runner and the browser agree on "today". */
 export function utcDayStart(at: Date | number) {
   const d = new Date(at);

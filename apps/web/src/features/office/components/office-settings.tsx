@@ -18,11 +18,12 @@ import {
   GlobeIcon,
   KeyRoundIcon,
   type LucideIcon,
+  SendIcon,
   ShieldCheckIcon,
   WalletIcon,
   WavesIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, Suspense, useState } from "react";
 import { toast } from "sonner";
 import { Group, Row, RowIcon, SegmentedControl } from "@/components/grouped-list";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +32,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
-import { errorText, FormError } from "@/features/agents/components/agent-ui";
+import { errorText, FormError, TelegramPanel } from "@/features/agents/components/agent-ui";
 import { PresetPicker } from "@/features/agents/components/screener-source";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { shortAddr } from "@/lib/format";
@@ -76,11 +77,12 @@ const SECTIONS = [
   { value: "keys", label: "API keys", Icon: KeyRoundIcon, Page: KeysPage },
   { value: "wallet", label: "Wallet", Icon: WalletIcon, Page: WalletPage },
   { value: "guardrails", label: "Guardrails", Icon: ShieldCheckIcon, Page: GuardrailsPage },
+  { value: "telegram", label: "Telegram", Icon: SendIcon, Page: TelegramPage },
 ] as const;
 type Section = (typeof SECTIONS)[number]["value"];
 
 /**
- * Everything the owner sets: models, pools, keys, wallet and guardrails, laid out like the app's Settings dialog (a bottom
+ * Everything the owner sets: models, pools, keys, wallet, guardrails and Telegram, laid out like the app's Settings dialog (a bottom
  * drawer with every section on phones). Every write is checked by its zod schema.
  */
 export function OfficeSettings({
@@ -101,7 +103,9 @@ export function OfficeSettings({
         <DrawerContent className="h-[90dvh] data-[vaul-drawer-direction=bottom]:max-h-[90dvh]">
           <div className="flex h-12 shrink-0 items-center justify-center border-b px-4">
             <DrawerTitle className="text-sm font-semibold">Office settings</DrawerTitle>
-            <DrawerDescription className="sr-only">Models, pools, keys, wallet and guardrails</DrawerDescription>
+            <DrawerDescription className="sr-only">
+              Models, pools, keys, wallet, guardrails and Telegram
+            </DrawerDescription>
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-4 pt-3 pb-8">
             {SECTIONS.map(({ value, label, Page }) => (
@@ -121,7 +125,9 @@ export function OfficeSettings({
       <DialogContent className="flex h-[min(46rem,90dvh)] flex-row gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
           <DialogTitle className="px-2 pt-1 pb-3 text-sm font-semibold">Office settings</DialogTitle>
-          <DialogDescription className="sr-only">Models, pools, keys, wallet and guardrails</DialogDescription>
+          <DialogDescription className="sr-only">
+            Models, pools, keys, wallet, guardrails and Telegram
+          </DialogDescription>
           {SECTIONS.map(({ value, label, Icon }) => (
             <button
               key={value}
@@ -149,6 +155,21 @@ export function OfficeSettings({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TelegramPage() {
+  return (
+    <Group
+      title="Approval bot"
+      footer="Every proposal that needs you arrives as a card with Approve and Reject. Send /stop to the bot to stop the office, /resume to start it again. The web panel keeps working without it."
+    >
+      <div className="p-3">
+        <Suspense fallback={<Spinner />}>
+          <TelegramPanel kind="office" />
+        </Suspense>
+      </div>
+    </Group>
   );
 }
 

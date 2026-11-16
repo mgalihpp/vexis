@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, asc, desc, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
-import { type AgentKind, defaultAgentConfig, parseAgentConfig } from "./agents.ts";
+import { type AgentKind, defaultAgentConfig, parseAgentConfig, type TelegramKind } from "./agents.ts";
 import type { Db } from "./client.server.ts";
 import {
   agentAlerts,
@@ -281,7 +281,7 @@ export function getTelegramLinks({ db, userId }: UserScope) {
   return db.select().from(telegramLinks).where(eq(telegramLinks.userId, userId));
 }
 
-export function getTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
+export function getTelegramLink({ db, userId }: UserScope, kind: TelegramKind) {
   return db
     .select()
     .from(telegramLinks)
@@ -292,11 +292,18 @@ export function getTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
 /** Stores the kind's bot (token already encrypted). Any earlier chat is dropped: it belonged to another bot. */
 export async function saveOwnBot(
   { db, userId }: UserScope,
-  kind: AgentKind,
+  kind: TelegramKind,
   encryptedToken: string,
   botUsername: string,
 ) {
-  const fresh = { botToken: encryptedToken, botUsername, chatId: null, username: null, linkedAt: null };
+  const fresh = {
+    botToken: encryptedToken,
+    botUsername,
+    chatId: null,
+    username: null,
+    linkedAt: null,
+    updateOffset: null,
+  };
   await db
     .insert(telegramLinks)
     .values({ userId, kind, ...fresh })
@@ -304,7 +311,7 @@ export async function saveOwnBot(
 }
 
 /** Binds the chat found on the kind's bot. False when no bot is saved for that kind. */
-export async function linkOwnBotChat({ db, userId }: UserScope, kind: AgentKind, chatId: bigint, username?: string) {
+export async function linkOwnBotChat({ db, userId }: UserScope, kind: TelegramKind, chatId: bigint, username?: string) {
   const rows = await db
     .update(telegramLinks)
     .set({ chatId, username: username ?? null, linkedAt: new Date() })
@@ -314,7 +321,7 @@ export async function linkOwnBotChat({ db, userId }: UserScope, kind: AgentKind,
 }
 
 /** Forgets the kind's bot and chat. The runner pauses that agent at its next alert. */
-export async function removeTelegramLink({ db, userId }: UserScope, kind: AgentKind) {
+export async function removeTelegramLink({ db, userId }: UserScope, kind: TelegramKind) {
   await db.delete(telegramLinks).where(and(eq(telegramLinks.userId, userId), eq(telegramLinks.kind, kind)));
 }
 

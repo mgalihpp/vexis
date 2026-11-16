@@ -4,7 +4,6 @@ import {
   activeModels,
   type Guardrails,
   type KeySource,
-  KILL_SWITCH,
   LLM_AGENTS,
   LLM_PROVIDERS,
   type LlmProvider,
@@ -15,34 +14,33 @@ import {
   PROPOSAL_PARAMS,
   parseGuardrails,
   parseScreen,
+  REFUSAL_TEXT,
   RiskNotes,
   utcDayStart,
   type WalletSource,
 } from "@vexis/db/office";
 import {
-  clearPause,
   closeJournal,
+  decideProposal as decide,
   getOfficeConfig,
-  getProposal,
   journalPnl,
+  killOffice,
   latestRuns,
   listJournal,
   listMessages,
   listProposals,
   llmSpendToday,
   type MessageRow,
-  moveProposal,
   type OfficeConfigRow,
   type ProposalRow,
   proposalCountsSince,
-  rejectUnexecuted,
+  resumeOffice as resume,
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser, getRebalanceWallet } from "@vexis/db/queries";
 import { encryptSecret } from "@vexis/db/secret";
 import { checkRpcUrl, keypairOf, rpcHost } from "@/features/agents/wallet.server";
 import type { ConfigView, MessageView, OfficeData, ProposalView } from "./office";
-import { pauseView } from "./office";
 
 // Every function takes the signed-in user's id from the viewer middleware and goes through `forUser`, so the
 // office of one user is never read or written by another. API keys, the office wallet's secret and its RPC URL
@@ -168,50 +166,27 @@ export async function loadFeed(userId: string, filter: { agent?: OfficeAgent; po
 
 // --- approvals ---------------------------------------------------------------------------------
 
-/**
- * The owner's decision on a waiting proposal. An approval is refused once the proposal expired or while the
- * office is paused; a proposal another actor moved first (expired, killed) is refused too.
- */
+/** The owner's decision on a waiting proposal, through the same path as the Telegram card. */
 export async function decideProposal(userId: string, proposalId: string, decision: "approve" | "reject") {
-  const s = scope(userId);
-  const [config, proposal] = await Promise.all([getOfficeConfig(s), getProposal(s, proposalId)]);
-  if (!config) throw new Error(NO_OFFICE);
-  if (!proposal) throw new Error("Proposal not found");
-  const decided = new Error("This proposal was already decided");
-  if (proposal.status !== "awaiting_approval") throw decided;
-  if (decision === "approve") {
-    const now = Date.now();
-    if (proposal.expiresAt.getTime() <= now) throw new Error("This proposal expired");
-    const pause = pauseView({ ...config, pausedUntil: config.pausedUntil?.getTime() ?? null }, now);
-    if (pause.state === "paused") throw new Error("The office is paused; nothing can be approved");
-  }
-  const to = decision === "approve" ? "approved" : "rejected";
-  const moved = await moveProposal(s, proposalId, "awaiting_approval", to, { decidedBy: "owner" });
-  if (!moved) throw decided;
+  const result = await decide(scope(userId), proposalId, decision, new Date());
+  if (!result.ok) throw new Error(REFUSAL_TEXT[result.refusal]);
 }
 
 // --- pause -------------------------------------------------------------------------------------
 
-/** Pauses the office and rejects every proposal that has not started executing. Returns how many. */
+/** Pauses the office and rejects every proposal that has not started executing; `/stop` does the same. */
 export async function killSwitch(userId: string) {
-  return getDb().transaction(async (tx) => {
-    const s = forUser(tx, userId);
-    const paused = await updateOfficeConfig(s, { paused: true, pausedReason: KILL_SWITCH, pausedUntil: null });
-    if (!paused) throw new Error(NO_OFFICE);
-    return rejectUnexecuted(s, "kill_switch");
-  });
+  const rejected = await killOffice(scope(userId));
+  if (rejected === null) throw new Error(NO_OFFICE);
+  return rejected;
 }
 
 /** Lifts a pause the owner may lift; an admin stop or a daily-loss pause before its time stays. */
 export async function resumeOffice(userId: string) {
-  const s = scope(userId);
-  const config = await getOfficeConfig(s);
-  if (!config) throw new Error(NO_OFFICE);
-  const now = new Date();
-  const pause = pauseView({ ...config, pausedUntil: config.pausedUntil?.getTime() ?? null }, now.getTime());
-  if (pause.state === "running") return;
-  if (!pause.canResume || !pause.reason) throw new Error("This pause cannot be lifted from here");
-  if (!(await clearPause(s, pause.reason, now))) throw new Error("The pause changed; reload the page");
+  const result = await resume(scope(userId), new Date());
+  if (result === "no_office") throw new Error(NO_OFFICE);
+  if (result === "locked") throw new Error("This pause cannot be lifted from here");
+  if (result === "changed") throw new Error("The pause changed; reload the page");
 }
 
 // --- positions ---------------------------------------------------------------------------------

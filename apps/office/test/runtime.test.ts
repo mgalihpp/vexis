@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { DAILY_LOSS, RiskNotes } from "@vexis/db/office";
+import { DAILY_LOSS, KILL_SWITCH, RiskNotes } from "@vexis/db/office";
 import { SCREENER_PRESETS } from "@vexis/db/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
+import { pollInbox } from "../src/inbox.ts";
+import { callbackData } from "../src/telegram.ts";
 import { tick } from "../src/tick.ts";
-import { MINUTE, office, openParams, POOL, proposal, setup, T0 } from "./fakes.ts";
+import { BOT_TOKEN, CHAT, MINUTE, office, openParams, POOL, PROPOSAL_ID, proposal, setup, T0 } from "./fakes.ts";
 
 const statuses = (s: ReturnType<typeof setup>) => s.db.proposals.map((p) => p.status);
 
@@ -178,5 +180,119 @@ describe("office tick", () => {
     await s.run(tick(), T0 + 3 * MINUTE);
     expect(s.db.offices[0]?.paused).toBe(false);
     expect(s.llm.calls.length).toBeGreaterThan(0);
+  });
+});
+
+describe("office on Telegram", () => {
+  const linked = (s: ReturnType<typeof setup>) =>
+    s.db.bots.set("user-1", { _tag: "ready", token: BOT_TOKEN, chatId: CHAT });
+  const waiting = (overrides: Parameters<typeof proposal>[0] = {}) =>
+    proposal({ id: PROPOSAL_ID, status: "awaiting_approval", telegramMessageId: 100, ...overrides });
+  const press = (decision: "approve" | "reject", chat = CHAT, id = 7) => ({
+    update_id: id,
+    callback_query: {
+      id: `cb-${id}`,
+      data: callbackData(decision, PROPOSAL_ID),
+      message: { message_id: 100, chat: { id: chat } },
+    },
+  });
+  const say = (text: string, id = 8) => ({ update_id: id, message: { chat: { id: CHAT }, text } });
+
+  test("a proposal that reaches the owner gets one card with Approve and Reject, and keeps its message id", async () => {
+    const s = setup();
+    linked(s);
+    await s.run(tick());
+    const [card] = s.telegram.sent;
+    expect(card?.chatId).toBe(CHAT);
+    expect(card?.text).toContain("Proposal: open JUP-SOL");
+    expect(card?.buttons.map((b) => b.text)).toEqual(["Approve", "Reject"]);
+    expect(s.db.proposals[0]).toMatchObject({ status: "awaiting_approval", telegramMessageId: card?.messageId });
+  });
+
+  test("no linked bot means no card and no pause; a failed send leaves the proposal approvable and tells the feed", async () => {
+    const none = setup();
+    await none.run(tick());
+    expect(none.telegram.sent).toHaveLength(0);
+    expect(none.db.offices[0]?.paused).toBe(false);
+
+    const failing = setup();
+    linked(failing);
+    failing.telegram.failing = true;
+    await failing.run(tick());
+    expect(failing.db.proposals[0]).toMatchObject({ status: "awaiting_approval", telegramMessageId: null });
+    expect(failing.db.messages.at(-1)?.text).toContain("The Telegram card was not delivered");
+  });
+
+  test("Approve decides through the shared path, answers the press and edits the card", async () => {
+    const s = setup({ proposals: [waiting()] });
+    linked(s);
+    s.telegram.inbox = [press("approve")];
+    await s.run(pollInbox());
+    expect(s.db.proposals[0]).toMatchObject({ status: "approved", decidedBy: "owner", telegramMessageId: null });
+    expect(s.telegram.answers).toEqual([{ callbackId: "cb-7", text: "Approved" }]);
+    expect(s.telegram.edits).toHaveLength(1);
+    expect(s.telegram.edits[0]?.text.endsWith("✅ Approved.")).toBe(true);
+    expect(s.db.bots.get("user-1")).toMatchObject({ offset: 8 });
+  });
+
+  test.each([
+    ["an expired proposal", { proposals: [waiting({ expiresAt: new Date(T0 - 1) })] }, "This proposal expired"],
+    [
+      "a paused office",
+      { offices: [office({ paused: true, pausedReason: KILL_SWITCH })], proposals: [waiting()] },
+      "The office is paused; nothing can be approved",
+    ],
+    [
+      "an already decided proposal",
+      { proposals: [waiting({ status: "rejected" })] },
+      "This proposal was already decided",
+    ],
+  ])("Approve on %s is refused and said so", async (_, seed, text) => {
+    const s = setup(seed);
+    linked(s);
+    s.telegram.inbox = [press("approve")];
+    await s.run(pollInbox());
+    expect(s.db.proposals[0]?.status).not.toBe("approved");
+    expect(s.telegram.answers).toEqual([{ callbackId: "cb-7", text }]);
+  });
+
+  test("a press from another chat is answered and ignored", async () => {
+    const s = setup({ proposals: [waiting()] });
+    linked(s);
+    s.telegram.inbox = [press("approve", 999)];
+    await s.run(pollInbox());
+    expect(s.db.proposals[0]?.status).toBe("awaiting_approval");
+    expect(s.telegram.answers).toEqual([{ callbackId: "cb-7", text: "" }]);
+    expect(s.telegram.edits).toHaveLength(0);
+  });
+
+  test("/stop is the kill switch and /resume lifts it; the killed card shows it", async () => {
+    const s = setup({ proposals: [waiting()] });
+    linked(s);
+    s.telegram.inbox = [say("/stop")];
+    await s.run(pollInbox());
+    expect(s.db.offices[0]).toMatchObject({ paused: true, pausedReason: KILL_SWITCH });
+    expect(s.db.proposals[0]).toMatchObject({ status: "rejected", decidedBy: "kill_switch" });
+    expect(s.telegram.sent.at(-1)?.text).toContain("Office stopped. 1 proposal(s) rejected.");
+    expect(s.telegram.edits[0]?.text.endsWith("🛑 Rejected by the kill switch.")).toBe(true);
+
+    s.telegram.inbox = [say("/resume", 9)];
+    await s.run(pollInbox());
+    expect(s.db.offices[0]?.paused).toBe(false);
+    expect(s.telegram.sent.at(-1)?.text).toBe("The office is running again.");
+    expect(s.telegram.polls).toEqual([null, 9]);
+  });
+
+  test("a card decided on the web or expired is edited at the next poll", async () => {
+    const s = setup({ offices: [office({ models: {} })], proposals: [waiting({ expiresAt: new Date(T0 - 1) })] });
+    linked(s);
+    await s.run(
+      Effect.gen(function* () {
+        yield* tick();
+        yield* pollInbox();
+        yield* pollInbox();
+      }),
+    );
+    expect(s.telegram.edits.map((e) => e.text.split("\n").at(-1))).toEqual(["⌛ Expired before anyone approved it."]);
   });
 });

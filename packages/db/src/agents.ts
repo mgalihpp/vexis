@@ -7,6 +7,10 @@ import { PoolFilter, PRESETS, SCREENER_MAX_BASELINE } from "./screen.ts";
 export const AGENT_KINDS = ["volume-watch", "auto-rebalance"] as const;
 export type AgentKind = (typeof AGENT_KINDS)[number];
 
+/** `telegram_links.kind`: one bot per agent kind, plus the office's approval bot. */
+export const TELEGRAM_KINDS = [...AGENT_KINDS, "office"] as const;
+export type TelegramKind = (typeof TELEGRAM_KINDS)[number];
+
 export const VOLUME_SOURCES = ["pools", "screener"] as const;
 export type VolumeSource = (typeof VOLUME_SOURCES)[number];
 

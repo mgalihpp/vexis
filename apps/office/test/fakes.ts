@@ -1,21 +1,36 @@
-import { type LlmAgent, OPEN_STATUSES, transition, utcDayStart } from "@vexis/db/office";
+import {
+  isPaused,
+  KILL_SWITCH,
+  type LlmAgent,
+  OPEN_STATUSES,
+  ownerCanResume,
+  pauseOf,
+  refuseDecision,
+  transition,
+  utcDayStart,
+} from "@vexis/db/office";
 import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow } from "@vexis/db/office-queries";
 import { Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";
-import { ChainError, LlmError, MeteoraError } from "../src/errors.ts";
+import { ChainError, LlmError, MeteoraError, TelegramError } from "../src/errors.ts";
 import type { OfficePool } from "../src/pools.ts";
 import { Chain, type PoolBins } from "../src/services/chain.ts";
-import { Db, type Spike, type WalletTarget } from "../src/services/db.ts";
+import { type BotTarget, Db, type Spike, type WalletTarget } from "../src/services/db.ts";
 import { Llm, type LlmRequest } from "../src/services/llm.ts";
 import { Meteora, Screener } from "../src/services/meteora.ts";
 import { OfficeState } from "../src/services/state.ts";
+import { Telegram } from "../src/services/telegram.ts";
+import type { Button, Update } from "../src/telegram.ts";
 
 export const MINUTE = 60_000;
 export const T0 = Date.UTC(2026, 0, 1, 12, 0, 0);
 export const POOL = "JUPpool1111111111111111111111111111111111";
 export const OTHER_POOL = "BONKpool111111111111111111111111111111111";
 export const TEST_RPC = "https://rpc.test/?api-key=secret-key";
+export const PROPOSAL_ID = "0b6f1d8e-3c4a-4d7e-9f10-2a3b4c5d6e7f";
+export const CHAT = 4242;
+export const BOT_TOKEN = "fake-bot-token";
 
 /** Runs an effect at `at` on a TestClock. The one `runPromise` is the test boundary. */
 export const runAt = <A, E>(effect: Effect.Effect<A, E>, at: number = T0) =>
@@ -75,6 +90,7 @@ export function proposal(overrides: Partial<ProposalRow> = {}): ProposalRow {
     signature: null,
     txError: null,
     expiresAt: new Date(T0 + 15 * MINUTE),
+    telegramMessageId: null,
     createdAt: new Date(T0),
     updatedAt: new Date(T0),
     ...overrides,
@@ -92,6 +108,8 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
     alerts: [] as (Spike & { userId: string })[],
     rebalancePools: new Map<string, string[]>(),
     wallets: new Map<string, WalletTarget>([["user-1", { _tag: "ready", owner: "OWNER1", rpcUrl: TEST_RPC }]]),
+    /** Office bots by user; none is linked unless a test adds one. */
+    bots: new Map<string, BotTarget & { offset?: number | null }>(),
   };
   let ids = 0;
   const id = (prefix: string) => `${prefix}-${++ids}`;
@@ -162,6 +180,55 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
       spikesSince: (userId, since) =>
         Effect.sync(() => state.alerts.filter((a) => a.userId === userId && a.at > since)),
       wallet: (row) => Effect.sync(() => state.wallets.get(row.userId) ?? { _tag: "missing" }),
+      officeBot: (userId) => Effect.sync(() => state.bots.get(userId) ?? { _tag: "missing" }),
+      polledBots: () =>
+        Effect.sync(() =>
+          [...state.bots].flatMap(([userId, b]) =>
+            b._tag === "ready" ? [{ userId, token: b.token, chatId: b.chatId, offset: b.offset ?? null }] : [],
+          ),
+        ),
+      setUpdateOffset: (userId, offset) =>
+        Effect.sync(() => {
+          const bot = state.bots.get(userId);
+          if (bot) state.bots.set(userId, { ...bot, offset });
+        }),
+      setCard: (userId, proposalId, messageId) =>
+        Effect.sync(() => {
+          const p = mine(userId).find((r) => r.id === proposalId);
+          if (p) p.telegramMessageId = messageId;
+        }),
+      settledCards: (userId) =>
+        Effect.sync(() => mine(userId).filter((p) => p.telegramMessageId !== null && p.status !== "awaiting_approval")),
+      decide: (userId, proposalId, decision, now) =>
+        Effect.sync(() => {
+          const row = state.offices.find((o) => o.userId === userId);
+          const p = mine(userId).find((r) => r.id === proposalId);
+          const refusal = refuseDecision(row && pauseOf(row), p, decision, now.getTime());
+          if (refusal || !p) return { ok: false, refusal: refusal ?? "not_found" } as const;
+          const status = transition(p.status, decision === "approve" ? "approved" : "rejected");
+          return { ok: true, proposal: Object.assign(p, { status, decidedBy: "owner" as const }) } as const;
+        }),
+      kill: (userId) =>
+        Effect.sync(() => {
+          const row = state.offices.find((o) => o.userId === userId);
+          if (!row) return null;
+          Object.assign(row, { paused: true, pausedReason: KILL_SWITCH, pausedUntil: null });
+          const open = mine(userId).filter((p) =>
+            ["draft", "risk_checked", "awaiting_approval", "approved"].includes(p.status),
+          );
+          for (const p of open) Object.assign(p, { status: "rejected", decidedBy: "kill_switch" });
+          return open.length;
+        }),
+      resume: (userId, now) =>
+        Effect.sync(() => {
+          const row = state.offices.find((o) => o.userId === userId);
+          if (!row) return "no_office" as const;
+          const pause = pauseOf(row);
+          if (!isPaused(pause, now.getTime())) return "running" as const;
+          if (!ownerCanResume(pause)) return "locked" as const;
+          Object.assign(row, { paused: false, pausedReason: null, pausedUntil: null });
+          return "resumed" as const;
+        }),
       setPause: (userId, pause) =>
         Effect.sync(() => {
           const row = state.offices.find((o) => o.userId === userId);
@@ -267,6 +334,50 @@ export function fakeLlm(replies: Partial<Record<LlmAgent, string>> = REPLIES) {
   return { state, layer };
 }
 
+/** Telegram stand-in: records what was sent, edited and answered; `inbox` is what the next poll returns. */
+export function fakeTelegram() {
+  const state = {
+    sent: [] as { chatId: number; text: string; buttons: readonly Button[]; messageId: number }[],
+    edits: [] as { messageId: number; text: string }[],
+    answers: [] as { callbackId: string; text: string }[],
+    polls: [] as (number | null)[],
+    inbox: [] as Update[],
+    failing: false,
+  };
+  const fail = (method: string) => Effect.fail(new TelegramError({ message: `${method}: HTTP 502` }));
+  const layer = Layer.succeed(
+    Telegram,
+    Telegram.of({
+      send: (_token, chatId, text, buttons = []) =>
+        Effect.suspend(() => {
+          if (state.failing) return fail("sendMessage");
+          const messageId = 100 + state.sent.length;
+          state.sent.push({ chatId, text, buttons, messageId });
+          return Effect.succeed(messageId);
+        }),
+      edit: (_token, _chatId, messageId, text) =>
+        Effect.suspend(() => {
+          if (state.failing) return fail("editMessageText");
+          state.edits.push({ messageId, text });
+          return Effect.void;
+        }),
+      updates: (_token, offset) =>
+        Effect.sync(() => {
+          state.polls.push(offset);
+          const updates = state.inbox.filter((u) => offset === null || u.update_id >= offset);
+          state.inbox = [];
+          const next = updates.length > 0 ? Math.max(...updates.map((u) => u.update_id)) + 1 : null;
+          return { updates, next };
+        }),
+      answer: (_token, callbackId, text) =>
+        Effect.sync(() => {
+          state.answers.push({ callbackId, text });
+        }),
+    }),
+  );
+  return { state, layer };
+}
+
 export const testConfig = Layer.succeed(AppConfig, AppConfig.of({ vexisKeys: { claude: Redacted.make("vexis-key") } }));
 
 /** Fresh fakes wired together; `run` gives every tick in one effect the same in-memory state and screener cache. */
@@ -275,15 +386,19 @@ export function setup(seed: Parameters<typeof fakeDb>[0] = {}) {
   const meteora = fakeMeteora();
   const chain = fakeChain();
   const llm = fakeLlm();
+  const telegram = fakeTelegram();
   const layer = Layer.mergeAll(
     db.layer,
     Screener.layer.pipe(Layer.provide(meteora.layer)),
     chain.layer,
     llm.layer,
     OfficeState.layer,
+    telegram.layer,
     testConfig,
   );
-  const run = <A, E>(effect: Effect.Effect<A, E, Db | Screener | Chain | Llm | OfficeState | AppConfig>, at = T0) =>
-    runAt(effect.pipe(Effect.provide(layer)), at);
-  return { db: db.state, meteora: meteora.state, chain: chain.state, llm: llm.state, run };
+  const run = <A, E>(
+    effect: Effect.Effect<A, E, Db | Screener | Chain | Llm | OfficeState | Telegram | AppConfig>,
+    at = T0,
+  ) => runAt(effect.pipe(Effect.provide(layer)), at);
+  return { db: db.state, meteora: meteora.state, chain: chain.state, llm: llm.state, telegram: telegram.state, run };
 }

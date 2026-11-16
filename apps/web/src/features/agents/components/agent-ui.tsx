@@ -11,12 +11,12 @@ import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
-  type AgentKind,
   type AgentStatus,
   BOT_TOKEN_PATTERN,
   type ConfigFields,
   MAX_POOLS,
   STATUS_LABEL,
+  type TelegramKind,
 } from "../agents";
 import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
@@ -619,8 +619,8 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
   );
 }
 
-/** Shows whether this agent's alerts have a chat to go to, and runs the bot link flow when they do not. */
-export function TelegramPanel({ kind }: { kind: AgentKind }) {
+/** Shows whether this kind's messages have a chat to go to, and runs the bot link flow when they do not. */
+export function TelegramPanel({ kind }: { kind: TelegramKind }) {
   const { data } = useSuspenseQuery(telegramQuery);
   const tg = data[kind];
   const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { kind, token } }));
@@ -636,7 +636,7 @@ export function TelegramPanel({ kind }: { kind: AgentKind }) {
   const [title, subtitle] = !bot
     ? tg.relink
       ? [`@${tg.relink}`, "Token needs to be pasted again"]
-      : ["Not connected", "Alerts go to your own Telegram bot"]
+      : ["Not connected", `${kind === "office" ? "Approval cards" : "Alerts"} go to your own Telegram bot`]
     : bot.linked
       ? [bot.chatUsername ? `@${bot.chatUsername}` : "Your chat", `via @${bot.username}`]
       : [`@${bot.username}`, "Waiting for /start"];
@@ -675,7 +675,10 @@ export function TelegramPanel({ kind }: { kind: AgentKind }) {
       {warn && (
         <p className="flex gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">
           <TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />
-          <span>The saved token can no longer be read, so no alerts are sent. Paste it again.</span>
+          <span>
+            The saved token can no longer be read, so no {kind === "office" ? "cards" : "alerts"} are sent. Paste it
+            again.
+          </span>
         </p>
       )}
 
