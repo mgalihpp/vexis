@@ -36,6 +36,7 @@ const config = (over: Partial<ConfigView> = {}): ConfigView => ({
   walletSource: "user",
   userWallet: null,
   officeWallet: null,
+  screen: { preset: "blue-chip", custom: null },
   ...over,
 });
 

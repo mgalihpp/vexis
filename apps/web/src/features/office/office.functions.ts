@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { Guardrails, KEY_SOURCES, LLM_PROVIDERS, OFFICE_AGENTS, OfficeModels, WALLET_SOURCES } from "@vexis/db/office";
+import { PoolFilter, PRESETS } from "@vexis/db/screen";
 import { z } from "zod";
 import { RpcUrlInput, SecretKeyInput } from "@/features/agents/wallet.server";
 import { PoolAddress } from "@/features/analytics/analytics.functions";
@@ -7,6 +8,7 @@ import { requireViewer } from "@/features/auth/auth.middleware";
 import {
   closeSimulated,
   decideProposal,
+  hasOffice,
   killSwitch,
   loadFeed,
   loadOffice,
@@ -18,6 +20,7 @@ import {
   saveLlmKey,
   saveModels,
   saveOfficeWallet,
+  saveScreen,
   saveWalletSource,
 } from "./office.server";
 
@@ -33,6 +36,15 @@ const ApiKey = z
 export const getOffice = createServerFn({ method: "GET" })
   .middleware([requireViewer])
   .handler(({ context }) => loadOffice(context.viewer.id));
+
+export const getOfficeEnabled = createServerFn({ method: "GET" })
+  .middleware([requireViewer])
+  .handler(({ context }) => hasOffice(context.viewer.id));
+
+export const saveScreenFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .validator(z.object({ preset: z.enum(PRESETS), custom: PoolFilter.optional() }))
+  .handler(({ context, data }) => saveScreen(context.viewer.id, data.preset, data.custom));
 
 export const getOfficeFeed = createServerFn({ method: "GET" })
   .middleware([requireViewer])

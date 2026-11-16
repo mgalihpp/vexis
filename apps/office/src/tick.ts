@@ -1,4 +1,13 @@
-import { activeModels, DAILY_LOSS, PROPOSAL_PARAMS, parseGuardrails, parseModels, utcDayStart } from "@vexis/db/office";
+import {
+  activeModels,
+  DAILY_LOSS,
+  officeFilter,
+  PROPOSAL_PARAMS,
+  parseGuardrails,
+  parseModels,
+  parseScreen,
+  utcDayStart,
+} from "@vexis/db/office";
 import type { OfficeConfigRow, ProposalRow } from "@vexis/db/office-queries";
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
@@ -34,6 +43,7 @@ const parse = (row: OfficeConfigRow) =>
     try: () => ({
       guardrails: parseGuardrails(row.guardrails),
       models: activeModels(row.keySource, parseModels(row.models)),
+      filter: officeFilter(parseScreen(row)),
     }),
     catch: (cause) => new BadOfficeConfig({ userId: row.userId, cause }),
   });

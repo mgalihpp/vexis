@@ -65,7 +65,14 @@ try {
     );
     for (const o of offices) {
       const pause = o.paused ? `paused (${o.pausedReason ?? "by owner"})` : "running";
-      console.log(`${emails.get(o.userId) ?? o.userId}  ${pause}  keys ${o.keySource}  cap $${o.vexisDailyUsd}`);
+      const pools =
+        o.poolPreset !== "custom"
+          ? o.poolPreset
+          : o.poolFilter
+            ? `custom ${JSON.stringify(o.poolFilter)}`
+            : "custom with no filter (Scout stopped)";
+      const who = emails.get(o.userId) ?? o.userId;
+      console.log(`${who}  ${pause}  keys ${o.keySource}  cap $${o.vexisDailyUsd}  pools ${pools}`);
     }
     console.log(`${offices.length} office(s)`);
   } else {

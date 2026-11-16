@@ -66,6 +66,7 @@ import {
   warnings,
 } from "../screener";
 import { AlertButton } from "./alert-button";
+import { OfficeButton } from "./office-button";
 
 export interface ScreenerView {
   sort: SortKey;
@@ -227,6 +228,7 @@ export function ScreenerPage({
         <h1 className="truncate font-brand text-xl font-bold tracking-tight md:text-2xl">Pool screener</h1>
         <div className="flex shrink-0 items-center gap-3">
           <Updated at={data.at} />
+          <OfficeButton filter={alertFilter(filters)} />
           <AlertButton filter={alertFilter(filters)} />
         </div>
       </header>

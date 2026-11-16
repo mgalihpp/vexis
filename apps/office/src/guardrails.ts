@@ -44,7 +44,7 @@ export const budgetLeft = (spentUsd: number, capUsd: number) => spentUsd < capUs
  * Every hard rule for an `open` proposal. A rule that cannot be evaluated (wallet unread, pool unknown) fails: the
  * code never guesses in the proposal's favor. The proposal passes only when every check is ok.
  */
-export function checkOpen(g: Guardrails, filter: PoolFilter, f: RiskFacts): GuardrailCheck[] {
+export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts): GuardrailCheck[] {
   const { amountSol } = f.params;
   const wallet = f.walletSol;
   const cap = wallet === null ? null : (wallet * g.maxPositionPct) / 100;
@@ -74,7 +74,7 @@ export function checkOpen(g: Guardrails, filter: PoolFilter, f: RiskFacts): Guar
     },
     {
       rule: "pool_alertable",
-      ok: f.pool !== null && alertable(f.pool, filter),
+      ok: f.pool !== null && filter !== null && alertable(f.pool, filter),
       value: poolVerdict(f.pool, filter),
     },
     {
@@ -96,9 +96,11 @@ export function checkOpen(g: Guardrails, filter: PoolFilter, f: RiskFacts): Guar
   ];
 }
 
-function poolVerdict(pool: FilterPool | null, filter: PoolFilter) {
+function poolVerdict(pool: FilterPool | null, filter: PoolFilter | null) {
+  if (filter === null) return "no pool filter";
   if (pool === null) return "not on the screener list";
   if (pool.blacklisted) return "blacklisted";
   if (pool.freezable) return "freeze authority held";
+  if (filter.minOrganic > 0 && pool.baseOrganic === null) return "organic score unknown";
   return alertable(pool, filter) ? "passes the screen" : "outside the screen";
 }

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { Guardrails } from "@vexis/db/office";
+import { SCREENER_PRESETS } from "@vexis/db/screen";
 import { checkOpen, dailyCapUsd, dailyLossHit, dailyLossPct, type RiskFacts } from "../src/guardrails.ts";
-import { OFFICE_FILTER } from "../src/pools.ts";
 import { pool, T0 } from "./fakes.ts";
 
 // Defaults: 25% max position, 3 positions, 5% daily loss, 0.1 SOL reserve, 300 s cooldown, $1 own-key budget.
 const g = Guardrails.parse({});
+const BLUE_CHIP = SCREENER_PRESETS["blue-chip"].filter;
 
 const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
   params: { strategy: "Spot", activeBin: 100, lowerBin: 90, upperBin: 110, amountSol: 1, solUsd: 150 },
@@ -22,11 +23,11 @@ const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
 });
 
 const params = (amountSol: number) => ({ ...facts().params, amountSol });
-const verdict = (rule: string, f: RiskFacts) => checkOpen(g, OFFICE_FILTER, f).find((c) => c.rule === rule)?.ok;
+const verdict = (rule: string, f: RiskFacts) => checkOpen(g, BLUE_CHIP, f).find((c) => c.rule === rule)?.ok;
 
 describe("checkOpen", () => {
   test("a sound proposal passes every rule", () => {
-    expect(checkOpen(g, OFFICE_FILTER, facts()).every((c) => c.ok)).toBe(true);
+    expect(checkOpen(g, BLUE_CHIP, facts()).every((c) => c.ok)).toBe(true);
   });
 
   test.each([
@@ -56,10 +57,23 @@ describe("checkOpen", () => {
   });
 
   test("a failing rule says why", () => {
-    const pooled = checkOpen(g, OFFICE_FILTER, facts({ pool: pool({ blacklisted: true }) }));
+    const pooled = checkOpen(g, BLUE_CHIP, facts({ pool: pool({ blacklisted: true }) }));
     expect(pooled.find((c) => c.rule === "pool_alertable")?.value).toBe("blacklisted");
-    const wallet = checkOpen(g, OFFICE_FILTER, facts({ walletSol: null }));
+    const wallet = checkOpen(g, BLUE_CHIP, facts({ walletSol: null }));
     expect(wallet.find((c) => c.rule === "max_position_pct")?.value).toBe("wallet unread");
+  });
+
+  test("pool_alertable reads the office's own filter, and an unknown organic score fails an organic bound", () => {
+    const check = (filter: typeof BLUE_CHIP | null, p = pool()) =>
+      checkOpen(g, filter, facts({ pool: p })).find((c) => c.rule === "pool_alertable");
+    const midCap = pool({ tvl: 100_000, volume24h: 200_000, baseMcap: 20_000_000, binStep: 50, baseOrganic: 70 });
+    expect(check(SCREENER_PRESETS["mid-cap"].filter, midCap)?.ok).toBe(true);
+    expect(check(BLUE_CHIP, midCap)?.ok).toBe(false);
+    expect(check(SCREENER_PRESETS["mid-cap"].filter, { ...midCap, baseOrganic: null })).toMatchObject({
+      ok: false,
+      value: "organic score unknown",
+    });
+    expect(check(null)).toMatchObject({ ok: false, value: "no pool filter" });
   });
 });
 

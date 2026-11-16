@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DAILY_LOSS, RiskNotes } from "@vexis/db/office";
+import { SCREENER_PRESETS } from "@vexis/db/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { tick } from "../src/tick.ts";
@@ -114,6 +115,42 @@ describe("office tick", () => {
     );
     expect(s.meteora.calls).toBe(1);
     expect(s.llm.calls.filter((c) => c.agent === "scout")).toHaveLength(3);
+  });
+
+  test("the Scout screens with the office's preset, or a custom filter", async () => {
+    const midCap = setup({ offices: [office({ poolPreset: "mid-cap" })] });
+    await midCap.run(tick());
+    expect(midCap.llm.calls.filter((c) => c.agent === "scout")).toHaveLength(0);
+    expect(midCap.db.messages.map((m) => m.text)).toContain("No pool passes the screen right now.");
+
+    const filter = {
+      ...SCREENER_PRESETS["mid-cap"].filter,
+      minMcap: 0,
+      maxMcap: 0,
+      minStep: 0,
+      maxStep: 20,
+      minOrganic: 0,
+    };
+    const custom = setup({ offices: [office({ poolPreset: "mid-cap", poolFilter: filter })] });
+    await custom.run(tick());
+    expect(custom.llm.calls.filter((c) => c.agent === "scout")).toHaveLength(0);
+    const picked = setup({ offices: [office({ poolPreset: "custom", poolFilter: filter })] });
+    await picked.run(tick());
+    expect(picked.llm.calls.filter((c) => c.agent === "scout")).toHaveLength(1);
+  });
+
+  test("custom with no filter never scouts or falls back, and says so once a day", async () => {
+    const s = setup({ offices: [office({ poolPreset: "custom", poolFilter: null })] });
+    await s.run(
+      Effect.gen(function* () {
+        yield* tick();
+        yield* TestClock.adjust(16 * MINUTE);
+        yield* tick();
+      }),
+    );
+    expect(s.meteora.calls).toBe(0);
+    expect(s.llm.calls).toHaveLength(0);
+    expect(s.db.messages.filter((m) => m.text.startsWith("The custom pool filter is empty"))).toHaveLength(1);
   });
 
   test("a daily loss over the limit pauses the office until the next UTC midnight", async () => {

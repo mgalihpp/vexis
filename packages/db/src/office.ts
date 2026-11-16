@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { REBALANCE_STRATEGIES } from "./agents.ts";
+import { PoolFilter, PRESETS, presetFilter } from "./screen.ts";
 
 // The virtual office: four LLM agents propose, guardrails in code check, the owner approves. Shared by the web app,
 // `apps/office` and (from V1) the runner. Every jsonb column here is parsed with these schemas on write and on read.
@@ -124,6 +125,22 @@ export type Guardrails = z.infer<typeof Guardrails>;
 
 export const parseGuardrails = (raw: unknown) => Guardrails.parse(raw ?? {});
 export const parseModels = (raw: unknown) => OfficeModels.parse(raw ?? {});
+
+/**
+ * The screener pools the office scouts and its Risk Manager allows: a preset, or the owner's custom filter (handed
+ * over by the screener). Custom with no filter is stored as is and stops the Scout; it never falls back to a preset.
+ */
+export const OfficeScreen = z.object({
+  preset: z.enum(PRESETS).default("blue-chip"),
+  custom: PoolFilter.nullable().default(null),
+});
+export type OfficeScreen = z.infer<typeof OfficeScreen>;
+
+export const parseScreen = (row: { poolPreset: string | null; poolFilter: unknown }) =>
+  OfficeScreen.parse({ preset: row.poolPreset ?? undefined, custom: row.poolFilter ?? null });
+
+/** The filter the office screens with; null for custom with no filter. */
+export const officeFilter = (s: OfficeScreen) => presetFilter(s.preset, s.custom);
 
 // --- proposals -------------------------------------------------------------------------------
 

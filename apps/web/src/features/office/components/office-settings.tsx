@@ -15,6 +15,7 @@ import {
   BotIcon,
   BrainIcon,
   CoinsIcon,
+  DropletsIcon,
   GlobeIcon,
   KeyRoundIcon,
   type LucideIcon,
@@ -31,6 +32,7 @@ import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/compone
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import { errorText, FormError } from "@/features/agents/components/agent-ui";
+import { PresetPicker } from "@/features/agents/components/screener-source";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { shortAddr } from "@/lib/format";
 import { AGENT_INFO, type ConfigView, missingKeys } from "../office";
@@ -42,6 +44,7 @@ import {
   saveLlmKeyFn,
   saveModelsFn,
   saveOfficeWalletFn,
+  saveScreenFn,
   saveWalletSourceFn,
 } from "../office.functions";
 import { Portrait } from "./agent-card";
@@ -69,6 +72,7 @@ function Save({ disabled, pending, children }: { disabled: boolean; pending: boo
 
 const SECTIONS = [
   { value: "models", label: "Models", Icon: BrainIcon, Page: ModelsPage },
+  { value: "pools", label: "Pools", Icon: DropletsIcon, Page: PoolsPage },
   { value: "keys", label: "API keys", Icon: KeyRoundIcon, Page: KeysPage },
   { value: "wallet", label: "Wallet", Icon: WalletIcon, Page: WalletPage },
   { value: "guardrails", label: "Guardrails", Icon: ShieldCheckIcon, Page: GuardrailsPage },
@@ -76,7 +80,7 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]["value"];
 
 /**
- * Everything the owner sets: models, keys, wallet and guardrails, laid out like the app's Settings dialog (a bottom
+ * Everything the owner sets: models, pools, keys, wallet and guardrails, laid out like the app's Settings dialog (a bottom
  * drawer with every section on phones). Every write is checked by its zod schema.
  */
 export function OfficeSettings({
@@ -97,7 +101,7 @@ export function OfficeSettings({
         <DrawerContent className="h-[90dvh] data-[vaul-drawer-direction=bottom]:max-h-[90dvh]">
           <div className="flex h-12 shrink-0 items-center justify-center border-b px-4">
             <DrawerTitle className="text-sm font-semibold">Office settings</DrawerTitle>
-            <DrawerDescription className="sr-only">Models, keys, wallet and guardrails</DrawerDescription>
+            <DrawerDescription className="sr-only">Models, pools, keys, wallet and guardrails</DrawerDescription>
           </div>
           <div className="flex min-h-0 flex-1 flex-col gap-8 overflow-y-auto px-4 pt-3 pb-8">
             {SECTIONS.map(({ value, label, Page }) => (
@@ -117,7 +121,7 @@ export function OfficeSettings({
       <DialogContent className="flex h-[min(46rem,90dvh)] flex-row gap-0 overflow-hidden p-0 sm:max-w-4xl">
         <nav className="flex w-56 shrink-0 flex-col gap-1 border-r bg-muted/30 p-3">
           <DialogTitle className="px-2 pt-1 pb-3 text-sm font-semibold">Office settings</DialogTitle>
-          <DialogDescription className="sr-only">Models, keys, wallet and guardrails</DialogDescription>
+          <DialogDescription className="sr-only">Models, pools, keys, wallet and guardrails</DialogDescription>
           {SECTIONS.map(({ value, label, Icon }) => (
             <button
               key={value}
@@ -145,6 +149,35 @@ export function OfficeSettings({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function PoolsPage({ config }: { config: ConfigView }) {
+  const [preset, setPreset] = useState(config.screen.preset);
+  const save = useOfficeMutation(saveScreenFn);
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate({ data: { preset } }, { onSuccess: () => toast.success("Pool filter saved") });
+      }}
+    >
+      <p className="px-3 text-xs text-muted-foreground">
+        The Scout reads only the screener pools this filter passes, and the Risk Manager vetoes any other. Blacklisted
+        pools and tokens whose freeze authority is still held never pass.
+      </p>
+      <PresetPicker
+        selected={preset}
+        custom={config.screen.custom}
+        onPick={(id) => id !== "pools" && setPreset(id)}
+        customHint="Filter the screener, then press “Scout pools like these” to hand the filter to the office."
+      />
+      <FormError error={save.error} />
+      <Save disabled={preset === config.screen.preset} pending={save.isPending}>
+        Save pool filter
+      </Save>
+    </form>
   );
 }
 

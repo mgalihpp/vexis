@@ -9,6 +9,7 @@ import {
   runCost,
 } from "@vexis/db/office";
 import type { OfficeConfigRow } from "@vexis/db/office-queries";
+import type { PoolFilter } from "@vexis/db/screen";
 import { Clock, Effect, Option, Result } from "effect";
 import { AppConfig, llmKey } from "./config.ts";
 import { parseDecision } from "./decision.ts";
@@ -24,6 +25,8 @@ export type Office = {
   readonly userId: string;
   readonly guardrails: Guardrails;
   readonly models: OfficeModels;
+  /** The office's pool screen; null for a custom choice with no filter, which stops the Scout. */
+  readonly filter: PoolFilter | null;
   readonly now: number;
 };
 

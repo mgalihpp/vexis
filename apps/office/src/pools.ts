@@ -1,10 +1,7 @@
-import { type FilterPool, SCREENER_PRESETS } from "@vexis/db/screen";
+import type { FilterPool } from "@vexis/db/screen";
 
-/**
- * The office trades blue chips only in the MVP: verified tokens, $100M+ market cap, $500k TVL and volume, bin step
- * up to 20. It needs no organic score, so the screener list costs one datapi request and no discovery request.
- */
-export const OFFICE_FILTER = SCREENER_PRESETS["blue-chip"].filter;
+// Each office screens this list with its own filter (`office_config.pool_preset`, or `pool_filter` for custom),
+// resolved in `tick.ts`. The Scout and the Risk Manager's `pool_alertable` check read the same filter.
 
 export const WSOL_MINT = "So11111111111111111111111111111111111111112";
 

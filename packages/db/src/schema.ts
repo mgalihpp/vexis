@@ -40,6 +40,7 @@ import {
   WALLET_SOURCES,
   type WalletSource,
 } from "./office.ts";
+import { PRESETS, type PresetChoice } from "./screen.ts";
 
 // Two kinds of tables live here:
 //
@@ -445,6 +446,9 @@ export const officeConfig = pgTable(
     officePublicKey: text("office_public_key"),
     officeSecretKey: text("office_secret_key"),
     officeRpcUrl: text("office_rpc_url"),
+    /** A preset id, never its filter, so tuning a preset reaches every office on it; `custom` reads `pool_filter`. */
+    poolPreset: text("pool_preset").$type<PresetChoice>().notNull().default("blue-chip"),
+    poolFilter: jsonb("pool_filter").$type<Record<string, unknown>>(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -452,6 +456,7 @@ export const officeConfig = pgTable(
     enumCheck("office_config_mode_check", "mode", OFFICE_MODES),
     enumCheck("office_config_key_source_check", "key_source", KEY_SOURCES),
     enumCheck("office_config_wallet_source_check", "wallet_source", WALLET_SOURCES),
+    enumCheck("office_config_pool_preset_check", "pool_preset", PRESETS),
   ],
 ).enableRLS();
 

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
+import { alertable, presetFilter } from "@vexis/db/screen";
 import {
   CheckIcon,
   FlameIcon,
@@ -9,13 +10,14 @@ import {
   SlidersHorizontalIcon,
   TrendingUpIcon,
 } from "lucide-react";
+import { asFilterPool } from "@/features/screener/screener";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import {
-  DEFAULT_CONFIG,
   type Draft,
   describeFilter,
   formatMinutes,
   MAX_POOLS,
+  type PoolFilter,
   PRESET_IDS,
   type PresetChoice,
   presetLabel,
@@ -26,8 +28,9 @@ import {
 import { PoolsTable } from "./pools-table";
 
 type Source = Draft["source"];
+type Choice = "pools" | PresetChoice;
 
-const SOURCE_ICON: Record<"pools" | PresetChoice, LucideIcon> = {
+const SOURCE_ICON: Record<Choice, LucideIcon> = {
   pools: ListIcon,
   "blue-chip": GemIcon,
   "mid-cap": TrendingUpIcon,
@@ -35,18 +38,34 @@ const SOURCE_ICON: Record<"pools" | PresetChoice, LucideIcon> = {
   custom: SlidersHorizontalIcon,
 };
 
+type PickerOption = { id: Choice; name: string; sub: string; meta?: string; disabled?: boolean };
+
 /**
- * Where a volume-watch agent finds its pools: picked by hand, or every screener pool that passes a preset. Match counts
- * read the screener list the screener page already polls, so they cost no extra datapi request.
+ * The screener presets plus Custom, each with how many screener pools it passes now. Counts read the screener list
+ * the screener page already polls, so they cost no extra datapi request. Custom is disabled until the screener hands
+ * over a filter (`customHint` says how).
  */
-export function SourcePicker({ value, onChange }: { value: Source; onChange: (next: Source) => void }) {
+export function PresetPicker({
+  selected,
+  custom,
+  onPick,
+  customHint,
+  lead = [],
+}: {
+  selected: Choice;
+  custom: PoolFilter | null;
+  onPick: (id: Choice) => void;
+  customHint: string;
+  lead?: PickerOption[];
+}) {
   const { data } = useQuery(screenerQuery);
   const count = (preset: PresetChoice) => {
-    const matches = data && screenerMatches({ ...DEFAULT_CONFIG, ...value, source: "screener", preset }, data.pools);
-    return matches ? `${matches.length} pools now` : "Counting…";
+    const filter = presetFilter(preset, custom);
+    if (!data || !filter) return "Counting…";
+    return `${data.pools.filter((p) => alertable(asFilterPool(p), filter)).length} pools now`;
   };
-  const options: { id: "pools" | PresetChoice; name: string; sub: string; meta?: string; disabled?: boolean }[] = [
-    { id: "pools", name: "Pools you pick", sub: `Up to ${MAX_POOLS} pools, chosen by hand` },
+  const options: PickerOption[] = [
+    ...lead,
     ...PRESET_IDS.map((id) => ({
       id,
       name: SCREENER_PRESETS[id].label,
@@ -56,16 +75,11 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
     {
       id: "custom",
       name: "Custom",
-      sub: value.custom
-        ? describeFilter(value.custom)
-        : "Filter the screener, then press “Alert on pools like these” to watch its pools.",
-      meta: value.custom ? count("custom") : undefined,
-      disabled: !value.custom,
+      sub: custom ? describeFilter(custom) : customHint,
+      meta: custom ? count("custom") : undefined,
+      disabled: !custom,
     },
   ];
-  const selected = value.source === "pools" ? "pools" : value.preset;
-  const pick = (id: "pools" | PresetChoice) =>
-    onChange(id === "pools" ? { ...value, source: "pools" } : { ...value, source: "screener", preset: id });
 
   return (
     <div className="space-y-2">
@@ -78,7 +92,7 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
                 type="button"
                 disabled={o.disabled}
                 aria-pressed={selected === o.id}
-                onClick={() => pick(o.id)}
+                onClick={() => onPick(o.id)}
                 className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left ${
                   o.disabled ? "opacity-60" : selected === o.id ? "border-brand/50 bg-brand/5" : "hover:bg-muted/40"
                 }`}
@@ -103,7 +117,7 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
           );
         })}
       </ul>
-      {!value.custom && (
+      {!custom && (
         <p className="text-xs text-muted-foreground">
           <Link to="/screener" className="font-medium text-brand hover:underline">
             Open the screener
@@ -112,6 +126,21 @@ export function SourcePicker({ value, onChange }: { value: Source; onChange: (ne
         </p>
       )}
     </div>
+  );
+}
+
+/** Where a volume-watch agent finds its pools: picked by hand, or every screener pool that passes a preset. */
+export function SourcePicker({ value, onChange }: { value: Source; onChange: (next: Source) => void }) {
+  return (
+    <PresetPicker
+      selected={value.source === "pools" ? "pools" : value.preset}
+      custom={value.custom}
+      customHint="Filter the screener, then press “Alert on pools like these” to watch its pools."
+      lead={[{ id: "pools", name: "Pools you pick", sub: `Up to ${MAX_POOLS} pools, chosen by hand` }]}
+      onPick={(id) =>
+        onChange(id === "pools" ? { ...value, source: "pools" } : { ...value, source: "screener", preset: id })
+      }
+    />
   );
 }
 
