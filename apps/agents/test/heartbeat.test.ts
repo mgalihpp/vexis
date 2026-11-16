@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { judge } from "@vexis/db/heartbeat";
+import { judge } from "@vexis/shared/heartbeat";
 import { Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { tracked, watchdog } from "../src/heartbeat/heartbeat.ts";

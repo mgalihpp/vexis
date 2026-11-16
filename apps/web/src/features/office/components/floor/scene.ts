@@ -1,4 +1,4 @@
-import type { OfficeAgent } from "@vexis/db/office";
+import type { OfficeAgent } from "@vexis/shared/office";
 import type { DeskStatus } from "../../office";
 import { type Expr, type Pose, SPRITE_H, SPRITE_W, sprite } from "./sprites";
 import {

@@ -1,5 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
-import type { OfficeAgent } from "@vexis/db/office";
+import type { OfficeAgent } from "@vexis/shared/office";
 import { pollMs } from "./office";
 import { getOffice, getOfficeEnabled, getOfficeFeed } from "./office.functions";
 

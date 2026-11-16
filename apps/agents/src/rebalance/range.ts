@@ -1,4 +1,4 @@
-import type { AutoRebalanceConfig } from "@vexis/db/agents";
+import type { AutoRebalanceConfig } from "@vexis/shared/agents";
 
 /** One of the wallet's positions in a pool, as read on-chain. */
 export type OnChainPosition = {

@@ -8,7 +8,7 @@ import {
   type ZapInDlmmResponse,
 } from "@meteora-ag/zap-sdk";
 import { Keypair, PublicKey, type Transaction } from "@solana/web3.js";
-import type { AutoRebalanceConfig } from "@vexis/db/agents";
+import type { AutoRebalanceConfig } from "@vexis/shared/agents";
 import BN from "bn.js";
 import { ataBalance, executeSweepToSol } from "./fee-execute.ts";
 import { solToLamports, WSOL_MINT } from "./fees.ts";

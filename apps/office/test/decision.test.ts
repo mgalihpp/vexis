@@ -5,7 +5,7 @@ import {
   RiskDecision,
   ScoutDecision,
   StrategistDecision,
-} from "@vexis/db/office-prompts";
+} from "@vexis/shared/office-prompts";
 import type { z } from "zod";
 import { POOL } from "./fakes.ts";
 

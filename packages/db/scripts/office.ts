@@ -7,10 +7,10 @@
 
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { ADMIN_STOP } from "@vexis/shared/office";
 import { and, eq } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
 import { disableOffice, enableOffice, listOffices, stopAllOffices } from "../src/office.server.ts";
-import { ADMIN_STOP } from "../src/office.ts";
 import { forUser } from "../src/queries.server.ts";
 import { officeConfig, users } from "../src/schema.ts";
 

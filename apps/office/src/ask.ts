@@ -1,4 +1,5 @@
-import { budgetLeft, dailyCapUsd } from "@vexis/db/guardrails";
+import type { OfficeConfigRow } from "@vexis/db/office-queries";
+import { budgetLeft, dailyCapUsd } from "@vexis/shared/guardrails";
 import {
   type AgentModel,
   type Guardrails,
@@ -8,10 +9,9 @@ import {
   type OfficeModels,
   PROVIDER_LABEL,
   runCost,
-} from "@vexis/db/office";
-import { type Prompt, parseDecision } from "@vexis/db/office-prompts";
-import type { OfficeConfigRow } from "@vexis/db/office-queries";
-import type { PoolFilter } from "@vexis/db/screen";
+} from "@vexis/shared/office";
+import { type Prompt, parseDecision } from "@vexis/shared/office-prompts";
+import type { PoolFilter } from "@vexis/shared/screen";
 import { Clock, Effect, Option, Result } from "effect";
 import { AppConfig, llmKey } from "./config.ts";
 import { Db, type NewMessage, type NewThread } from "./services/db.ts";

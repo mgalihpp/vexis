@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { alertable, presetFilter } from "@vexis/db/screen";
+import { alertable, presetFilter } from "@vexis/shared/screen";
 import {
   CheckIcon,
   FlameIcon,

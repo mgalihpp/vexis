@@ -9,11 +9,11 @@
 
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { generateWalletKeypair } from "@vexis/shared/secret";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
 import { type Rewrap, rewrapSymmetric, rewrapWalletSecret } from "../src/rewrap.ts";
 import { officeConfig, rebalanceWallets } from "../src/schema.ts";
-import { generateWalletKeypair } from "../src/secret.ts";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));

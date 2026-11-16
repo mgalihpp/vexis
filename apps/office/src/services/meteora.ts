@@ -1,5 +1,5 @@
-import { datapiBackgroundFetch } from "@vexis/db/datapi-budget";
-import { filterPool } from "@vexis/db/screen";
+import { datapiBackgroundFetch } from "@vexis/shared/datapi-budget";
+import { filterPool } from "@vexis/shared/screen";
 import { Clock, Config, Context, Effect, flow, Layer, Option, Ref, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { MeteoraError } from "../errors.ts";

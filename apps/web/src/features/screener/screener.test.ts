@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { alertable } from "@vexis/db/screen";
+import { alertable } from "@vexis/shared/screen";
 import {
   alertFilter,
   asFilterPool,

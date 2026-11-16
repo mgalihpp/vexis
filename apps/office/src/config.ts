@@ -1,5 +1,5 @@
-import { type KeySource, LLM_PROVIDERS, type LlmProvider } from "@vexis/db/office";
-import { decryptSecret } from "@vexis/db/secret";
+import { type KeySource, LLM_PROVIDERS, type LlmProvider } from "@vexis/shared/office";
+import { decryptSecret } from "@vexis/shared/secret";
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect";
 
 /** Env var holding Vexis's own key per provider, for offices on key source `vexis`. */

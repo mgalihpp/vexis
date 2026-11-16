@@ -1,4 +1,4 @@
-import type { OfficeAgent } from "@vexis/db/office";
+import type { OfficeAgent } from "@vexis/shared/office";
 import { type Ctx, canvas, shade } from "./world";
 
 // The seven characters as 12×22 pixel sprites (14×24 with the outline): four humans for the LLM agents, three

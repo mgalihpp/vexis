@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { DAILY_LOSS, KILL_SWITCH, RiskNotes } from "@vexis/db/office";
-import { SCREENER_PRESETS } from "@vexis/db/screen";
+import { DAILY_LOSS, KILL_SWITCH, RiskNotes } from "@vexis/shared/office";
+import { SCREENER_PRESETS } from "@vexis/shared/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
 import { pollInbox } from "../src/inbox.ts";

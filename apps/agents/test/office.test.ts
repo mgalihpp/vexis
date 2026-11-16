@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { EXECUTION_FAILING, Guardrails, KILL_SWITCH, RiskNotes } from "@vexis/db/office";
-import type { PositionPnl } from "@vexis/db/pnl";
+import { EXECUTION_FAILING, Guardrails, KILL_SWITCH, RiskNotes } from "@vexis/shared/office";
+import type { PositionPnl } from "@vexis/shared/pnl";
 import { Effect, Layer } from "effect";
 import { BOOK_DELAY_MS, officeBookkeeper } from "../src/office/bookkeeper.ts";
 import { officeExecutor } from "../src/office/executor.ts";

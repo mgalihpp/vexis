@@ -11,8 +11,8 @@ import {
   OfficeModels,
   PROVIDER_LABEL,
   WALLET_SOURCES,
-} from "@vexis/db/office";
-import { PROMPT_TEXT } from "@vexis/db/office-prompts";
+} from "@vexis/shared/office";
+import { PROMPT_TEXT } from "@vexis/shared/office-prompts";
 import {
   BotIcon,
   BrainIcon,

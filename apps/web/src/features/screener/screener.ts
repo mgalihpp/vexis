@@ -1,4 +1,4 @@
-import { baseOf, type FilterToken, filterPool, inBounds, type PoolFilter, QUOTES } from "@vexis/db/screen";
+import { baseOf, type FilterToken, filterPool, inBounds, type PoolFilter, QUOTES } from "@vexis/shared/screen";
 
 export const WINDOWS = ["30m", "1h", "2h", "4h", "12h", "24h"] as const;
 export type FeeWindow = (typeof WINDOWS)[number];

@@ -12,6 +12,7 @@
     "@meteora-ag/dlmm": "^1.9.14",
     "@solana/web3.js": "^1.98.4",
     "@vexis/db": "workspace:*",
+    "@vexis/shared": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "effect": "^4.1.1",
     "zod": "^4.6.7"

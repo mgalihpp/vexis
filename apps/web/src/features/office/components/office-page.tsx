@@ -1,5 +1,5 @@
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { type OfficeAgent, OPEN_STATUSES } from "@vexis/db/office";
+import { type OfficeAgent, OPEN_STATUSES } from "@vexis/shared/office";
 import {
   Building2Icon,
   OctagonPauseIcon,

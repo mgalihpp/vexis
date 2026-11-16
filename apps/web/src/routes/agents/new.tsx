@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PoolFilter } from "@vexis/db/screen";
+import { PoolFilter } from "@vexis/shared/screen";
 import { z } from "zod";
 import { WIZARD_STEPS } from "@/features/agents/agents";
 import { agentsQuery, telegramQuery, walletQuery } from "@/features/agents/agents.queries";

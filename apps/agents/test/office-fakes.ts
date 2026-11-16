@@ -1,4 +1,4 @@
-import { OPEN_STATUSES, transition } from "@vexis/db/office";
+import { OPEN_STATUSES, transition } from "@vexis/shared/office";
 import { Effect, Layer } from "effect";
 import {
   type JournalRow,

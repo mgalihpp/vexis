@@ -1,4 +1,4 @@
-import { judge, type Runtime, type ScheduleName, verdictText } from "@vexis/db/heartbeat";
+import { judge, type Runtime, type ScheduleName, verdictText } from "@vexis/shared/heartbeat";
 import { Clock, Effect, type Schedule } from "effect";
 import { AppConfig } from "../config.ts";
 import { Db } from "../services/db.ts";

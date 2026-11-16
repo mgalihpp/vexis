@@ -1,5 +1,4 @@
 import { Keypair } from "@solana/web3.js";
-import { WALLET_UNREADABLE } from "@vexis/db/agents";
 import { getDb } from "@vexis/db/client";
 import {
   forUser,
@@ -9,7 +8,8 @@ import {
   saveRebalanceRpcUrl,
   saveRebalanceWallet,
 } from "@vexis/db/queries";
-import { encryptSecret, sealSecret } from "@vexis/db/secret";
+import { WALLET_UNREADABLE } from "@vexis/shared/agents";
+import { encryptSecret, sealSecret } from "@vexis/shared/secret";
 import bs58 from "bs58";
 import { z } from "zod";
 import { SECRET_KEY_PATTERN } from "./agents";

@@ -1,21 +1,3 @@
-import { sql } from "drizzle-orm";
-import {
-  bigint,
-  boolean,
-  check,
-  doublePrecision,
-  foreignKey,
-  index,
-  integer,
-  jsonb,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  unique,
-  uniqueIndex,
-  uuid,
-} from "drizzle-orm/pg-core";
 import {
   AGENT_KINDS,
   type AgentKind,
@@ -23,7 +5,7 @@ import {
   type RebalanceAction,
   TELEGRAM_KINDS,
   type TelegramKind,
-} from "./agents.ts";
+} from "@vexis/shared/agents";
 import {
   type Decider,
   KEY_SOURCES,
@@ -46,8 +28,26 @@ import {
   type Proposer,
   WALLET_SOURCES,
   type WalletSource,
-} from "./office.ts";
-import { PRESETS, type PresetChoice } from "./screen.ts";
+} from "@vexis/shared/office";
+import { PRESETS, type PresetChoice } from "@vexis/shared/screen";
+import { sql } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  check,
+  doublePrecision,
+  foreignKey,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 // Two kinds of tables live here:
 //

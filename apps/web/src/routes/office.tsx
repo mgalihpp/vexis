@@ -1,5 +1,5 @@
 import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
-import { OFFICE_AGENTS } from "@vexis/db/office";
+import { OFFICE_AGENTS } from "@vexis/shared/office";
 import { z } from "zod";
 import { telegramQuery } from "@/features/agents/agents.queries";
 import { PoolAddress } from "@/features/analytics/analytics.functions";

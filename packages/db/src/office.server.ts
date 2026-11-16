@@ -1,5 +1,3 @@
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
-import type { Db } from "./client.server.ts";
 import {
   type Decider,
   type Decision,
@@ -16,7 +14,9 @@ import {
   refuseDecision,
   transition,
   utcDayStart,
-} from "./office.ts";
+} from "@vexis/shared/office";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import type { Db } from "./client.server.ts";
 import { forUser, type UserScope } from "./queries.server.ts";
 import {
   officeConfig,

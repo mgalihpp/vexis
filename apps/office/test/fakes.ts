@@ -1,3 +1,4 @@
+import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow, ThreadRow } from "@vexis/db/office-queries";
 import {
   isPaused,
   KILL_SWITCH,
@@ -8,8 +9,7 @@ import {
   refuseDecision,
   transition,
   utcDayStart,
-} from "@vexis/db/office";
-import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow, ThreadRow } from "@vexis/db/office-queries";
+} from "@vexis/shared/office";
 import { Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";

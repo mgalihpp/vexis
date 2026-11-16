@@ -5,7 +5,7 @@ import type { LinkButton } from "../format.ts";
 
 /**
  * Sends a message through a user's own Telegram bot. There is no shared bot: every user brings a token
- * (stored encrypted, see `@vexis/db/secret`), and the web app links their chat.
+ * (stored encrypted, see `@vexis/shared/secret`), and the web app links their chat.
  */
 export class Telegram extends Context.Service<
   Telegram,

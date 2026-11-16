@@ -1,4 +1,4 @@
-import type { VolumeWatchConfig } from "@vexis/db/agents";
+import type { VolumeWatchConfig } from "@vexis/shared/agents";
 
 /** One `pool_minutes` row as the spike rule sees it. `volume` is null where the delta is unknown. */
 export type MinuteVolume = { readonly minute: number; readonly volume: number | null };

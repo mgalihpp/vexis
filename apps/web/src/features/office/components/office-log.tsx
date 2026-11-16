@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/db/office";
+import { OFFICE_AGENTS, type OfficeAgent } from "@vexis/shared/office";
 import { ScrollTextIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";

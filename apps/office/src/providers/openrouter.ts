@@ -1,4 +1,4 @@
-import { MODEL_PRICES } from "@vexis/db/office";
+import { MODEL_PRICES } from "@vexis/shared/office";
 import { chatCompletions } from "./openai.ts";
 import type { Provider } from "./provider.ts";
 

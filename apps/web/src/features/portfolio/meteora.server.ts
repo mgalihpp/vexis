@@ -1,5 +1,5 @@
-import { datapiFetch } from "@vexis/db/datapi-budget";
-import { num, PnlPage, type PositionPnl, positionAmounts } from "@vexis/db/pnl";
+import { datapiFetch } from "@vexis/shared/datapi-budget";
+import { num, PnlPage, type PositionPnl, positionAmounts } from "@vexis/shared/pnl";
 import { z } from "zod";
 import type { WatchPosition } from "@/features/notifications/notifications";
 import {

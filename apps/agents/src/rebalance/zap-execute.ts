@@ -12,7 +12,7 @@ import {
   type ZapConfig,
 } from "@meteora-ag/zap-sdk";
 import { type Connection, type Keypair, PublicKey, Transaction, type TransactionInstruction } from "@solana/web3.js";
-import type { AutoRebalanceConfig } from "@vexis/db/agents";
+import type { AutoRebalanceConfig } from "@vexis/shared/agents";
 import BN from "bn.js";
 import {
   type PrioritySetting,

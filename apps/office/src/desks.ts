@@ -1,5 +1,6 @@
-import { checkManage, checkOpen, freeSol, officeCapital } from "@vexis/db/guardrails";
-import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/db/office";
+import type { ProposalRow } from "@vexis/db/office-queries";
+import { checkManage, checkOpen, freeSol, officeCapital } from "@vexis/shared/guardrails";
+import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/shared/office";
 import {
   managerPrompt,
   riskPrompt,
@@ -7,9 +8,8 @@ import {
   type StrategistCandidate,
   scoutPrompt,
   strategistPrompt,
-} from "@vexis/db/office-prompts";
-import type { ProposalRow } from "@vexis/db/office-queries";
-import { alertable } from "@vexis/db/screen";
+} from "@vexis/shared/office-prompts";
+import { alertable } from "@vexis/shared/screen";
 import { Effect, Option } from "effect";
 import { ask, call, llmBudget, type Office, say, sayOnce, seat } from "./ask.ts";
 import type { DbError } from "./errors.ts";
