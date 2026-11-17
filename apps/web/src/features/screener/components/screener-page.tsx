@@ -17,6 +17,7 @@ import {
   DropletsIcon,
   FilterIcon,
   FootprintsIcon,
+  InfoIcon,
   type LucideIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
@@ -27,12 +28,14 @@ import {
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
+import { InfoTip } from "@/components/info-tip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Drawer, DrawerClose, DrawerContent, DrawerTitle, DrawerTrigger } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { age } from "@/features/analytics/analytics";
 import { Updated } from "@/features/analytics/components/ui";
+import { Notice } from "@/features/portfolio/components/notice";
 import { Badge, TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { PoolFilter } from "@/features/portfolio/components/table-controls";
@@ -236,32 +239,38 @@ export function ScreenerPage({
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <Total
           label="Pools"
+          hint="Pools above the floor that pass the current filters."
           value={<Num value={rows.length} format={(v) => String(Math.round(v))} />}
           sub={`of ${data.pools.length} above $1K`}
         />
         <Total
           label="TVL"
+          hint="Total value locked in the pools that pass the current filters."
           value={<Num value={sum.tvl} format={compactUsd} />}
           sub={<Num value={sum.tvl} format={sol} />}
         />
         <Total
           label={`Volume ${view.win}`}
+          hint="Trading volume over the selected window in the pools that pass the current filters."
           value={<Num value={sum.volume} format={compactUsd} />}
           sub={<Num value={sum.volume} format={sol} />}
         />
         <Total
           label="Fees 24h"
+          hint="Fees the pools paid in the last 24 hours."
           value={<Num value={sum.fees24h} format={compactUsd} />}
           sub={<Num value={sum.fees24h} format={sol} />}
           badge={sum.feeTvl === null ? undefined : `${percent(sum.feeTvl)} of TVL`}
         />
         <Total
           label="Swaps 24h"
+          hint="Swaps in the pools over the last 24 hours."
           value={<Num value={sum.swaps} format={compact} />}
           sub={`${times(sum.turnover)} volume/TVL`}
         />
         <Total
           label="Net deposits 24h"
+          hint="Liquidity deposited minus withdrawn over the last 24 hours."
           value={<Num value={sum.netDeposits} format={signedUsd} />}
           sub={<Num value={sum.netDeposits} format={(v) => signedSol(v, solPrice)} />}
           className={sum.netDeposits === null ? "" : tone(sum.netDeposits)}
@@ -328,19 +337,19 @@ export function ScreenerPage({
       </div>
 
       {data.total > data.pools.length && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+        <Notice>
           Meteora has {data.total} pools above the floor; the {data.pools.length} with the most TVL are listed.
-        </p>
+        </Notice>
       )}
 
       {noStats && (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+        <Notice>
           Meteora's discovery API did not answer, so price trend, flow, activity and token figures show a dash.
-        </p>
+        </Notice>
       )}
 
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed px-4 py-12 text-center">
+        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-12 text-center">
           <p className="text-sm font-medium">No pool passes these filters</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             Lower a minimum, widen the bin step or clear the search. Pools under ${FLOOR.tvl.toLocaleString("en-US")}{" "}
@@ -352,9 +361,9 @@ export function ScreenerPage({
         </div>
       ) : (
         <>
-          <div className="hidden rounded-[10px] border bg-card lg:block">
+          <div className="hidden rounded-lg border lg:block">
             <div
-              className={`${GRID} sticky top-0 z-10 h-9 rounded-t-[10px] border-b bg-card/95 text-[11px] font-medium text-muted-foreground backdrop-blur`}
+              className={`${GRID} sticky top-0 z-10 h-10 rounded-t-lg border-b bg-background text-[11px] font-medium text-muted-foreground`}
             >
               {COLUMNS.map((c) => (
                 <HeaderCell key={c.label} column={c} view={view} onSort={sortBy} />
@@ -402,30 +411,33 @@ export function ScreenerPage({
 
 function Total({
   label,
+  hint,
   value,
   sub,
   badge,
   className = "",
 }: {
   label: string;
+  hint: string;
   value: ReactNode;
   sub: ReactNode;
   badge?: string;
   className?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col justify-center rounded-lg bg-card px-3.25 py-4">
-      <dt className="flex min-w-0 items-center justify-between gap-1.5 text-xs text-muted-foreground">
+    <div className="flex h-[7.5rem] min-w-0 flex-col justify-center rounded-lg bg-card px-3.25">
+      <dt className="flex min-w-0 items-center gap-1.25 text-xs text-muted-foreground">
         <span className="truncate">{label}</span>
+        <InfoTip aria-label={hint} content={hint} contentClassName="max-w-48">
+          <InfoIcon className="size-2.75 shrink-0 text-muted-foreground" />
+        </InfoTip>
         {badge && (
-          <span className="num shrink-0 rounded bg-brand/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-brand">
+          <span className="num ml-auto shrink-0 rounded bg-brand/15 px-1.5 py-0.5 text-[0.625rem] font-medium text-brand">
             {badge}
           </span>
         )}
       </dt>
-      <dd className={`num mt-2.5 truncate text-[1.375rem] leading-none font-bold md:text-[1.5rem] ${className}`}>
-        {value}
-      </dd>
+      <dd className={`num mt-2.5 truncate text-[1.5rem] leading-none font-bold ${className}`}>{value}</dd>
       <dd className="num mt-1.5 truncate text-[11px] text-muted-foreground">{sub}</dd>
     </div>
   );
@@ -597,7 +609,9 @@ function MobileControls({
         </div>
         <div className="border-t p-3">
           <DrawerClose asChild>
-            <Button className="w-full">Show {shown} pools</Button>
+            <Button className="w-full bg-brand font-semibold text-brand-foreground hover:bg-brand/90">
+              Show {shown} pools
+            </Button>
           </DrawerClose>
         </div>
       </DrawerContent>
@@ -696,17 +710,17 @@ function HeaderCell({
   if (!key) return <span className={className}>{label}</span>;
   // APR is the 24h ratio scaled, so it shares that sort; only the Fee/TVL header shows the arrow.
   const active = view.sort === key && label !== "APR";
-  const Arrow = view.dir === "desc" ? ArrowDownIcon : ArrowUpIcon;
+  const Icon = !active ? ArrowUpDownIcon : view.dir === "desc" ? ArrowDownIcon : ArrowUpIcon;
   return (
     <button
       type="button"
       title={hint}
       aria-label={`Sort by ${label}`}
       onClick={() => onSort(key)}
-      className={`flex items-center gap-1 whitespace-nowrap transition-colors hover:text-foreground ${active ? "text-foreground" : ""} ${className}`}
+      className={`inline-flex items-center gap-0.75 whitespace-nowrap transition-colors hover:text-foreground ${active ? "text-brand" : ""} ${className}`}
     >
       {label}
-      {active && <Arrow className="size-3 text-brand" />}
+      <Icon className="size-2.75" />
     </button>
   );
 }
@@ -844,7 +858,7 @@ function RowLink({ pool }: { pool: ScreenerPool }) {
 function PoolRow({ pool, rank, top, now, solPrice, win, open, onToggle }: RowProps) {
   const flags = warnings(pool);
   return (
-    <div className="border-b last:rounded-b-[10px] last:border-b-0">
+    <div className="border-b last:rounded-b-lg last:border-b-0">
       <div
         className={`${GRID} group relative isolate h-12 text-xs transition-colors focus-within:bg-muted/50 hover:bg-muted/50 ${open ? "bg-muted/40" : ""}`}
       >
@@ -890,7 +904,7 @@ function PoolRow({ pool, rank, top, now, solPrice, win, open, onToggle }: RowPro
 function PoolCard({ pool, rank, top, now, solPrice, win }: Omit<RowProps, "open" | "onToggle">) {
   const flags = warnings(pool);
   return (
-    <div className="relative isolate flex flex-col gap-3 rounded-[10px] border bg-card p-3 text-xs transition-colors active:bg-muted/60">
+    <div className="relative isolate flex flex-col gap-3 rounded-lg border bg-card p-3 text-xs transition-colors active:bg-muted/60">
       <RowLink pool={pool} />
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -1165,7 +1179,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="flex min-w-0 flex-col gap-3 rounded-[10px] border bg-card p-3">
+    <section className="flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-3">
       <header className="flex h-5 items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-[13px] font-semibold">
           {Icon && (

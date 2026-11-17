@@ -11,15 +11,15 @@ export function ScreenerSkeleton() {
       <Block className="h-8 w-40" />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {TOTALS.map((i) => (
-          <Block key={i} className="h-[6.5rem] rounded-lg" />
+          <Block key={i} className="h-[7.5rem] rounded-lg" />
         ))}
       </div>
       <Block className="h-8 w-full lg:w-2/3" />
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:rounded-[10px] lg:border lg:bg-card">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:rounded-lg lg:border">
         {ROWS.map((i) => (
           <div
             key={i}
-            className="rounded-[10px] border bg-card p-3 lg:rounded-none lg:border-0 lg:border-b lg:bg-transparent"
+            className="rounded-lg border bg-card p-3 lg:rounded-none lg:border-0 lg:border-b lg:bg-transparent"
           >
             <Block className="h-24 w-full lg:h-6" />
           </div>
