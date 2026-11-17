@@ -7,12 +7,14 @@ import {
   filterWallets,
   inRangeStatus,
   type PoolTotals,
+  sortByLiquidity,
   sumKnown,
   TRACKED_PAGE_SIZES,
   TRACKED_REFRESH_MS,
   type TrackedPageSize,
   type TrackedPosition,
   type TrackedResult,
+  type TrackedSort,
   type TrackedWallet,
   type WalletFilter,
 } from "./tracked";
@@ -257,6 +259,7 @@ async function buildPage(
   pageSize: number,
   refresh: boolean,
   filter: WalletFilter,
+  sort: TrackedSort,
 ): Promise<TrackedResult> {
   const refreshed = refresh && expireScan(pool);
   let scan: Scan;
@@ -296,6 +299,12 @@ async function buildPage(
       ).map((w) => w.owner),
     );
     matched = groups.filter((g) => keep.has(g.owner));
+  }
+  // Like the PnL filter, this reads the totals job's detail: a wallet it has not reached yet sorts last until it does.
+  if (sort === "liquidity") {
+    matched = sortByLiquidity(matched, (g) =>
+      sumKnown((job.rows.get(g.owner) ?? []).map((r) => r.unrealizedPnl?.balances ?? null)),
+    );
   }
   const pages = Math.max(1, Math.ceil(matched.length / pageSize));
   const slice = matched.slice((page - 1) * pageSize, page * pageSize);
@@ -369,6 +378,7 @@ export function trackedPositions(
   pageSize: TrackedPageSize = TRACKED_PAGE_SIZES[0],
   refresh = false,
   filter: WalletFilter = { query: "", range: new Set(), pnl: new Set() },
+  sort: TrackedSort = "recent",
 ): Promise<TrackedResult> {
-  return buildPage(pool, page, pageSize, refresh, filter);
+  return buildPage(pool, page, pageSize, refresh, filter, sort);
 }

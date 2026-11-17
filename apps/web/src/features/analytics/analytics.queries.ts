@@ -16,15 +16,17 @@ export const trackedQuery = (input: {
   query?: string;
   range?: ("in" | "out")[];
   pnl?: ("profit" | "loss")[];
+  sort?: "recent" | "liquidity";
 }) => {
   const page = input.page ?? 1;
   const pageSize = input.pageSize ?? 10;
   const query = (input.query ?? "").trim();
   const range = [...(input.range ?? [])].sort();
   const pnl = [...(input.pnl ?? [])].sort();
+  const sort = input.sort ?? "recent";
   return queryOptions({
-    queryKey: ["analytics", "tracked", input.pool, page, pageSize, query, range, pnl],
-    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize, query, range, pnl } }),
+    queryKey: ["analytics", "tracked", input.pool, page, pageSize, query, range, pnl, sort],
+    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize, query, range, pnl, sort } }),
     staleTime: 5 * 60_000,
     // Poll while the pool-wide totals are still loading.
     refetchInterval: (q) => (q.state.data?.ok && q.state.data.totals.running ? 2000 : false),

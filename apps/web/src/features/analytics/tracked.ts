@@ -149,6 +149,18 @@ export interface WalletFilter {
   pnl: ReadonlySet<PnlFilter>;
 }
 
+/** Newest activity first, or the wallets holding the most liquidity first. */
+export type TrackedSort = "recent" | "liquidity";
+
+/** Largest value first; unknown values go last, and ties keep their incoming order. */
+export function sortByLiquidity<T>(items: readonly T[], liquidity: (item: T) => number | null): T[] {
+  const key = (item: T) => liquidity(item) ?? -Infinity;
+  return [...items].sort((a, b) => {
+    const [x, y] = [key(a), key(b)];
+    return x === y ? 0 : y > x ? 1 : -1;
+  });
+}
+
 export function filterWallets(wallets: readonly TrackedWallet[], filter: WalletFilter): TrackedWallet[] {
   const q = filter.query.trim().toLowerCase();
   return wallets.filter((w) => {

@@ -41,14 +41,18 @@ export const getTrackedPositions = createServerFn({ method: "GET" })
         .array(z.enum(["profit", "loss"]))
         .max(2)
         .default([]),
+      sort: z.enum(["recent", "liquidity"]).default("recent"),
     }),
   )
   .handler(({ data }) =>
-    trackedPositions(data.pool, data.page, data.pageSize, data.refresh, {
-      query: data.query,
-      range: new Set(data.range),
-      pnl: new Set(data.pnl),
-    }),
+    trackedPositions(
+      data.pool,
+      data.page,
+      data.pageSize,
+      data.refresh,
+      { query: data.query, range: new Set(data.range), pnl: new Set(data.pnl) },
+      data.sort,
+    ),
   );
 
 export const getOlderBars = createServerFn({ method: "GET" })
