@@ -6,6 +6,7 @@ import {
   type PnlFilter,
   type RangeFilter,
   rangeBar,
+  sortByLiquidity,
   sumKnown,
   type TrackedPosition,
 } from "./tracked";
@@ -42,6 +43,19 @@ describe("filterWallets", () => {
   test("pnl filters on the wallet's total sign, combined with the other filters", () => {
     expect(owners("", [], ["loss"])).toEqual(["BobWallet"]);
     expect(owners("", ["out"], ["profit"])).toEqual(["CarolWallet"]);
+  });
+});
+
+describe("sortByLiquidity", () => {
+  test("largest first, unknown last, ties keep their order", () => {
+    const rows = [
+      { id: "a", v: 5 },
+      { id: "b", v: null },
+      { id: "c", v: 50 },
+      { id: "d", v: 5 },
+      { id: "e", v: 0 },
+    ];
+    expect(sortByLiquidity(rows, (r) => r.v).map((r) => r.id)).toEqual(["c", "a", "d", "e", "b"]);
   });
 });
 

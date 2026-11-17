@@ -12,6 +12,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { collapseZeros } from "@/features/portfolio/money";
@@ -30,6 +31,7 @@ import {
   type TrackedPageSize,
   type TrackedPosition,
   type TrackedResult,
+  type TrackedSort,
   type TrackedWallet,
 } from "../tracked";
 import { amount, CollapsiblePanel, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
@@ -452,19 +454,28 @@ function CheckGroup<T extends string>({
   );
 }
 
-/** The portfolio's pair filter: an icon that turns brand while a filter is on, opening a checkbox list. */
+const SORT_OPTIONS: { value: TrackedSort; label: string }[] = [
+  { value: "recent", label: "Newest activity" },
+  { value: "liquidity", label: "Most liquidity" },
+];
+
+/** The portfolio's pair filter: an icon that turns brand while a filter or sort is on, opening a checkbox list. */
 function WalletFilterMenu({
   range,
   pnl,
+  sort,
   onRange,
   onPnl,
+  onSort,
 }: {
   range: ReadonlySet<RangeFilter>;
   pnl: ReadonlySet<PnlFilter>;
+  sort: TrackedSort;
   onRange: (next: ReadonlySet<RangeFilter>) => void;
   onPnl: (next: ReadonlySet<PnlFilter>) => void;
+  onSort: (next: TrackedSort) => void;
 }) {
-  const active = range.size + pnl.size > 0;
+  const active = range.size + pnl.size > 0 || sort !== "recent";
   return (
     <Popover>
       <PopoverTrigger
@@ -483,12 +494,26 @@ function WalletFilterMenu({
               onClick={() => {
                 onRange(new Set());
                 onPnl(new Set());
+                onSort("recent");
               }}
             >
               Clear
             </button>
           )}
         </div>
+        <div className="px-0.75 pt-1 pb-0.5 text-[0.6875rem] text-muted-foreground">Sort by</div>
+        <RadioGroup value={sort} onValueChange={(v) => onSort(v as TrackedSort)} className="gap-0">
+          {SORT_OPTIONS.map((o) => (
+            <label
+              key={o.value}
+              htmlFor={`tracked-sort-${o.value}`}
+              className="flex cursor-pointer items-center gap-1.5 rounded px-0.75 py-1.25 text-xs hover:bg-muted"
+            >
+              <RadioGroupItem id={`tracked-sort-${o.value}`} value={o.value} />
+              {o.label}
+            </label>
+          ))}
+        </RadioGroup>
         <CheckGroup title="Range" options={RANGE_OPTIONS} selected={range} onChange={onRange} />
         <CheckGroup title="PnL" options={PNL_OPTIONS} selected={pnl} onChange={onPnl} />
       </PopoverContent>
@@ -510,7 +535,7 @@ function RefreshButton({
   pool: string;
   page: number;
   pageSize: TrackedPageSize;
-  filter: { query: string; range: RangeFilter[]; pnl: PnlFilter[] };
+  filter: { query: string; range: RangeFilter[]; pnl: PnlFilter[]; sort: TrackedSort };
   data: Extract<TrackedResult, { ok: true }>;
 }) {
   const queryClient = useQueryClient();
@@ -583,7 +608,8 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
     const t = setTimeout(() => setSearch(query), 300);
     return () => clearTimeout(t);
   }, [query]);
-  const filter = { query: search, range: [...range], pnl: [...pnl] };
+  const [sort, setSort] = useState<TrackedSort>("recent");
+  const filter = { query: search, range: [...range], pnl: [...pnl], sort };
   const { data } = useQuery({
     ...trackedQuery({ pool, page, pageSize: paging.size, ...filter }),
     placeholderData: keepPreviousData,
@@ -618,12 +644,17 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
               <WalletFilterMenu
                 range={range}
                 pnl={pnl}
+                sort={sort}
                 onRange={(next) => {
                   setRange(next);
                   firstPage();
                 }}
                 onPnl={(next) => {
                   setPnl(next);
+                  firstPage();
+                }}
+                onSort={(next) => {
+                  setSort(next);
                   firstPage();
                 }}
               />
@@ -633,6 +664,11 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
             <p className="text-xs text-muted-foreground">
               {plural(data.matchedWallets, "wallet")} match
               {data.totals.running && pnl.size > 0 ? " so far; PnL is still loading" : ""}
+            </p>
+          )}
+          {sort === "liquidity" && data.totals.running && (
+            <p className="text-xs text-muted-foreground">
+              Sorted by liquidity so far: {data.totals.loaded} of {plural(data.totals.total, "wallet")} loaded
             </p>
           )}
           {wallets.length === 0 ? (
