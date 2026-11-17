@@ -1,6 +1,5 @@
 import { CheckIcon, InboxIcon, OctagonPauseIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { shortAddr } from "@/lib/format";
@@ -30,15 +29,13 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
   if (waiting.length === 0)
     return (
       <>
-        <Card size="sm">
-          <CardContent>
-            <PanelEmpty
-              icon={stopped ? <OctagonPauseIcon /> : <InboxIcon />}
-              title={stopped ? "Office stopped" : "Nothing to approve"}
-              hint={stopped ? undefined : "New proposals land here."}
-            />
-          </CardContent>
-        </Card>
+        <div className="rounded-lg bg-card p-3.25">
+          <PanelEmpty
+            icon={stopped ? <OctagonPauseIcon /> : <InboxIcon />}
+            title={stopped ? "Office stopped" : "Nothing to approve"}
+            hint={stopped ? undefined : "New proposals land here."}
+          />
+        </div>
         <Section title="Today (UTC)">
           <dl className="m-0 grid grid-cols-5 gap-1">
             {TODAY.map((t) => (
@@ -72,7 +69,7 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
   return (
     <section
       aria-label={`Proposal: ${KIND_LABEL[p.kind]} ${pool}`}
-      className={`flex flex-col gap-2.5 rounded-lg bg-card p-3.5 ring-1 ${left.expired ? "ring-border" : "ring-brand/60 shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_14%,transparent)]"}`}
+      className="flex flex-col gap-2.5 rounded-lg bg-card p-3.5"
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[0.625rem] tracking-[0.08em] text-brand uppercase">
@@ -89,7 +86,7 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
       <Meter share={left.share} className="bg-amber-500" />
       <dl className="m-0 grid grid-cols-2 gap-1.5">
         {proposalFacts(p).map((f) => (
-          <div key={f.label} className="min-w-0 rounded-md border bg-background/60 px-2 py-1.5">
+          <div key={f.label} className="min-w-0 rounded-md border bg-background/90 px-2 py-1.5">
             <dt className="text-[0.6875rem] text-muted-foreground">{f.label}</dt>
             <dd className="m-0 font-mono text-xs font-medium [overflow-wrap:anywhere]">
               {f.value}
@@ -135,7 +132,11 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
         <Button variant="outline" disabled={busy} onClick={() => choose("reject")}>
           Reject
         </Button>
-        <Button disabled={busy || left.expired || stopped} onClick={() => choose("approve")}>
+        <Button
+          disabled={busy || left.expired || stopped}
+          onClick={() => choose("approve")}
+          className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+        >
           {busy && <Spinner />}
           {left.expired ? "Expired" : "Approve"}
         </Button>

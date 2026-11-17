@@ -75,7 +75,12 @@ const icon = (Icon: LucideIcon) => (
 /** The page's save button, under its groups and aligned like an iOS form's action. */
 function Save({ disabled, pending, children }: { disabled: boolean; pending: boolean; children: ReactNode }) {
   return (
-    <Button type="submit" size="sm" disabled={disabled || pending} className="self-end">
+    <Button
+      type="submit"
+      size="sm"
+      disabled={disabled || pending}
+      className="self-end bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+    >
       {pending && <Spinner />}
       {children}
     </Button>
