@@ -13,10 +13,10 @@ import {
 describe("filterWallets", () => {
   const wallets = () =>
     groupByOwner([
-      pos({ address: "PosA1", owner: "AliceWallet", inRange: true, pnlUsd: 10 }),
-      pos({ address: "PosB1", owner: "BobWallet", inRange: false, pnlUsd: -5 }),
-      pos({ address: "PosC1", owner: "CarolWallet", inRange: true, pnlUsd: 3 }),
-      pos({ address: "PosC2", owner: "CarolWallet", inRange: false, pnlUsd: 1 }),
+      pos({ address: "PosA1", owner: "AliceWallet", inRange: true, pnlSol: 10 }),
+      pos({ address: "PosB1", owner: "BobWallet", inRange: false, pnlSol: -5 }),
+      pos({ address: "PosC1", owner: "CarolWallet", inRange: true, pnlSol: 3 }),
+      pos({ address: "PosC2", owner: "CarolWallet", inRange: false, pnlSol: 1 }),
     ]);
   const owners = (query: string, range: RangeFilter[] = [], pnl: PnlFilter[] = []) =>
     filterWallets(wallets(), { query, range: new Set(range), pnl: new Set(pnl) })
@@ -154,15 +154,15 @@ describe("groupByOwner", () => {
 
   test("sums a wallet's PnL over the positions that have one", () => {
     const [wallet] = groupByOwner([
-      pos({ address: "p1", owner: "A", pnlUsd: 10 }),
-      pos({ address: "p2", owner: "A", pnlUsd: -4 }),
-      pos({ address: "p3", owner: "A", pnlUsd: null }),
+      pos({ address: "p1", owner: "A", pnlSol: 10 }),
+      pos({ address: "p2", owner: "A", pnlSol: -4 }),
+      pos({ address: "p3", owner: "A", pnlSol: null }),
     ]);
-    expect(wallet?.pnlUsd).toBe(6);
+    expect(wallet?.pnlSol).toBe(6);
   });
 
   test("a wallet with no PnL values reports null, not zero", () => {
     const [wallet] = groupByOwner([pos({ address: "p1", owner: "A" })]);
-    expect(wallet?.pnlUsd).toBeNull();
+    expect(wallet?.pnlSol).toBeNull();
   });
 });

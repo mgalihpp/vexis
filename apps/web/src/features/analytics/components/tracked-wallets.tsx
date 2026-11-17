@@ -8,7 +8,7 @@ import {
   InfoIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -21,7 +21,6 @@ import { age } from "../analytics";
 import { getTrackedPositions } from "../analytics.functions";
 import { trackedQuery } from "../analytics.queries";
 import {
-  filterWallets,
   type PnlFilter,
   type RangeFilter,
   rangeBar,
@@ -505,21 +504,23 @@ function RefreshButton({
   pool,
   page,
   pageSize,
+  filter,
   data,
 }: {
   pool: string;
   page: number;
   pageSize: TrackedPageSize;
+  filter: { query: string; range: RangeFilter[]; pnl: PnlFilter[] };
   data: Extract<TrackedResult, { ok: true }>;
 }) {
   const queryClient = useQueryClient();
   const now = useNow(data.scannedAt);
   const refresh = useMutation({
-    mutationFn: () => getTrackedPositions({ data: { pool, page, pageSize, refresh: true } }),
+    mutationFn: () => getTrackedPositions({ data: { pool, page, pageSize, ...filter, refresh: true } }),
     onSuccess: async (next) => {
       // The other pages come from the old scan; they refetch when opened.
       await queryClient.invalidateQueries({ queryKey: ["analytics", "tracked", pool], refetchType: "none" });
-      queryClient.setQueryData(trackedQuery({ pool, page, pageSize }).queryKey, next);
+      queryClient.setQueryData(trackedQuery({ pool, page, pageSize, ...filter }).queryKey, next);
     },
   });
   const why = refresh.isPending
@@ -573,26 +574,33 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
   if (paging.pool !== pool) setPaging({ pool, page: 1, size: paging.size });
   const page = paging.pool === pool ? paging.page : 1;
   // The previous page stays on screen while the next one loads.
+  const [query, setQuery] = useState("");
+  const [range, setRange] = useState<ReadonlySet<RangeFilter>>(new Set());
+  const [pnl, setPnl] = useState<ReadonlySet<PnlFilter>>(new Set());
+  // The server filters the whole pool before paging; typing waits a moment so each keystroke is not a request.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+  const filter = { query: search, range: [...range], pnl: [...pnl] };
   const { data } = useQuery({
-    ...trackedQuery({ pool, page, pageSize: paging.size }),
+    ...trackedQuery({ pool, page, pageSize: paging.size, ...filter }),
     placeholderData: keepPreviousData,
   });
   const ok = data?.ok === true;
   const wallets = ok ? data.wallets : [];
-  const [query, setQuery] = useState("");
-  const [range, setRange] = useState<ReadonlySet<RangeFilter>>(new Set());
-  const [pnl, setPnl] = useState<ReadonlySet<PnlFilter>>(new Set());
-  // Filters apply to the wallets on the current page; a new search or filter starts from the first page.
+  // A new search or filter starts from the first page.
   const firstPage = () => setPaging((p) => ({ ...p, page: 1 }));
-  const matched = useMemo(() => filterWallets(wallets, { query, range, pnl }), [wallets, query, range, pnl]);
   const pages = ok ? data.pages : 1;
+  const filtered = search.trim() !== "" || range.size > 0 || pnl.size > 0;
 
   return (
     <>
       {!data && <div className="h-24 animate-pulse rounded-lg bg-background/60" />}
       {data && !data.ok && <p className="text-xs text-loss">{data.message}</p>}
-      {ok && wallets.length === 0 && <p className="text-xs text-muted-foreground">No open positions.</p>}
-      {ok && wallets.length > 0 && (
+      {ok && data.totalWallets === 0 && <p className="text-xs text-muted-foreground">No open positions.</p>}
+      {ok && data.totalWallets > 0 && (
         <>
           <PoolTotals data={data} />
           <div className="flex items-center justify-between gap-2.5 pt-1">
@@ -606,7 +614,7 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
             />
             <div className="flex items-center gap-1">
               <Updated at={data.scannedAt} />
-              <RefreshButton pool={pool} page={page} pageSize={paging.size} data={data} />
+              <RefreshButton pool={pool} page={page} pageSize={paging.size} filter={filter} data={data} />
               <WalletFilterMenu
                 range={range}
                 pnl={pnl}
@@ -621,11 +629,17 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
               />
             </div>
           </div>
-          {matched.length === 0 ? (
+          {filtered && (
+            <p className="text-xs text-muted-foreground">
+              {plural(data.matchedWallets, "wallet")} match
+              {data.totals.running && pnl.size > 0 ? " so far; PnL is still loading" : ""}
+            </p>
+          )}
+          {wallets.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted-foreground">No wallets match.</p>
           ) : (
             <div className="flex flex-col divide-y">
-              {matched.map((w) => (
+              {wallets.map((w) => (
                 <WalletCard key={w.owner} wallet={w} scannedAt={data.scannedAt} base={base} quote={quote} />
               ))}
             </div>
@@ -639,7 +653,7 @@ function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: 
             // The portfolio's pagination bar, flattened onto the panel's bottom edge instead of sticking.
             <div className="-mx-3 -mb-3 [&>div]:static [&>div]:rounded-b-[10px] [&>div]:bg-card">
               <Pagination
-                total={data.totalWallets}
+                total={data.matchedWallets}
                 page={page - 1}
                 pages={pages}
                 pageSize={paging.size}

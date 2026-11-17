@@ -4,6 +4,7 @@ import { z } from "zod";
 import { get } from "../portfolio/meteora.server";
 import { type Cache, cached } from "./cache.server";
 import {
+  filterWallets,
   inRangeStatus,
   type PoolTotals,
   sumKnown,
@@ -13,6 +14,7 @@ import {
   type TrackedPosition,
   type TrackedResult,
   type TrackedWallet,
+  type WalletFilter,
 } from "./tracked";
 
 // The DLMM program. Every position account is owned by it, and the filters below select one pool's positions.
@@ -249,7 +251,13 @@ function expireScan(pool: string): boolean {
   return true;
 }
 
-async function buildPage(pool: string, page: number, pageSize: number, refresh: boolean): Promise<TrackedResult> {
+async function buildPage(
+  pool: string,
+  page: number,
+  pageSize: number,
+  refresh: boolean,
+  filter: WalletFilter,
+): Promise<TrackedResult> {
   const refreshed = refresh && expireScan(pool);
   let scan: Scan;
   try {
@@ -259,12 +267,39 @@ async function buildPage(pool: string, page: number, pageSize: number, refresh: 
   }
 
   const { groups } = scan;
-  const pages = Math.max(1, Math.ceil(groups.length / pageSize));
-  const slice = groups.slice((page - 1) * pageSize, page * pageSize);
-  const owners = slice.map((g) => g.owner);
   // Before the totals job starts, since it reuses cached detail.
-  if (refreshed) for (const owner of owners) detailCache.delete(`${pool}:${owner}`);
+  if (refreshed) {
+    for (const g of groups.slice((page - 1) * pageSize, page * pageSize)) detailCache.delete(`${pool}:${g.owner}`);
+  }
   const job = totalsJobFor(pool, scan);
+
+  // Filters cut the whole pool before paging. They read the totals job's detail, so a wallet it has not reached yet
+  // has no PnL and drops out of a PnL filter until it does; its range falls back to the bins and the active bin.
+  const filtering = filter.query.trim() !== "" || filter.range.size > 0 || filter.pnl.size > 0;
+  let matched = groups;
+  if (filtering) {
+    const rowsAll = [...job.rows.values()].flat();
+    const active = rowsAll.find((r) => r?.poolActiveBinId != null)?.poolActiveBinId ?? null;
+    const keep = new Set(
+      filterWallets(
+        groups.map((g) => {
+          const byAddress = new Map((job.rows.get(g.owner) ?? []).map((r) => [r.positionAddress, r]));
+          const positions = g.positions.map((p) => {
+            const built = buildPosition(p, byAddress.get(p.address));
+            return built.inRange == null
+              ? { ...built, inRange: inRangeStatus({ outOfRange: null, activeBinId: active, ...p }) }
+              : built;
+          });
+          return { owner: g.owner, positions, pnlSol: sumKnown(positions.map((p) => p.pnlSol)) };
+        }),
+        filter,
+      ).map((w) => w.owner),
+    );
+    matched = groups.filter((g) => keep.has(g.owner));
+  }
+  const pages = Math.max(1, Math.ceil(matched.length / pageSize));
+  const slice = matched.slice((page - 1) * pageSize, page * pageSize);
+  const owners = slice.map((g) => g.owner);
 
   const details = new Map<string, PnlRow>();
   let next = 0;
@@ -282,7 +317,7 @@ async function buildPage(pool: string, page: number, pageSize: number, refresh: 
     const positions = g.positions
       .map((p) => buildPosition(p, details.get(p.address)))
       .sort((a, b) => (b.createdAt ?? -Infinity) - (a.createdAt ?? -Infinity));
-    return { owner: g.owner, positions, pnlUsd: sumKnown(positions.map((p) => p.pnlUsd)) };
+    return { owner: g.owner, positions, pnlSol: sumKnown(positions.map((p) => p.pnlSol)) };
   });
 
   // Range status for every position in the pool, not just this page: bins come from the scan and the active bin is
@@ -312,6 +347,7 @@ async function buildPage(pool: string, page: number, pageSize: number, refresh: 
     pageSize,
     pages,
     totalWallets: groups.length,
+    matchedWallets: matched.length,
     totalPositions: groups.reduce((n, g) => n + g.positions.length, 0),
     inRangePositions,
     rangeKnownPositions,
@@ -332,6 +368,7 @@ export function trackedPositions(
   page = 1,
   pageSize: TrackedPageSize = TRACKED_PAGE_SIZES[0],
   refresh = false,
+  filter: WalletFilter = { query: "", range: new Set(), pnl: new Set() },
 ): Promise<TrackedResult> {
-  return buildPage(pool, page, pageSize, refresh);
+  return buildPage(pool, page, pageSize, refresh, filter);
 }
