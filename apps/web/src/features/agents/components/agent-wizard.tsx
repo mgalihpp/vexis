@@ -380,7 +380,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
   ];
   return (
     <>
-      <ul className="divide-y divide-border overflow-hidden rounded-2xl bg-muted/40">
+      <ul className="divide-y divide-border overflow-hidden rounded-lg bg-card">
         {rows.map((r) => (
           <li key={r.label}>
             <button
@@ -398,7 +398,7 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
       {issues.length > 0 && (
         <div
           role="alert"
-          className="flex items-start gap-2.5 rounded-2xl border border-loss/30 bg-loss/10 px-4 py-3 text-sm text-loss"
+          className="flex items-start gap-2.5 rounded-lg border border-loss/30 bg-loss/10 px-4 py-3 text-sm text-loss"
         >
           <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
           <ul className="space-y-0.5">
@@ -409,11 +409,11 @@ function ReviewStep({ draft, issues, onGo }: { draft: Draft; issues: string[]; o
         </div>
       )}
       {draft.kind === "auto-rebalance" && (
-        <div className="rounded-2xl bg-muted/40 p-4">
+        <div className="rounded-lg bg-card p-4">
           <WalletPanel />
         </div>
       )}
-      <div className="rounded-2xl bg-muted/40 p-4">
+      <div className="rounded-lg bg-card p-4">
         <TelegramPanel kind={draft.kind} />
       </div>
     </>

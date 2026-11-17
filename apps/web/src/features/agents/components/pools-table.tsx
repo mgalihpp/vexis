@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BadgeCheckIcon, ExternalLinkIcon, MoreHorizontalIcon, XIcon } from "lucide-react";
-import { useState } from "react";
+import {
+  BadgeCheckIcon,
+  CircleDollarSignIcon,
+  ExternalLinkIcon,
+  FootprintsIcon,
+  MoreHorizontalIcon,
+  XIcon,
+} from "lucide-react";
+import { type ReactNode, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/features/portfolio/components/pool-identity";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { compactSol, compactUsd, timeAgo } from "@/features/portfolio/money";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
@@ -61,6 +69,7 @@ export function PoolsTable({
   agentId,
   now,
   empty,
+  emptyAction,
   lastLabel = "Last alert",
 }: {
   rows: PoolRow[];
@@ -69,6 +78,7 @@ export function PoolsTable({
   agentId?: string;
   now: number;
   empty: string;
+  emptyAction?: ReactNode;
 }) {
   const { data: screener } = useQuery(screenerQuery);
   const { data: prices } = useQuery(pricesQuery);
@@ -111,7 +121,7 @@ export function PoolsTable({
   };
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
+    <section className="overflow-hidden rounded-lg bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4">
         <div role="tablist" className="-mb-px flex gap-5 overflow-x-auto">
           {TABS.map((t) => (
@@ -161,6 +171,7 @@ export function PoolsTable({
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={8} className="py-12 text-center text-muted-foreground">
                 {full.length === 0 ? empty : "No pools match these filters."}
+                {full.length === 0 && emptyAction && <div className="mt-3 flex justify-center">{emptyAction}</div>}
               </TableCell>
             </TableRow>
           )}
@@ -180,8 +191,21 @@ export function PoolsTable({
                         <BadgeCheckIcon aria-label="Verified" className="size-3.5 shrink-0 text-profit" />
                       )}
                     </Link>
-                    <div className="text-[0.7rem] text-muted-foreground">
-                      {r.pool ? `Bin step ${r.pool.binStep} · Fee ${percent(r.pool.baseFeePct)}` : shortAddr(r.address)}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {r.pool ? (
+                        <>
+                          <Badge tone="blue" title="Bin step">
+                            <FootprintsIcon className="size-3.5" />
+                            {r.pool.binStep}
+                          </Badge>
+                          <Badge tone="orange" title="Base fee">
+                            <CircleDollarSignIcon className="size-3.5" />
+                            {percent(r.pool.baseFeePct)}
+                          </Badge>
+                        </>
+                      ) : (
+                        <span className="text-[0.7rem] text-muted-foreground">{shortAddr(r.address)}</span>
+                      )}
                     </div>
                   </div>
                 </div>

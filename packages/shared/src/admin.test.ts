@@ -102,16 +102,18 @@ describe("slide", () => {
 });
 
 describe("redact", () => {
+  const botToken = ["123456789", "AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw"].join(":");
+
   it("keeps the host of a URL, never its path or key", () => {
-    expect(
-      redact("fetch failed https://api.telegram.org/bot123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw/sendMessage"),
-    ).toBe("fetch failed api.telegram.org/…");
+    expect(redact(`fetch failed https://api.telegram.org/bot${botToken}/sendMessage`)).toBe(
+      "fetch failed api.telegram.org/…",
+    );
     expect(redact("RPC https://user:pass@mainnet.helius-rpc.com/?api-key=abc123 429")).toBe(
       "RPC mainnet.helius-rpc.com/… 429",
     );
   });
   it("hides a bare bot token and a base58 secret, and caps the length", () => {
-    expect(redact("bad 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw token")).toBe("bad … token");
+    expect(redact(`bad ${botToken} token`)).toBe("bad … token");
     expect(redact(`key ${"5".repeat(64)} leaked`)).toBe("key … leaked");
     expect(redact("word ".repeat(100)).length).toBe(200);
   });

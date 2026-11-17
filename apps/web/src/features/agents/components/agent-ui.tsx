@@ -1,5 +1,15 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { BadgeCheckIcon, CheckIcon, SearchIcon, TriangleAlertIcon, UnlinkIcon, XIcon, ZapIcon } from "lucide-react";
+import {
+  BadgeCheckIcon,
+  CheckIcon,
+  CircleDollarSignIcon,
+  FootprintsIcon,
+  SearchIcon,
+  TriangleAlertIcon,
+  UnlinkIcon,
+  XIcon,
+  ZapIcon,
+} from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -7,7 +17,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { findPools } from "@/features/analytics/analytics.functions";
 import type { PoolSearchHit } from "@/features/analytics/analytics.types";
 import { usePoolHits } from "@/features/analytics/components/pool-search";
-import { TokenIcon } from "@/features/portfolio/components/pool-identity";
+import { Badge, TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
 import {
@@ -73,7 +83,6 @@ export function FormError({ error }: { error: unknown }) {
 const ROW =
   "grid w-full grid-cols-[minmax(0,1fr)_6rem_1.25rem] items-center gap-3 px-4 md:grid-cols-[minmax(0,1fr)_5rem_6rem_6rem_1.25rem]";
 
-/** Pair, verified mark, and bin step / base fee as one muted line. */
 function PoolCell({ hit }: { hit: PoolSearchHit }) {
   return (
     <span className="flex min-w-0 items-center gap-3">
@@ -86,8 +95,15 @@ function PoolCell({ hit }: { hit: PoolSearchHit }) {
           {hit.name}
           {hit.tokenX.verified && <BadgeCheckIcon aria-label="Verified" className="size-4 text-profit" />}
         </span>
-        <span className="block truncate text-[0.7rem] text-muted-foreground tabular-nums">
-          Bin step {hit.binStep} · Fee {pct(hit.baseFee / 100)}
+        <span className="flex items-center gap-1">
+          <Badge tone="blue" title="Bin step">
+            <FootprintsIcon className="size-3.5" />
+            {hit.binStep}
+          </Badge>
+          <Badge tone="orange" title="Base fee">
+            <CircleDollarSignIcon className="size-3.5" />
+            {pct(hit.baseFee / 100)}
+          </Badge>
         </span>
       </span>
     </span>
