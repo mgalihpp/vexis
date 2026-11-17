@@ -27,8 +27,8 @@ export interface TrackedPosition {
 export interface TrackedWallet {
   owner: string;
   positions: TrackedPosition[];
-  /** Sum of the wallet's position PnL in USD, null when none of them has a value. */
-  pnlUsd: number | null;
+  /** Sum of the wallet's position PnL in SOL, null when none of them has a value. */
+  pnlSol: number | null;
 }
 
 /** Fees and PnL summed over the wallets whose Meteora detail has loaded so far. */
@@ -62,6 +62,8 @@ export type TrackedResult =
       pages: number;
       /** Wallets with an open position in the pool, across every page. */
       totalWallets: number;
+      /** Wallets that pass the request's filters, across every page; the page count follows this. */
+      matchedWallets: number;
       totalPositions: number;
       /** In-range positions across every page, judged against the pool's active bin. */
       inRangePositions: number;
@@ -143,7 +145,7 @@ export interface WalletFilter {
   query: string;
   /** Empty means any. Otherwise the wallet needs a position in one of the picked states. */
   range: ReadonlySet<RangeFilter>;
-  /** Empty means any. Otherwise the wallet's USD PnL must have one of the picked signs. */
+  /** Empty means any. Otherwise the wallet's SOL PnL must have one of the picked signs. */
   pnl: ReadonlySet<PnlFilter>;
 }
 
@@ -158,8 +160,8 @@ export function filterWallets(wallets: readonly TrackedWallet[], filter: WalletF
       if (![...filter.range].some(has)) return false;
     }
     if (filter.pnl.size > 0) {
-      if (w.pnlUsd == null || w.pnlUsd === 0) return false;
-      if (!filter.pnl.has(w.pnlUsd > 0 ? "profit" : "loss")) return false;
+      if (w.pnlSol == null || w.pnlSol === 0) return false;
+      if (!filter.pnl.has(w.pnlSol > 0 ? "profit" : "loss")) return false;
     }
     return true;
   });
@@ -176,7 +178,7 @@ export function groupByOwner(positions: readonly TrackedPosition[]): TrackedWall
   const wallets: TrackedWallet[] = [...byOwner].map(([owner, list]) => ({
     owner,
     positions: [...list].sort((a, b) => (b.createdAt ?? -Infinity) - (a.createdAt ?? -Infinity)),
-    pnlUsd: sumKnown(list.map((p) => p.pnlUsd)),
+    pnlSol: sumKnown(list.map((p) => p.pnlSol)),
   }));
   return wallets.sort((a, b) => b.positions.length - a.positions.length || a.owner.localeCompare(b.owner));
 }

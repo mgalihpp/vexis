@@ -9,12 +9,22 @@ export const analyticsQuery = (input: { pool?: string | undefined }) =>
   });
 
 /** Positions change slowly and each scan costs RPC and rate-limit budget, so this query does not poll. */
-export const trackedQuery = (input: { pool: string; page?: number; pageSize?: 10 | 25 | 50 }) => {
+export const trackedQuery = (input: {
+  pool: string;
+  page?: number;
+  pageSize?: 10 | 25 | 50;
+  query?: string;
+  range?: ("in" | "out")[];
+  pnl?: ("profit" | "loss")[];
+}) => {
   const page = input.page ?? 1;
   const pageSize = input.pageSize ?? 10;
+  const query = (input.query ?? "").trim();
+  const range = [...(input.range ?? [])].sort();
+  const pnl = [...(input.pnl ?? [])].sort();
   return queryOptions({
-    queryKey: ["analytics", "tracked", input.pool, page, pageSize],
-    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize } }),
+    queryKey: ["analytics", "tracked", input.pool, page, pageSize, query, range, pnl],
+    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize, query, range, pnl } }),
     staleTime: 5 * 60_000,
     // Poll while the pool-wide totals are still loading.
     refetchInterval: (q) => (q.state.data?.ok && q.state.data.totals.running ? 2000 : false),

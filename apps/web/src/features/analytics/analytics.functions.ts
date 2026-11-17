@@ -32,9 +32,24 @@ export const getTrackedPositions = createServerFn({ method: "GET" })
       page: z.number().int().min(1).max(10_000).default(1),
       pageSize: z.union([z.literal(10), z.literal(25), z.literal(50)]).default(10),
       refresh: z.boolean().default(false),
+      query: z.string().trim().max(44).default(""),
+      range: z
+        .array(z.enum(["in", "out"]))
+        .max(2)
+        .default([]),
+      pnl: z
+        .array(z.enum(["profit", "loss"]))
+        .max(2)
+        .default([]),
     }),
   )
-  .handler(({ data }) => trackedPositions(data.pool, data.page, data.pageSize, data.refresh));
+  .handler(({ data }) =>
+    trackedPositions(data.pool, data.page, data.pageSize, data.refresh, {
+      query: data.query,
+      range: new Set(data.range),
+      pnl: new Set(data.pnl),
+    }),
+  );
 
 export const getOlderBars = createServerFn({ method: "GET" })
   .middleware([requireViewer])
