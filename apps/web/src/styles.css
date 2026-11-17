@@ -161,23 +161,23 @@
 :root {
   /* Token Y / SOL accent on the analytics page. */
   --sol: #9b6bff;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --background: oklch(0.955 0.004 100);
+  --foreground: oklch(0.25 0.01 285);
+  --card: oklch(0.982 0.003 100);
+  --card-foreground: oklch(0.25 0.01 285);
+  --popover: oklch(0.982 0.003 100);
+  --popover-foreground: oklch(0.25 0.01 285);
   --primary: oklch(0.21 0.006 285.885);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
+  --secondary: oklch(0.925 0.004 100);
   --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
+  --muted: oklch(0.925 0.004 100);
+  --muted-foreground: oklch(0.5 0.014 285);
+  --accent: oklch(0.925 0.004 100);
   --accent-foreground: oklch(0.21 0.006 285.885);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
+  --border: oklch(0.88 0.005 100);
+  --input: oklch(0.88 0.005 100);
   --ring: oklch(0.705 0.015 286.067);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -192,13 +192,13 @@
   /* Profit/loss values clear 4.5:1 on their own tinted calendar cells (WCAG AA). */
   --profit: oklch(0.48 0.12 160);
   --loss: oklch(0.5 0.19 25);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar: oklch(0.935 0.004 100);
+  --sidebar-foreground: oklch(0.25 0.01 285);
   --sidebar-primary: oklch(0.21 0.006 285.885);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
+  --sidebar-accent: oklch(0.9 0.005 100);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-border: oklch(0.88 0.005 100);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 }
 
