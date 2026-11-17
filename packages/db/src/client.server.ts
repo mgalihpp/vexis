@@ -9,7 +9,13 @@ export type Db = ReturnType<typeof createDb>;
  * statements. The pooler does the pooling, so a small client-side `max` is enough.
  */
 export function createDb(url: string, options: { max?: number } = {}) {
-  const client = postgres(url, { prepare: false, max: options.max ?? 5 });
+  const client = postgres(url, {
+    prepare: false,
+    max: options.max ?? 5,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    max_lifetime: 60 * 10,
+  });
   return drizzle({ client, schema });
 }
 
