@@ -9,8 +9,9 @@ import {
   LayoutGridIcon,
   SearchIcon,
   TableIcon,
+  XIcon,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { TableHead } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -88,16 +89,40 @@ export function PoolFilter({
   onChange: (value: string) => void;
   placeholder?: string;
 }) {
+  const [draft, setDraft] = useState(value);
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    setDraft(value);
+  }
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const commit = (next: string, wait: number) => {
+    setDraft(next);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onChange(next), wait);
+  };
+
   return (
     <label className="relative w-full min-w-0 max-w-[16rem]">
       <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.25 -translate-y-1/2 text-muted-foreground" />
       <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={draft}
+        onChange={(e) => commit(e.target.value, 250)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-7 w-full rounded-md border bg-card pr-2 pl-8 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
+        className="h-7 w-full rounded-md border bg-card pr-7 pl-8 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring"
       />
+      {draft && (
+        <button
+          type="button"
+          onClick={() => commit("", 0)}
+          aria-label="Clear search"
+          className="absolute top-1/2 right-1.5 flex size-4 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+        >
+          <XIcon className="size-3.25" />
+        </button>
+      )}
     </label>
   );
 }
