@@ -47,6 +47,13 @@ const ALERT_PAGE = 100;
 
 const scope = (userId: string) => forUser(getDb(), userId);
 
+// Cold pair names cost a datapi and a Jupiter request per pool; the page must not wait on them. The lookup keeps
+// running and its cache answers the next refetch, so a pool shows its address until then.
+const PAIR_WAIT_MS = 300;
+
+const pairWithin = (address: string) =>
+  Promise.race([poolTokens(address), new Promise<null>((resolve) => setTimeout(resolve, PAIR_WAIT_MS, null))]);
+
 export async function loadAgents(userId: string): Promise<AgentsData> {
   const s = scope(userId);
   const now = Date.now();
@@ -61,7 +68,7 @@ export async function loadAgents(userId: string): Promise<AgentsData> {
   const agents = await Promise.all(
     rows.map(async (row): Promise<AgentView> => {
       const pools = await listAgentPools(s, row.id);
-      const tokens = await Promise.all(pools.map((p) => poolTokens(p.poolAddress)));
+      const tokens = await Promise.all(pools.map((p) => pairWithin(p.poolAddress)));
       // An in-range fee claim is not an out-of-range event, so it stays out of the counts.
       const events = row.kind === "volume-watch" ? alerts : rebalances.filter((r) => r.action === "rebalance");
       const mine = events.filter((e) => e.agentId === row.id);
