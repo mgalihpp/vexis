@@ -98,6 +98,16 @@ function save(s: Store) {
     .catch((err) => console.error("[traders] store write failed", err));
 }
 
+/** Today's Solana Tracker requests against the daily limit, for the admin page. Reads only. */
+export async function trackerUsage() {
+  const { usage } = await loadStore();
+  return {
+    configured: Boolean(process.env.SOLANA_TRACKER_API_KEY),
+    used: usage.day === today() ? usage.used : 0,
+    limit: DAILY_LIMIT,
+  };
+}
+
 /** Counts `n` requests against today's budget, or refuses without counting. */
 function spend(s: Store, n: number) {
   if (s.usage.day !== today()) s.usage = { day: today(), used: 0 };

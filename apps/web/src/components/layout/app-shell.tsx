@@ -28,7 +28,7 @@ const DATA_SOURCES = [
   { name: "Jupiter", href: "https://jup.ag", icon: "https://static.jup.ag/jup/icon.png" },
 ];
 
-type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents" | "/office";
+type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents" | "/office" | "/admin/invites";
 
 const MOBILE_LINKS: { to: NavTarget; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
@@ -52,7 +52,7 @@ interface Prices {
   btc: number | null;
 }
 
-export function AppShell({ prices, children }: { prices: Prices; children: ReactNode }) {
+export function AppShell({ prices, isAdmin, children }: { prices: Prices; isAdmin: boolean; children: ReactNode }) {
   useEffect(() => {
     useWallets.persist.rehydrate();
     usePools.persist.rehydrate();
@@ -62,7 +62,7 @@ export function AppShell({ prices, children }: { prices: Prices; children: React
 
   return (
     <div className="flex h-dvh flex-col">
-      <AppHeader />
+      <AppHeader isAdmin={isAdmin} />
       <NotificationWatcher />
       <FavoritesBar />
       <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
@@ -87,11 +87,11 @@ function NavItem({ to, children, badge }: { to: NavTarget; children: ReactNode; 
   );
 }
 
-function AppHeader() {
+function AppHeader({ isAdmin }: { isAdmin: boolean }) {
   return (
     <header className="shrink-0 border-b">
       <div className="flex h-[3rem] items-center gap-2 px-2 md:gap-8">
-        <MobileMenu />
+        <MobileMenu isAdmin={isAdmin} />
         <Link
           to="/portfolio"
           aria-label="Vexis"
@@ -106,6 +106,7 @@ function AppHeader() {
           <NavItem to="/screener">Screener</NavItem>
           <NavItem to="/agents">Agents</NavItem>
           <NavItem to="/office">Office</NavItem>
+          {isAdmin && <NavItem to="/admin/invites">Admin</NavItem>}
         </nav>
         <HeaderActions />
       </div>
@@ -113,7 +114,7 @@ function AppHeader() {
   );
 }
 
-function MobileMenu() {
+function MobileMenu({ isAdmin }: { isAdmin: boolean }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
@@ -130,21 +131,23 @@ function MobileMenu() {
           <SheetDescription className="sr-only">Navigation</SheetDescription>
         </SheetHeader>
         <nav className="flex flex-col px-2">
-          {MOBILE_LINKS.map(({ to, label, badge }) => (
-            <SheetClose key={to} asChild>
-              <Link
-                to={to}
-                className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted data-[status=active]:text-brand"
-              >
-                {label}
-                {badge && (
-                  <span className="rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
-                    {badge}
-                  </span>
-                )}
-              </Link>
-            </SheetClose>
-          ))}
+          {(isAdmin ? [...MOBILE_LINKS, { to: "/admin/invites" as const, label: "Admin" }] : MOBILE_LINKS).map(
+            ({ to, label, badge }) => (
+              <SheetClose key={to} asChild>
+                <Link
+                  to={to}
+                  className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm font-medium transition-colors hover:bg-muted data-[status=active]:text-brand"
+                >
+                  {label}
+                  {badge && (
+                    <span className="rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+              </SheetClose>
+            ),
+          )}
         </nav>
       </SheetContent>
     </Sheet>

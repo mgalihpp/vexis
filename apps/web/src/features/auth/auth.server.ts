@@ -84,6 +84,14 @@ export async function getViewerFromHeaders(headers: Headers): Promise<Viewer | n
   return { id, email, name, role: role === "admin" ? "admin" : "member" };
 }
 
+/** Like `getViewerFromHeaders`, but skips the signed cookie cache, so a revoked session or a changed role counts at once. */
+export async function getFreshViewerFromHeaders(headers: Headers): Promise<Viewer | null> {
+  const session = await getAuth().api.getSession({ headers, query: { disableCookieCache: true } });
+  if (!session) return null;
+  const { id, email, name, role } = session.user;
+  return { id, email, name, role: role === "admin" ? "admin" : "member" };
+}
+
 /** Which invite check a sign-up failed, if any. */
 export function inviteRejection(error: unknown): "invite" | "invite-email" | null {
   if (!(error instanceof APIError)) return null;

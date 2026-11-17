@@ -1,9 +1,13 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { heartbeatsQuery } from "@/features/admin/admin.queries";
-import { HeartbeatPage } from "@/features/admin/components/heartbeat-page";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { countsQuery } from "@/features/admin/admin.queries";
+import { AdminLayout } from "@/features/admin/components/admin-layout";
 
+// The role check here only steers the UI. Every admin server function checks the role in the database again.
 export const Route = createFileRoute("/admin")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(heartbeatsQuery),
+  beforeLoad: ({ context }) => {
+    if (context.viewer?.role !== "admin") throw notFound();
+  },
+  loader: ({ context }) => context.queryClient.ensureQueryData(countsQuery),
   head: () => ({ meta: [{ title: "Admin | Vexis" }] }),
-  component: HeartbeatPage,
+  component: AdminLayout,
 });
