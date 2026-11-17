@@ -8,11 +8,11 @@
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ADMIN_STOP } from "@vexis/shared/office";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { closeDb, createDb } from "../src/client.server.ts";
-import { disableOffice, enableOffice, listOffices, stopAllOffices } from "../src/office.server.ts";
+import { disableOffice, enableOffice, listOffices, resumeAllOffices, stopAllOffices } from "../src/office.server.ts";
 import { forUser } from "../src/queries.server.ts";
-import { officeConfig, users } from "../src/schema.ts";
+import { users } from "../src/schema.ts";
 
 try {
   process.loadEnvFile(fileURLToPath(new URL("../../../.env", import.meta.url)));
@@ -52,12 +52,7 @@ try {
     await stopAllOffices(db, ADMIN_STOP);
     console.log("Every office is paused and every unexecuted proposal rejected.");
   } else if (values["resume-all"]) {
-    const rows = await db
-      .update(officeConfig)
-      .set({ paused: false, pausedReason: null, pausedUntil: null })
-      .where(and(eq(officeConfig.paused, true), eq(officeConfig.pausedReason, ADMIN_STOP)))
-      .returning({ userId: officeConfig.userId });
-    console.log(`Resumed ${rows.length} office(s).`);
+    console.log(`Resumed ${await resumeAllOffices(db, ADMIN_STOP)} office(s).`);
   } else if (values.list) {
     const offices = await listOffices(db);
     const emails = new Map(

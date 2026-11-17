@@ -6,6 +6,7 @@
     "./schema": "./src/schema.ts",
     "./office-queries": "./src/office.server.ts",
     "./heartbeat-queries": "./src/heartbeat.server.ts",
+    "./admin-queries": "./src/admin.server.ts",
     "./client": "./src/client.server.ts",
     "./queries": "./src/queries.server.ts",
     "./emails": "./src/emails.server.ts"

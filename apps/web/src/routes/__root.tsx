@@ -62,10 +62,11 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootLayout() {
   const { data: prices } = useSuspenseQuery(pricesQuery);
+  const { viewer } = Route.useRouteContext();
   const bare = useRouterState({ select: (s) => isPublicPath(s.location.pathname) });
   if (bare) return <Outlet />;
   return (
-    <AppShell prices={prices}>
+    <AppShell prices={prices} isAdmin={viewer?.role === "admin"}>
       <Outlet />
     </AppShell>
   );

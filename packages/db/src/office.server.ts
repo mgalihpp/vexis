@@ -17,7 +17,7 @@ import {
 } from "@vexis/shared/office";
 import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "./client.server.ts";
-import { forUser, type UserScope } from "./queries.server.ts";
+import { type Executor, forUser, type UserScope } from "./queries.server.ts";
 import {
   officeConfig,
   officeJournal,
@@ -539,14 +539,29 @@ export function listOffices(db: Db) {
 }
 
 /** The admin's global kill switch: pauses every office and rejects whatever has not executed. */
-export async function stopAllOffices(db: Db, reason: string) {
-  await db.transaction(async (tx) => {
-    await tx.update(officeConfig).set({ paused: true, pausedReason: reason, pausedUntil: null });
-    await tx
+export async function stopAllOffices(db: Executor, reason: string) {
+  return db.transaction(async (tx) => {
+    const offices = await tx
+      .update(officeConfig)
+      .set({ paused: true, pausedReason: reason, pausedUntil: null })
+      .returning({ userId: officeConfig.userId });
+    const proposals = await tx
       .update(officeProposals)
       .set({ status: "rejected", decidedBy: "kill_switch" })
-      .where(inArray(officeProposals.status, ["draft", "risk_checked", "awaiting_approval", "approved"]));
+      .where(inArray(officeProposals.status, ["draft", "risk_checked", "awaiting_approval", "approved"]))
+      .returning({ id: officeProposals.id });
+    return { offices: offices.length, proposals: proposals.length };
   });
+}
+
+/** Lifts an admin stop (and only that: an owner's or a guardrail's pause stays). Returns how many offices resumed. */
+export async function resumeAllOffices(db: Executor, reason: string) {
+  const rows = await db
+    .update(officeConfig)
+    .set({ paused: false, pausedReason: null, pausedUntil: null })
+    .where(and(eq(officeConfig.paused, true), eq(officeConfig.pausedReason, reason)))
+    .returning({ userId: officeConfig.userId });
+  return rows.length;
 }
 
 /** Every office bot with a linked chat, for the office runtime's update poll. Tokens are still encrypted. */

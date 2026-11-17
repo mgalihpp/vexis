@@ -17,6 +17,12 @@ import { Route as OfficeRouteImport } from './routes/office'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ScreenerRouteImport } from './routes/screener'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminAgentsRouteImport } from './routes/admin/agents'
+import { Route as AdminInvitesRouteImport } from './routes/admin/invites'
+import { Route as AdminOfficeRouteImport } from './routes/admin/office'
+import { Route as AdminSystemRouteImport } from './routes/admin/system'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
 import { Route as AgentsNewRouteImport } from './routes/agents/new'
@@ -68,6 +74,36 @@ const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAgentsRoute = AdminAgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminInvitesRoute = AdminInvitesRouteImport.update({
+  id: '/invites',
+  path: '/invites',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminOfficeRoute = AdminOfficeRouteImport.update({
+  id: '/office',
+  path: '/office',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSystemRoute = AdminSystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AgentsIndexRoute = AgentsIndexRouteImport.update({
   id: '/agents/',
@@ -128,16 +164,22 @@ const PortfolioWalletTransactionsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
+  '/admin/agents': typeof AdminAgentsRoute
+  '/admin/invites': typeof AdminInvitesRoute
+  '/admin/office': typeof AdminOfficeRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -149,15 +191,20 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
+  '/admin/agents': typeof AdminAgentsRoute
+  '/admin/invites': typeof AdminInvitesRoute
+  '/admin/office': typeof AdminOfficeRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
+  '/admin': typeof AdminIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -170,16 +217,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/analytics': typeof AnalyticsRoute
   '/login': typeof LoginRoute
   '/office': typeof OfficeRoute
   '/privacy': typeof PrivacyRoute
   '/screener': typeof ScreenerRoute
   '/terms': typeof TermsRoute
+  '/admin/agents': typeof AdminAgentsRoute
+  '/admin/invites': typeof AdminInvitesRoute
+  '/admin/office': typeof AdminOfficeRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
   '/agents/': typeof AgentsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -200,9 +253,15 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/screener'
     | '/terms'
+    | '/admin/agents'
+    | '/admin/invites'
+    | '/admin/office'
+    | '/admin/system'
+    | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
     | '/portfolio/$wallet'
+    | '/admin/'
     | '/agents/'
     | '/portfolio/'
     | '/api/auth/$'
@@ -214,15 +273,20 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/admin'
     | '/analytics'
     | '/login'
     | '/office'
     | '/privacy'
     | '/screener'
     | '/terms'
+    | '/admin/agents'
+    | '/admin/invites'
+    | '/admin/office'
+    | '/admin/system'
+    | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
+    | '/admin'
     | '/agents'
     | '/portfolio'
     | '/api/auth/$'
@@ -241,9 +305,15 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/screener'
     | '/terms'
+    | '/admin/agents'
+    | '/admin/invites'
+    | '/admin/office'
+    | '/admin/system'
+    | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
     | '/portfolio/$wallet'
+    | '/admin/'
     | '/agents/'
     | '/portfolio/'
     | '/api/auth/$'
@@ -256,7 +326,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AnalyticsRoute: typeof AnalyticsRoute
   LoginRoute: typeof LoginRoute
   OfficeRoute: typeof OfficeRoute
@@ -328,6 +398,48 @@ declare module '@tanstack/react-router' {
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/agents': {
+      id: '/admin/agents'
+      path: '/agents'
+      fullPath: '/admin/agents'
+      preLoaderRoute: typeof AdminAgentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/invites': {
+      id: '/admin/invites'
+      path: '/invites'
+      fullPath: '/admin/invites'
+      preLoaderRoute: typeof AdminInvitesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/office': {
+      id: '/admin/office'
+      path: '/office'
+      fullPath: '/admin/office'
+      preLoaderRoute: typeof AdminOfficeRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/system': {
+      id: '/admin/system'
+      path: '/system'
+      fullPath: '/admin/system'
+      preLoaderRoute: typeof AdminSystemRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/agents/': {
       id: '/agents/'
@@ -409,6 +521,26 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminAgentsRoute: typeof AdminAgentsRoute
+  AdminInvitesRoute: typeof AdminInvitesRoute
+  AdminOfficeRoute: typeof AdminOfficeRoute
+  AdminSystemRoute: typeof AdminSystemRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminAgentsRoute: AdminAgentsRoute,
+  AdminInvitesRoute: AdminInvitesRoute,
+  AdminOfficeRoute: AdminOfficeRoute,
+  AdminSystemRoute: AdminSystemRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface PortfolioWalletRouteChildren {
   PortfolioWalletActiveRoute: typeof PortfolioWalletActiveRoute
   PortfolioWalletBalancesRoute: typeof PortfolioWalletBalancesRoute
@@ -431,7 +563,7 @@ const PortfolioWalletRouteWithChildren = PortfolioWalletRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AnalyticsRoute: AnalyticsRoute,
   LoginRoute: LoginRoute,
   OfficeRoute: OfficeRoute,

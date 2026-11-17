@@ -1,3 +1,4 @@
+import { AUDIT_ACTIONS, type AuditAction } from "@vexis/shared/admin";
 import {
   AGENT_KINDS,
   type AgentKind,
@@ -646,3 +647,24 @@ export const serviceHeartbeats = pgTable("service_heartbeats", {
   /** Set while a stale alert for this schedule is open, so one outage sends one message. */
   alertedAt: timestamp("alerted_at", { withTimezone: true }),
 }).enableRLS();
+
+/**
+ * Append-only record of what an admin did: who, what, to which target, when. Written in the same transaction as the
+ * action, so an action without a row cannot happen. `actor_email` is a copy, so the row still says who after the
+ * user is gone. `details` never holds an invite token, a key or a secret.
+ */
+export const adminAudit = pgTable(
+  "admin_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+    actorEmail: text("actor_email").notNull(),
+    action: text("action").$type<AuditAction>().notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: text("target_id"),
+    targetLabel: text("target_label"),
+    details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("admin_audit_at_idx").on(t.at.desc()), enumCheck("admin_audit_action_check", "action", AUDIT_ACTIONS)],
+).enableRLS();

@@ -338,7 +338,7 @@ export function hashInviteToken(token: string) {
 
 /** Returns the plain token once; only its hash is stored. */
 export async function createInvite(
-  db: Db,
+  db: Executor,
   input: { createdBy?: string; email?: string; note?: string; maxUses?: number; expiresAt: Date },
 ) {
   const token = randomBytes(24).toString("base64url");
@@ -390,8 +390,13 @@ export async function redeemInvite(db: Executor, token: string, user: { id: stri
   });
 }
 
-export async function revokeInvite(db: Db, inviteId: string) {
-  await db.update(invites).set({ revokedAt: new Date() }).where(eq(invites.id, inviteId));
+export async function revokeInvite(db: Executor, inviteId: string) {
+  const rows = await db
+    .update(invites)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(invites.id, inviteId), isNull(invites.revokedAt)))
+    .returning({ id: invites.id });
+  return rows.length > 0;
 }
 
 /** Returns true when the email had not asked before. */

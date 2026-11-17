@@ -42,6 +42,7 @@ The web app imports `client` and `queries` only from its own `*.server.ts` files
 | `rebalance_wallets`                              | user   | One per user: public key; sealed secret key, `rpc_url` encrypted with `RPC_ENC_KEY`, `rpc_host` in the clear. |
 | `agent_rebalances`                               | user   | `action` (rebalance, claim), bin ranges, `fee_sol`, `live`, `signature`, `tx_error`, `at`.                    |
 | `pool_minutes`                                   | global | Per-minute volume per pool, shared by everyone.                                                               |
+| `admin_audit`                                    | global | Append-only record of admin actions (who, what, target, when), written with the action in one transaction.    |
 
 ## Isolation
 
