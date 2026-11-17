@@ -311,7 +311,7 @@ export function RebalanceRuleSection({
           />
         </div>
       </div>
-      <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
+      <footer className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 md:static md:z-auto">
         <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
         <FormError error={save.error} />
         <Button variant="ghost" size="sm" disabled={!dirty || save.isPending} onClick={() => update(initial)}>
@@ -672,7 +672,7 @@ export function RebalanceOverview({ agent, now }: { agent: RebalanceAgentView; n
 export function RebalanceHistory({ agentId }: { agentId: string }) {
   const { data } = useSuspenseQuery(rebalancesQuery(agentId));
   return (
-    <Panel title="Rebalances" className="overflow-hidden rounded-xl border">
+    <Panel title="Rebalances" className="overflow-hidden">
       <div className="overflow-x-auto border-t">
         <RebalanceTable rows={data.rebalances} feeMode={data.feeMode} now={data.now} />
       </div>

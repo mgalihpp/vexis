@@ -102,7 +102,7 @@ export function FleetPage() {
           </Button>
         </header>
 
-        <section className="overflow-hidden rounded-xl border bg-card">
+        <section className="overflow-hidden rounded-lg bg-card">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4">
             <div role="tablist" className="-mb-px flex gap-5 overflow-x-auto">
               {TABS.map((t) => (

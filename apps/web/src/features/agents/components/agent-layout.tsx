@@ -45,10 +45,10 @@ export function StatCard({ label, value, tone = "" }: { label: string; value: Re
 }
 
 const STAT_TONE = {
-  brand: { card: "from-brand/10", icon: "bg-brand/15 text-brand", bar: "bg-brand" },
-  sky: { card: "from-sky-500/10", icon: "bg-sky-500/15 text-sky-500", bar: "bg-sky-500" },
-  violet: { card: "from-violet-500/10", icon: "bg-violet-500/15 text-violet-500", bar: "bg-violet-500" },
-  amber: { card: "from-amber-500/10", icon: "bg-amber-500/15 text-amber-500", bar: "bg-amber-500" },
+  brand: { icon: "bg-brand/15 text-brand", bar: "bg-brand" },
+  sky: { icon: "bg-sky-500/15 text-sky-500", bar: "bg-sky-500" },
+  violet: { icon: "bg-violet-500/15 text-violet-500", bar: "bg-violet-500" },
+  amber: { icon: "bg-amber-500/15 text-amber-500", bar: "bg-amber-500" },
 };
 
 export type Tone = keyof typeof STAT_TONE;
@@ -70,9 +70,7 @@ export function KpiCard({
 }) {
   const t = STAT_TONE[tone];
   return (
-    <div
-      className={`flex items-center gap-4 rounded-xl border bg-linear-to-br ${t.card} to-card to-60% bg-card px-4 py-5`}
-    >
+    <div className="flex items-center gap-4 rounded-lg bg-card px-3.25 py-4">
       <span className={`flex size-11 shrink-0 items-center justify-center rounded-full ${t.icon}`}>{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="text-xs text-muted-foreground">{label}</div>

@@ -9,6 +9,7 @@ import {
   PauseIcon,
   PencilIcon,
   PlayIcon,
+  PlusIcon,
   PowerIcon,
   SendIcon,
   SlidersHorizontalIcon,
@@ -29,12 +30,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Notice } from "@/features/portfolio/components/notice";
 import { Pagination, PoolFilter, type Sort, sortBy } from "@/features/portfolio/components/table-controls";
 import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { screenerQuery } from "@/features/screener/screener.queries";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   type AgentStatus,
   type AgentView,
@@ -125,6 +129,8 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
   const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
   const hint = statusHint(agent);
+  const [addOpen, setAddOpen] = useState(false);
+  const canAdd = tab === "pools" && agent.kind === "volume-watch" && agent.config.source === "pools";
   return (
     <div className="flex h-full flex-col">
       <AgentsBar
@@ -169,7 +175,21 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div className="mx-auto flex w-full max-w-[110rem] flex-col px-4 pt-5 pb-8 md:px-6">
-          <PageHeader agent={agent} tab={tab} />
+          <PageHeader
+            agent={agent}
+            tab={tab}
+            action={
+              canAdd && (
+                <Button
+                  size="sm"
+                  className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+                  onClick={() => setAddOpen(true)}
+                >
+                  <PlusIcon /> Add pool
+                </Button>
+              )
+            }
+          />
           {hint && <Notice>{hint}</Notice>}
           <FormError error={toggle.error} />
           {tab === "overview" &&
@@ -178,7 +198,7 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
             ) : (
               <Overview agent={agent} now={now} />
             ))}
-          {tab === "pools" && <PoolsTab agent={agent} now={now} />}
+          {tab === "pools" && <PoolsTab agent={agent} now={now} addOpen={addOpen} setAddOpen={setAddOpen} />}
           {tab === "alerts" &&
             (agent.kind === "auto-rebalance" ? <RebalanceHistory agentId={agent.id} /> : <AlertsTab now={now} />)}
           {tab === "settings" && <SettingsTab agent={agent} />}
@@ -188,11 +208,12 @@ function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: Detai
   );
 }
 
-function PageHeader({ agent, tab }: { agent: AgentView; tab: DetailTab }) {
+function PageHeader({ agent, tab, action }: { agent: AgentView; tab: DetailTab; action?: ReactNode }) {
   return (
-    <h1 className="shrink-0 truncate pb-4 font-brand text-xl font-bold tracking-tight md:text-2xl">
-      {tabLabel(tab, agent)}
-    </h1>
+    <div className="flex shrink-0 items-center justify-between gap-3 pb-4">
+      <h1 className="truncate font-brand text-xl font-bold tracking-tight md:text-2xl">{tabLabel(tab, agent)}</h1>
+      {action}
+    </div>
   );
 }
 
@@ -271,7 +292,6 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
         <div className="flex flex-col gap-4">
           <Panel
             title="Spike rule"
-            className="rounded-xl border"
             action={
               <Button asChild variant="outline" size="sm">
                 <Link to="/agents/$agentId" params={{ agentId: agent.id }} search={{ tab: "settings" }}>
@@ -290,7 +310,7 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
               ]}
             />
           </Panel>
-          <Panel title="Telegram" className="rounded-xl border">
+          <Panel title="Telegram">
             <div className="px-4 pb-4">
               <TelegramPanel kind="volume-watch" />
             </div>
@@ -298,7 +318,7 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
         </div>
         <Panel
           title="Recent alerts"
-          className="self-start overflow-hidden rounded-xl border"
+          className="self-start overflow-hidden"
           action={
             <Link
               to="/agents/$agentId"
@@ -319,13 +339,33 @@ function Overview({ agent, now }: { agent: VolumeAgentView; now: number }) {
   );
 }
 
-function PoolsTab({ agent, now }: { agent: AgentView; now: number }) {
+function PoolsTab({
+  agent,
+  now,
+  addOpen,
+  setAddOpen,
+}: {
+  agent: AgentView;
+  now: number;
+  addOpen: boolean;
+  setAddOpen: (open: boolean) => void;
+}) {
   if (agent.kind === "volume-watch" && agent.config.source === "screener")
     return <ScreenerMatches agent={agent} now={now} />;
-  return <PickedPools agent={agent} now={now} />;
+  return <PickedPools agent={agent} now={now} addOpen={addOpen} setAddOpen={setAddOpen} />;
 }
 
-function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
+function PickedPools({
+  agent,
+  now,
+  addOpen,
+  setAddOpen,
+}: {
+  agent: AgentView;
+  now: number;
+  addOpen: boolean;
+  setAddOpen: (open: boolean) => void;
+}) {
   const add = useAgentMutation(addAgentPoolFn);
   const remove = useAgentMutation(removeAgentPoolFn);
   // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
@@ -336,7 +376,14 @@ function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
         agentId={editable ? agent.id : undefined}
         lastLabel={editable ? "Last alert" : "Last out of range"}
         now={now}
-        empty="No pools yet. Add one below."
+        empty="No pools yet."
+        emptyAction={
+          editable && (
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+              <PlusIcon /> Add a pool
+            </Button>
+          )
+        }
         rows={agent.pools.map((p) => ({
           address: p.address,
           label: p.label,
@@ -347,8 +394,12 @@ function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
         }))}
       />
       {editable ? (
-        <Panel title="Add a pool" className="rounded-xl border">
-          <div className="px-4 pb-4">
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add a pool</DialogTitle>
+              <DialogDescription>Up to 20 pools, chosen by hand.</DialogDescription>
+            </DialogHeader>
             <PoolPicker
               taken={agent.pools.map((p) => p.address)}
               count={agent.pools.length}
@@ -358,8 +409,8 @@ function PickedPools({ agent, now }: { agent: AgentView; now: number }) {
               }
             />
             <FormError error={add.error ?? remove.error} />
-          </div>
-        </Panel>
+          </DialogContent>
+        </Dialog>
       ) : (
         <p className="text-xs text-muted-foreground">
           An auto-rebalance agent keeps the pool it was created for. Create another agent for another pool, or delete
@@ -393,7 +444,7 @@ function AlertsTab({ now }: { now: number }) {
   return (
     <Panel
       title="All alerts"
-      className="overflow-hidden rounded-xl border"
+      className="overflow-hidden"
       action={
         <PoolFilter
           value={query}
@@ -433,15 +484,68 @@ function AlertsTab({ now }: { now: number }) {
 }
 
 function SettingsTab({ agent }: { agent: AgentView }) {
-  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { agentId: agent.id, enabled } }));
+  const mobile = useIsMobile();
   const [dirty, setDirty] = useState(false);
   const [section, setSection] = useState<SettingsSectionId>("rule");
+  const [picked, setPicked] = useState<SettingsSectionId>("rule");
+  const [open, setOpen] = useState(false);
   const sections = SETTINGS_SECTIONS.filter((s) => s.id !== "wallet" || agent.kind === "auto-rebalance").map((s) =>
     s.id === "rule" && agent.kind === "auto-rebalance"
       ? { ...s, label: "Rebalance rule", description: "How the position is re-centered when it leaves its range." }
       : s,
   );
   const current = sections.find((s) => s.id === section) ?? SETTINGS_SECTIONS[0];
+  const opened = sections.find((s) => s.id === picked) ?? SETTINGS_SECTIONS[0];
+  const body = (id: SettingsSectionId) => <SettingsBody id={id} agent={agent} onDirty={setDirty} />;
+
+  // Phones get one menu row per section, each opening its own drawer; the sidebar stays for larger screens.
+  if (mobile)
+    return (
+      <>
+        <ul className="divide-y divide-border overflow-hidden rounded-lg bg-card">
+          {sections.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPicked(s.id);
+                  setOpen(true);
+                }}
+                className="flex w-full items-center gap-3 px-3.25 py-3 text-left transition-colors active:bg-muted/60"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                  <s.icon className="size-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    {s.label}
+                    {s.id === "rule" && dirty && <span className="size-1.5 rounded-full bg-brand" aria-hidden />}
+                  </span>
+                  <span className="block text-xs leading-relaxed text-muted-foreground">{s.description}</span>
+                </span>
+                <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground/60" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerContent>
+            <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+              <div className="min-w-0">
+                <DrawerTitle>{opened.label}</DrawerTitle>
+                <DrawerDescription className="mt-0.5">{opened.description}</DrawerDescription>
+              </div>
+              <DrawerClose asChild>
+                <Button variant="ghost" size="sm">
+                  Done
+                </Button>
+              </DrawerClose>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{body(opened.id)}</div>
+          </DrawerContent>
+        </Drawer>
+      </>
+    );
 
   return (
     <div className="grid gap-4 md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6">
@@ -474,50 +578,65 @@ function SettingsTab({ agent }: { agent: AgentView }) {
           <h2 className="text-sm font-semibold">{current.label}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{current.description}</p>
         </header>
-
-        {section === "rule" &&
-          (agent.kind === "auto-rebalance" ? (
-            <RebalanceRuleSection agent={agent} onDirty={setDirty} />
-          ) : (
-            <VolumeRuleSection agent={agent} onDirty={setDirty} />
-          ))}
-
-        {section === "telegram" && (
-          <div className="p-4 sm:p-5">
-            <TelegramPanel kind={agent.kind} />
-          </div>
-        )}
-
-        {section === "wallet" && (
-          <div className="p-4 sm:p-5">
-            <WalletPanel />
-          </div>
-        )}
-
-        {section === "agent" && (
-          <div className="space-y-3 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-6">
-              <div className="min-w-0">
-                <label htmlFor="agent-enabled" className="flex items-center gap-2 text-sm font-medium">
-                  Turned on
-                  {power.isPending && <Spinner className="size-3.5 text-muted-foreground" />}
-                </label>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                  When off, the runner skips this agent: nothing is judged and no alerts are sent.
-                </p>
-              </div>
-              <Switch
-                id="agent-enabled"
-                checked={agent.enabled}
-                disabled={power.isPending}
-                onCheckedChange={(on) => power.mutate(on)}
-              />
-            </div>
-            <FormError error={power.error} />
-            <DeleteAgent agent={agent} />
-          </div>
-        )}
+        {body(current.id)}
       </section>
+    </div>
+  );
+}
+
+function SettingsBody({
+  id,
+  agent,
+  onDirty,
+}: {
+  id: SettingsSectionId;
+  agent: AgentView;
+  onDirty: (dirty: boolean) => void;
+}) {
+  if (id === "rule")
+    return agent.kind === "auto-rebalance" ? (
+      <RebalanceRuleSection agent={agent} onDirty={onDirty} />
+    ) : (
+      <VolumeRuleSection agent={agent} onDirty={onDirty} />
+    );
+  if (id === "telegram")
+    return (
+      <div className="p-4 sm:p-5">
+        <TelegramPanel kind={agent.kind} />
+      </div>
+    );
+  if (id === "wallet")
+    return (
+      <div className="p-4 sm:p-5">
+        <WalletPanel />
+      </div>
+    );
+  return <AgentSection agent={agent} />;
+}
+
+function AgentSection({ agent }: { agent: AgentView }) {
+  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { agentId: agent.id, enabled } }));
+  return (
+    <div className="space-y-3 p-4 sm:p-5">
+      <div className="flex items-center justify-between gap-6">
+        <div className="min-w-0">
+          <label htmlFor="agent-enabled" className="flex items-center gap-2 text-sm font-medium">
+            Turned on
+            {power.isPending && <Spinner className="size-3.5 text-muted-foreground" />}
+          </label>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            When off, the runner skips this agent: nothing is judged and no alerts are sent.
+          </p>
+        </div>
+        <Switch
+          id="agent-enabled"
+          checked={agent.enabled}
+          disabled={power.isPending}
+          onCheckedChange={(on) => power.mutate(on)}
+        />
+      </div>
+      <FormError error={power.error} />
+      <DeleteAgent agent={agent} />
     </div>
   );
 }
@@ -591,7 +710,7 @@ function VolumeRuleSection({ agent, onDirty }: { agent: VolumeAgentView; onDirty
           onChange={(key, value) => update({ ...form, fields: { ...form.fields, [key]: value } })}
         />
       </div>
-      <footer className="flex flex-wrap items-center gap-3 border-t px-4 py-3 sm:px-5">
+      <footer className="sticky bottom-0 z-10 flex flex-wrap items-center gap-3 border-t bg-card px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5 md:static md:z-auto">
         <span className="mr-auto text-xs text-muted-foreground">{dirty && "You have unsaved changes"}</span>
         <FormError error={save.error} />
         <Button variant="ghost" size="sm" disabled={!dirty || save.isPending} onClick={() => update(saved)}>

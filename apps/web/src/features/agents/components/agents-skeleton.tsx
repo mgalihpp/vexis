@@ -15,7 +15,7 @@ export function FleetSkeleton() {
         <div className="h-8 w-28 animate-pulse rounded-md bg-card" />
         <div className="h-7 w-28 animate-pulse rounded-md bg-card" />
       </div>
-      <div className="h-64 animate-pulse rounded-xl bg-card" />
+      <div className="h-64 animate-pulse rounded-lg bg-card" />
       <p className="text-center text-xs text-muted-foreground">Loading agents…</p>
     </div>
   );
