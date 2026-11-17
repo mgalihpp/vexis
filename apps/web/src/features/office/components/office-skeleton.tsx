@@ -13,7 +13,7 @@ export function OfficeSkeleton() {
         </div>
       </div>
       <div className="grid gap-3 p-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex flex-col gap-2 rounded-xl bg-card p-2.5 ring-1 ring-foreground/10">
+        <div className="flex flex-col gap-2 rounded-lg bg-card p-2.5">
           <div className="flex gap-1.5">
             <Skeleton className="h-6 w-14" />
             <Skeleton className="h-6 w-20" />
@@ -32,9 +32,9 @@ export function OfficeSkeleton() {
             <Skeleton className="h-5 w-16" />
             <Skeleton className="h-5 w-10" />
           </div>
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-36 rounded-lg" />
+          <Skeleton className="h-28 rounded-lg" />
         </div>
       </div>
     </div>

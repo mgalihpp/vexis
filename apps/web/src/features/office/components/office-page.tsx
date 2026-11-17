@@ -240,7 +240,12 @@ function StopControl({ view, now }: { view: OfficeView; now: number }) {
     if (!pause.canResume) return null;
     return (
       <div className="flex flex-col items-end">
-        <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate(undefined)}>
+        <Button
+          size="sm"
+          disabled={resume.isPending}
+          onClick={() => resume.mutate(undefined)}
+          className="bg-brand font-semibold text-brand-foreground hover:bg-brand/90"
+        >
           {resume.isPending ? <Spinner /> : <PlayIcon />}
           Resume
         </Button>

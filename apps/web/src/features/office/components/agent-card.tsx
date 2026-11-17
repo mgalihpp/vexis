@@ -88,7 +88,7 @@ export function AgentCard({
       </div>
 
       <div data-vaul-no-drag className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4">
-        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md border bg-background/60 px-2.5 py-2">
+        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md border bg-background/90 px-2.5 py-2">
           {rows.map(([label, value, tone]) => (
             <div key={label} className="contents">
               <dt className="text-[0.6875rem] text-muted-foreground">{label}</dt>
@@ -106,7 +106,7 @@ export function AgentCard({
           </div>
         ) : (
           prompt && (
-            <details className="rounded-md border bg-background/60 px-2.5 py-2">
+            <details className="rounded-md border bg-background/90 px-2.5 py-2">
               <summary className="cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase select-none">
                 System prompt · {prompt.version}
               </summary>

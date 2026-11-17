@@ -11,7 +11,7 @@ const summary =
 /** One stored message, collapsed until asked for: a desk sends a system and a user message and gets one answer. */
 function Message({ name, text }: { name: string; text: string }) {
   return (
-    <details className="rounded-md border bg-background/60 px-2.5 py-2">
+    <details className="rounded-md border bg-background/90 px-2.5 py-2">
       <summary className={summary}>
         {name} · {text.length} chars
       </summary>
@@ -43,7 +43,7 @@ export function ThreadDetail({ thread, now }: { thread: ThreadView; now: number 
 
   return (
     <div className="flex flex-col gap-1.5">
-      <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md border bg-background/60 px-2.5 py-2">
+      <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-md border bg-background/90 px-2.5 py-2">
         {rows.map(([label, value, tone]) => (
           <div key={label} className="contents">
             <dt className="text-[0.6875rem] text-muted-foreground">{label}</dt>

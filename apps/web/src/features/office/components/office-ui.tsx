@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useState } from "react";
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { money } from "@/features/portfolio/money";
 import { OFFICE_KEY } from "../office.queries";
@@ -36,16 +35,16 @@ export const cost = (v: number | null) => (v === null ? DASH : money(v, "usd", {
 export const toneOf = (v: number | null) =>
   v === null || v === 0 ? "text-muted-foreground" : v > 0 ? "text-profit" : "text-loss";
 
-/** A sidebar panel: a small shadcn card with a title and an optional action on the right. */
+/** A sidebar panel with a title and an optional action on the right. */
 export function Section({ title, action, children }: { title: ReactNode; action?: ReactNode; children: ReactNode }) {
   return (
-    <Card size="sm" className="shrink-0">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {action && <CardAction>{action}</CardAction>}
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2.5">{children}</CardContent>
-    </Card>
+    <section className="shrink-0 rounded-lg bg-card p-3.25">
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-heading text-xs leading-snug font-medium">{title}</h3>
+        {action}
+      </div>
+      <div className="mt-2.5 flex flex-col gap-2.5">{children}</div>
+    </section>
   );
 }
 

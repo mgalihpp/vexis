@@ -117,7 +117,7 @@ export function OfficeFloor({
   return (
     <section
       aria-label="Office floor"
-      className="flex min-w-0 flex-col overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 lg:h-full lg:flex-row"
+      className="flex min-w-0 flex-col overflow-hidden rounded-lg bg-card lg:h-full lg:flex-row"
     >
       <Roster statuses={statuses} stopped={data.stopped} selected={selected} onSelect={onSelect} />
       <div className="flex min-w-0 flex-1 flex-col">
