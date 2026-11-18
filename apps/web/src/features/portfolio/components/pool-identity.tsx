@@ -1,4 +1,12 @@
-import { ActivityIcon, BadgeCheckIcon, CircleDollarSignIcon, FootprintsIcon, LeafIcon, ShieldIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BadgeCheckIcon,
+  CircleDollarSignIcon,
+  ExternalLinkIcon,
+  FootprintsIcon,
+  LeafIcon,
+  ShieldIcon,
+} from "lucide-react";
 import { type PointerEvent, type ReactNode, useCallback, useRef, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -226,6 +234,7 @@ export function LinkStack({ label, links }: { label: string; links: { name: stri
           >
             <img src={l.logo} alt="" className="size-3.5 rounded-[0.15rem]" />
             {l.name}
+            <ExternalLinkIcon className="ml-auto size-3 shrink-0 text-muted-foreground" />
           </a>
         ))}
       </PopoverContent>
