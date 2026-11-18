@@ -222,6 +222,7 @@ export function PoolCard({ pool, s, onSelect }: { pool: PoolView; s: SiblingPool
     <Link
       to="/analytics"
       search={(prev) => ({ ...prev, pool: s.address })}
+      preload={false}
       onClick={onSelect}
       className={`flex flex-col gap-2.5 rounded-lg border bg-muted/40 p-3 ${active ? "border-brand/60" : ""}`}
     >

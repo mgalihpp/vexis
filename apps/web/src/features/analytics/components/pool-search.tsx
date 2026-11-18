@@ -57,6 +57,7 @@ export function PoolHitList({ query, hits, onSelect }: { query: string; hits: Po
           <Link
             to="/analytics"
             search={(prev) => ({ ...prev, pool: h.address })}
+            preload={false}
             onClick={onSelect}
             className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
           >

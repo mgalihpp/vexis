@@ -181,6 +181,7 @@ export function PoolCell({ address, label, tokens }: { address: string; label: s
         <Link
           to="/analytics"
           search={{ pool: address }}
+          preload={false}
           className="block truncate text-xs font-semibold hover:text-brand"
         >
           {name}

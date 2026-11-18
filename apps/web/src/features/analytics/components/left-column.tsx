@@ -180,6 +180,7 @@ function PoolDialog({ pool, siblings }: { pool: PoolView; siblings: SiblingPool[
                   key={s.address}
                   to="/analytics"
                   search={(prev) => ({ ...prev, pool: s.address })}
+                  preload={false}
                   onClick={close}
                   className={`${cols} num h-11 border-t text-sm font-medium hover:bg-muted/60 ${active ? "bg-muted/40" : ""}`}
                 >
