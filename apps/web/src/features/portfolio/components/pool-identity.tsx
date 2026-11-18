@@ -1,6 +1,7 @@
 import { ActivityIcon, BadgeCheckIcon, CircleDollarSignIcon, FootprintsIcon, LeafIcon, ShieldIcon } from "lucide-react";
-import { type ReactNode, useCallback, useState } from "react";
+import { type PointerEvent, type ReactNode, useCallback, useRef, useState } from "react";
 import { InfoTip } from "@/components/info-tip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { shortAddr } from "@/lib/format";
 import { pct } from "../money";
 import type { PoolMeta, Token } from "../portfolio";
@@ -142,6 +143,7 @@ export function TokenScores({ token }: { token: Token }) {
 
 const LINKS = [
   { name: "Meteora", icon: "meteora", href: (p: PoolMeta) => `https://app.meteora.ag/dlmm/${p.address}` },
+  { name: "HawkFi", icon: "hawkfi", href: (p: PoolMeta) => hawkfiUrl(p.address) },
   { name: "Jupiter", icon: "jupiter", href: (p: PoolMeta) => `https://jup.ag/tokens/${p.tokenX.mint}` },
   { name: "DexScreener", icon: "dexscreener", href: (p: PoolMeta) => `https://dexscreener.com/solana/${p.address}` },
   { name: "GMGN", icon: "gmgn", href: (p: PoolMeta) => `https://gmgn.ai/sol/token/${p.tokenX.mint}` },
@@ -152,14 +154,84 @@ const LINKS = [
 ] as const;
 
 export const bubblemapsUrl = (mint: string) => `https://v2.bubblemaps.io/map?address=${mint}&chain=solana`;
+const hawkfiUrl = (pool: string) => `https://www.hawkfi.ag/meteora/${pool}?create=true`;
 
 /** Where to trade or chart a pool, shared by Analytics' Trade & Charts panel and the screener rows. */
 export const tradeLinks = (pool: string, x: string, y: string) => [
   { name: "Meteora", logo: "/links/meteora.png", href: `https://app.meteora.ag/dlmm/${pool}` },
+  { name: "HawkFi", logo: "/links/hawkfi.png", href: hawkfiUrl(pool) },
   { name: "Jupiter", logo: "/brands/jupiter.png", href: `https://jup.ag/swap/${x}-${y}` },
   { name: "GMGN", logo: "/brands/gmgn.png", href: `https://gmgn.ai/sol/token/${x}` },
   { name: "Bubblemaps", logo: "/links/bubblemaps.png", href: bubblemapsUrl(x) },
 ];
+
+const STACK_SHOWN = 3;
+
+/**
+ * The first few link icons stacked with a "+N" count; hovering (or tapping) opens a popover with every link. It stays
+ * open while the pointer is over the trigger or the popover, so the links inside can be clicked.
+ */
+export function LinkStack({ label, links }: { label: string; links: { name: string; logo: string; href: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const closing = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const mouse = useRef(false);
+  const hold = (e: PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(closing.current);
+    setOpen(true);
+  };
+  const release = (e: PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
+    closing.current = setTimeout(() => setOpen(false), 150);
+  };
+  const rest = links.length - STACK_SHOWN;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        aria-label={`${label} links`}
+        className="relative z-10 flex shrink-0 cursor-pointer items-center"
+        onPointerDown={(e) => {
+          mouse.current = e.pointerType === "mouse";
+        }}
+        onPointerEnter={hold}
+        onPointerLeave={release}
+        onClick={(e) => mouse.current && e.preventDefault()}
+      >
+        {links.slice(0, STACK_SHOWN).map((l, i) => (
+          <img
+            key={l.name}
+            src={l.logo}
+            alt=""
+            style={{ zIndex: STACK_SHOWN - i }}
+            className="relative size-3.5 shrink-0 rounded-[0.2rem] ring-2 ring-card not-first:-ml-1"
+          />
+        ))}
+        {rest > 0 && <span className="ml-1 text-[0.625rem] text-muted-foreground tabular-nums">+{rest}</span>}
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        className="w-fit gap-0 p-1"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onPointerEnter={hold}
+        onPointerLeave={release}
+      >
+        {links.map((l) => (
+          <a
+            key={l.name}
+            href={l.href}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`${label} on ${l.name}`}
+            className="flex items-center gap-2 rounded-sm px-2 py-1 hover:bg-accent hover:text-accent-foreground"
+          >
+            <img src={l.logo} alt="" className="size-3.5 rounded-[0.15rem]" />
+            {l.name}
+          </a>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function PoolLinks({ pool }: { pool: PoolMeta }) {
   return (
