@@ -844,7 +844,7 @@ function PoolRow({ pool, rank, top, now, solPrice, win, open, onToggle }: RowPro
   return (
     <div className="border-b last:rounded-b-lg last:border-b-0">
       <div
-        className={`${GRID} group relative isolate h-12 text-xs transition-colors focus-within:bg-muted/50 hover:bg-muted/50 ${open ? "bg-muted/40" : ""}`}
+        className={`${GRID} group relative isolate h-12 text-xs transition-colors has-[:focus-visible]:bg-muted/50 hover:bg-muted/50 ${open ? "bg-muted/40" : ""}`}
       >
         <RowLink pool={pool} />
         <span className="num text-[11px] text-muted-foreground">{rank}</span>
