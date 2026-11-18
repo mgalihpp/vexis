@@ -833,6 +833,7 @@ function RowLink({ pool }: { pool: ScreenerPool }) {
     <Link
       to="/analytics"
       search={{ pool: pool.address }}
+      preload={false}
       aria-label={`${pool.name} analytics`}
       className="absolute inset-0 rounded-[inherit] focus-visible:outline-none"
     />
@@ -1128,6 +1129,7 @@ function Details({ pool, solPrice, className }: { pool: ScreenerPool; solPrice: 
           <Link
             to="/analytics"
             search={{ pool: pool.address }}
+            preload={false}
             className="flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-brand hover:bg-brand/10"
           >
             Analytics

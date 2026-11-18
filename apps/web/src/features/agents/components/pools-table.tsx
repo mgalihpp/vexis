@@ -184,6 +184,7 @@ export function PoolsTable({
                     <Link
                       to="/analytics"
                       search={{ pool: r.address }}
+                      preload={false}
                       className="flex items-center gap-1.5 text-sm font-semibold hover:text-brand"
                     >
                       <span className="truncate">{r.name}</span>
@@ -249,7 +250,7 @@ export function PoolsTable({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem asChild>
-                      <Link to="/analytics" search={{ pool: r.address }}>
+                      <Link to="/analytics" search={{ pool: r.address }} preload={false}>
                         <ExternalLinkIcon className="size-3.5" /> Open analytics
                       </Link>
                     </DropdownMenuItem>
