@@ -405,7 +405,7 @@ function TopTraders({
   );
 }
 
-const CAPTION = "text-[0.625rem] font-medium tracking-[0.025em] text-muted-foreground uppercase";
+const CAPTION = "text-[0.625rem] font-medium tracking-[0.025em] text-muted-foreground";
 
 function Side({
   label,

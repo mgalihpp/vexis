@@ -5,8 +5,7 @@ import { cost, DASH, utcClock } from "./office-ui";
 
 const pre =
   "m-0 mt-1.5 overflow-x-auto font-mono text-[0.625rem] leading-relaxed whitespace-pre-wrap text-muted-foreground";
-const summary =
-  "cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase select-none";
+const summary = "cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground select-none";
 
 /** One stored message, collapsed until asked for: a desk sends a system and a user message and gets one answer. */
 function Message({ name, text }: { name: string; text: string }) {

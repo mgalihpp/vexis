@@ -69,13 +69,13 @@ function totals(positions: readonly TrackedPosition[]): Totals {
   };
 }
 
-/** Uppercase label over a value, the tile the portfolio cards use. */
+/** Labeled tile over a value, matching the portfolio cards. */
 function Tile({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
   return (
     <div
       className={`flex flex-col items-center justify-center gap-1 rounded-md border bg-background/90 p-3 text-center text-xs ${className}`}
     >
-      <span className="text-[0.6875rem] font-medium tracking-[0.025em] text-muted-foreground uppercase">{label}</span>
+      <span className="text-[0.6875rem] font-medium tracking-[0.025em] text-muted-foreground">{label}</span>
       {children}
     </div>
   );
@@ -181,7 +181,7 @@ const ROW_GRID =
 function PositionHeader() {
   return (
     <div
-      className={`${ROW_GRID} hidden pb-1 text-[0.6875rem] font-medium tracking-[0.025em] text-muted-foreground uppercase @2xl:grid`}
+      className={`${ROW_GRID} hidden pb-1 text-[0.6875rem] font-medium tracking-[0.025em] text-muted-foreground @2xl:grid`}
     >
       <span>Position</span>
       <span>Range</span>

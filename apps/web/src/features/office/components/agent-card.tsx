@@ -99,15 +99,13 @@ export function AgentCard({
 
         {thread ? (
           <div className="flex flex-col gap-1">
-            <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase">
-              Last exchange
-            </span>
+            <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground">Last exchange</span>
             <ThreadDetail thread={thread} now={now} />
           </div>
         ) : (
           prompt && (
             <details className="rounded-md border bg-background/90 px-2.5 py-2">
-              <summary className="cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase select-none">
+              <summary className="cursor-pointer text-[0.625rem] font-semibold tracking-wider text-muted-foreground select-none">
                 System prompt · {prompt.version}
               </summary>
               <pre className="m-0 mt-1.5 overflow-x-auto font-mono text-[0.625rem] leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -118,9 +116,7 @@ export function AgentCard({
         )}
 
         <div className="flex flex-col gap-1">
-          <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground uppercase">
-            Last said
-          </span>
+          <span className="text-[0.625rem] font-semibold tracking-wider text-muted-foreground">Last said</span>
           {said.length === 0 && <p className="text-[0.6875rem] text-muted-foreground">Nothing yet.</p>}
           {said.map((m) => (
             <p key={m.id} className="text-[0.6875rem] leading-snug [overflow-wrap:anywhere]">

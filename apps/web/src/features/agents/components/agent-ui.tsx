@@ -265,7 +265,7 @@ export function PoolPicker({
   const pinned = onRemove ? taken.map((a) => seen[a]).filter((h): h is PoolSearchHit => Boolean(h)) : [];
   const maxVol = Math.max(1, ...hits.map((h) => h.volume24h), ...pinned.map((h) => h.volume24h));
   const full = max > 1 && count >= max;
-  const label = "font-mono text-[0.6rem] tracking-[0.08em] uppercase";
+  const label = "font-mono text-[0.6rem] tracking-[0.08em]";
   return (
     <div className="space-y-3">
       {pinned.length > 0 && (
