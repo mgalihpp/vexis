@@ -79,7 +79,7 @@ function NavItem({ to, children, badge }: { to: NavTarget; children: ReactNode; 
     >
       {children}
       {badge && (
-        <span className="absolute -top-1.5 -right-0.75 translate-x-full rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
+        <span className="ml-1 align-super rounded-[0.2rem] border border-brand/60 px-0.75 text-[0.45rem] leading-[0.65rem] font-bold tracking-wider text-brand">
           {badge}
         </span>
       )}
