@@ -98,6 +98,7 @@ const view = (over: Partial<OfficeView> = {}): OfficeView => ({
   pnl: { today: { sol: null, usd: null }, total: { sol: null, usd: null } },
   spend: [],
   today: {},
+  briefing: null,
   ...over,
 });
 

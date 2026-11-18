@@ -58,7 +58,13 @@ export const sendCard = (
   Effect.gen(function* () {
     const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
     const messageId = autopilot
-      ? yield* sendToOwner(office, "notice", autopilotText(proposal, autopilot.nominalSol, autopilot.limitSol), [], where)
+      ? yield* sendToOwner(
+          office,
+          "notice",
+          autopilotText(proposal, autopilot.nominalSol, autopilot.limitSol),
+          [],
+          where,
+        )
       : yield* sendToOwner(office, "card", cardText(proposal), cardButtons(proposal.id), where);
     if (messageId !== null) yield* (yield* Db).setCard(office.userId, proposal.id, messageId);
   });

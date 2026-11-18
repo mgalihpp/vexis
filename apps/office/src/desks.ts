@@ -411,9 +411,13 @@ const present = (floor: Floor, proposal: ProposalRow, summary: string) =>
     if (!moved) return;
     const name = proposal.poolName ?? "A pool";
     const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
-    const held = floor.book.open.find((j) => j.positionAddress !== null && j.positionAddress === proposal.positionAddress);
+    const held = floor.book.open.find(
+      (j) => j.positionAddress !== null && j.positionAddress === proposal.positionAddress,
+    );
     const verdict = autopilotVerdict(floor.row.mode, floor.guardrails, proposal, held?.amountSol ?? null);
-    const approved = verdict.approve ? yield* db.autopilotApprove(floor.userId, proposal.id, new Date(floor.now)) : null;
+    const approved = verdict.approve
+      ? yield* db.autopilotApprove(floor.userId, proposal.id, new Date(floor.now))
+      : null;
     if (approved && verdict.nominalSol !== null) {
       const limitSol = floor.guardrails.autopilotMaxSol;
       const text = `Autopilot approved the ${KIND_TEXT[proposal.kind]} of ${name}: ${verdict.nominalSol.toFixed(4)} SOL, within the ${limitSol} SOL limit.`;

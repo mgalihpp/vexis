@@ -1,3 +1,4 @@
+import type { BriefingStats } from "@vexis/shared/briefing";
 import {
   ADMIN_STOP,
   DAILY_LOSS,
@@ -139,6 +140,9 @@ export type ConfigView = PauseFields & {
   screen: OfficeScreen;
 };
 
+/** The Manager's latest daily briefing: the LLM's prose and the numbers computed in code. */
+export type BriefingView = { day: string; headline: string; body: string; stats: BriefingStats; at: number };
+
 export type OfficeData =
   | { enabled: false }
   | {
@@ -156,6 +160,8 @@ export type OfficeData =
       spend: SpendRow[];
       /** Proposals that reached each status today (UTC). */
       today: Partial<Record<ProposalStatus, number>>;
+      /** Null before the first briefing. */
+      briefing: BriefingView | null;
     };
 
 export type OfficeView = Extract<OfficeData, { enabled: true }>;
@@ -166,7 +172,7 @@ export const AGENT_INFO: Record<OfficeAgent, { name: string; role: string }> = {
   scout: { name: "Scout", role: "Finds candidate pools on the screener list" },
   strategist: { name: "Strategist", role: "Drafts the strategy, range and size" },
   risk: { name: "Risk Manager", role: "Guardrails in code plus an LLM note; can veto" },
-  manager: { name: "Manager", role: "Summarizes proposals and asks for approval" },
+  manager: { name: "Manager", role: "Summarizes proposals, asks for approval and writes the daily briefing" },
   monitor: { name: "Monitor", role: "Watches positions: out of range, take profit, stop loss" },
   executor: { name: "Executor", role: "The only one that executes; simulation only in the MVP" },
   bookkeeper: { name: "Bookkeeper", role: "Writes each position's PnL to the journal" },
@@ -355,6 +361,10 @@ export function proposalFacts(p: ProposalView): { label: string; value: string; 
       return [...facts, { label: "Reason", value: p.params ? CLOSE_REASON[p.params.reason] : DASH }];
   }
 }
+
+/** Proposals autopilot approved, newest first: they never wait in the approval list. */
+export const autopilotDecisions = (proposals: readonly ProposalView[]) =>
+  proposals.filter((p) => p.decidedBy === "autopilot").sort((a, b) => b.updatedAt - a.updatedAt);
 
 // --- pauses -----------------------------------------------------------------------------------
 

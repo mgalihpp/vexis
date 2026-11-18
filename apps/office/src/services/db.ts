@@ -242,8 +242,7 @@ export class Db extends Context.Service<
         decide: (userId, id, decision, now) => run("decide", () => decideProposal(as(userId), id, decision, now)),
         kill: (userId) => run("kill", () => killOffice(as(userId))),
         resume: (userId, now) => run("resume", () => resumeOffice(as(userId), now)),
-        autopilotApprove: (userId, id, now) =>
-          run("autopilotApprove", () => approveByAutopilot(as(userId), id, now)),
+        autopilotApprove: (userId, id, now) => run("autopilotApprove", () => approveByAutopilot(as(userId), id, now)),
         lastBriefedDay: (userId) =>
           run("lastBriefedDay", () => latestBriefing(as(userId))).pipe(Effect.map((row) => row?.day ?? null)),
         insertBriefing: (userId, b) => run("insertBriefing", () => insertBriefing(as(userId), b)),

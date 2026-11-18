@@ -330,7 +330,9 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
       dayActivity: (userId, start, end) =>
         Effect.sync(() => ({
           proposals: mine(userId).filter((p) => p.createdAt >= start && p.createdAt < end),
-          closes: state.journal.filter((j) => j.userId === userId && j.closedAt && j.closedAt >= start && j.closedAt < end),
+          closes: state.journal.filter(
+            (j) => j.userId === userId && j.closedAt && j.closedAt >= start && j.closedAt < end,
+          ),
           runs: [],
           messages: [],
         })),

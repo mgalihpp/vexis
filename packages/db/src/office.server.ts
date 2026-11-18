@@ -551,7 +551,9 @@ export async function dayActivity({ db, userId }: UserScope, start: Date, end: D
     db
       .select()
       .from(officeJournal)
-      .where(and(eq(officeJournal.userId, userId), gte(officeJournal.closedAt, start), lt(officeJournal.closedAt, end))),
+      .where(
+        and(eq(officeJournal.userId, userId), gte(officeJournal.closedAt, start), lt(officeJournal.closedAt, end)),
+      ),
     db
       .select({ costUsd: officeRuns.costUsd, error: officeRuns.error })
       .from(officeRuns)

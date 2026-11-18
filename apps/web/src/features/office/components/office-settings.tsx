@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import {
   type AgentModel,
   Guardrails,
@@ -8,11 +9,13 @@ import {
   type LlmProvider,
   modelsOf,
   OFFICE_SLIPPAGE_BPS,
+  type OfficeMode,
   OfficeModels,
   PROVIDER_LABEL,
 } from "@vexis/shared/office";
-import { PROMPT_TEXT } from "@vexis/shared/office-prompts";
+import { briefingPrompt, PROMPT_TEXT } from "@vexis/shared/office-prompts";
 import {
+  BotIcon,
   BrainIcon,
   CoinsIcon,
   GlobeIcon,
@@ -45,6 +48,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner";
 import { errorText, FormError, TelegramPanel } from "@/features/agents/components/agent-ui";
 import { PresetPicker } from "@/features/agents/components/screener-source";
+import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { shortAddr } from "@/lib/format";
 import { AGENT_INFO, type ConfigView, missingKeys } from "../office";
@@ -55,12 +59,13 @@ import {
   saveKeySourceFn,
   saveLiveFn,
   saveLlmKeyFn,
+  saveModeFn,
   saveModelsFn,
   saveOfficeWalletFn,
   saveScreenFn,
 } from "../office.functions";
 import { Portrait } from "./agent-card";
-import { useOfficeMutation } from "./office-ui";
+import { sol, usd, useOfficeMutation } from "./office-ui";
 
 /** A small field inside an iOS row, the same look as the app Settings' number field. */
 const FIELD =
@@ -326,11 +331,13 @@ function PromptsPage({ config }: { config: ConfigView }) {
       title="System prompts"
       footer="Fixed per desk and versioned; every call records its version in the runs table. The user message carries this tick's pools, wallet and proposal, and is never stored."
     >
-      {LLM_AGENTS.map((agent) => {
+      {LLM_AGENTS.flatMap((agent): { agent: LlmAgent; prompt: { version: string; system: string } }[] => [
+        { agent, prompt: PROMPT_TEXT[agent] },
+        ...(agent === "manager" ? [{ agent, prompt: briefingPrompt }] : []),
+      ]).map(({ agent, prompt }) => {
         const model = config.models[agent];
-        const prompt = PROMPT_TEXT[agent];
         return (
-          <div key={agent} className="flex flex-col gap-2 p-3">
+          <div key={prompt.version} className="flex flex-col gap-2 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Portrait agent={agent} className="h-6 w-4" />
               <span className="text-xs font-medium">{AGENT_INFO[agent].name}</span>
@@ -446,6 +453,7 @@ function WalletPage({ config }: { config: ConfigView }) {
   return (
     <div className="flex flex-col gap-5">
       <ModeGroup config={config} />
+      <ApprovalsGroup config={config} />
 
       {config.officeWallet ? (
         <Group
@@ -576,6 +584,70 @@ function ModeGroup({ config }: { config: ConfigView }) {
   );
 }
 
+/**
+ * Who approves: the owner, every time, or autopilot for proposals within the limit set under Guardrails. Turning
+ * autopilot on asks first; back to asking needs no confirmation.
+ */
+function ApprovalsGroup({ config }: { config: ConfigView }) {
+  const [confirming, setConfirming] = useState(false);
+  const save = useOfficeMutation(saveModeFn);
+  const { data: prices } = useQuery(pricesQuery);
+  const set = (mode: OfficeMode) => !save.isPending && save.mutate({ data: { mode } });
+  const limit = config.guardrails.autopilotMaxSol;
+  const limitText = `${sol(limit)} (${usd(prices?.sol ? limit * prices.sol : null)})`;
+  return (
+    <>
+      <Group
+        title="Approvals"
+        footer={
+          config.mode === "autopilot"
+            ? `Autopilot: proposals that move at most ${limitText} are approved without you; larger ones still ask. Change the limit under Guardrails.`
+            : "Ask me: every proposal waits for your approval."
+        }
+      >
+        <Row icon={icon(BotIcon)} label="Approver">
+          <SegmentedControl
+            value={config.mode}
+            onChange={(v) => (v === "autopilot" ? setConfirming(true) : set("approval"))}
+            options={[
+              { value: "approval", label: "Ask me" },
+              { value: "autopilot", label: "Autopilot" },
+            ]}
+          />
+        </Row>
+      </Group>
+      <FormError error={save.error} />
+      <AlertDialog open={confirming} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Let autopilot approve?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  A proposal that passed every guardrail and moves at most {limitText} will be approved without asking
+                  you: an open's deposit plus its setup cost, a rebalance's or close's position at cost, a claim's fees.
+                  Anything larger, or whose amount is unknown, still waits for you.
+                </p>
+                <p>
+                  {config.live
+                    ? "The office is Live, so these are signed and sent from its wallet."
+                    : "The office is in Preview, so these are simulated until you turn Live on."}{" "}
+                  The kill switch, pauses and the daily loss limit stop autopilot like everything else. Proposals
+                  already waiting stay with you.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep asking me</AlertDialogCancel>
+            <AlertDialogAction onClick={() => set("autopilot")}>Turn autopilot on</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 const GUARDRAIL_GROUPS: {
   title: string;
   fields: { key: keyof Guardrails; label: string; unit: string; step: string }[];
@@ -603,6 +675,12 @@ const GUARDRAIL_GROUPS: {
       { key: "tpPct", label: "Take profit", unit: "% gain on cost", step: "1" },
       { key: "slPct", label: "Stop loss", unit: "% loss on cost", step: "0.5" },
       { key: "claimFeePct", label: "Claim fees at", unit: "% of cost unclaimed", step: "0.5" },
+    ],
+  },
+  {
+    title: "Autopilot",
+    fields: [
+      { key: "autopilotMaxSol", label: "Approve without me up to", unit: "SOL moved per proposal", step: "0.01" },
     ],
   },
   {

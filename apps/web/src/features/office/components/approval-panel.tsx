@@ -1,10 +1,11 @@
-import { CheckIcon, InboxIcon, OctagonPauseIcon, XIcon } from "lucide-react";
+import { BotIcon, CheckIcon, InboxIcon, OctagonPauseIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { shortAddr } from "@/lib/format";
 import {
   AGENT_INFO,
+  autopilotDecisions,
   countdown,
   KIND_LABEL,
   type OfficeView,
@@ -13,7 +14,7 @@ import {
   waitingProposals,
 } from "../office";
 import { decideProposalFn } from "../office.functions";
-import { Meter, PanelEmpty, Section, useOfficeMutation } from "./office-ui";
+import { Meter, PanelEmpty, Section, sol, useOfficeMutation } from "./office-ui";
 
 const TODAY: { status: "approved" | "rejected" | "expired" | "failed" | "done"; label: string }[] = [
   { status: "approved", label: "approved" },
@@ -33,7 +34,13 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
           <PanelEmpty
             icon={stopped ? <OctagonPauseIcon /> : <InboxIcon />}
             title={stopped ? "Office stopped" : "Nothing to approve"}
-            hint={stopped ? undefined : "New proposals land here."}
+            hint={
+              stopped
+                ? undefined
+                : view.config.mode === "autopilot"
+                  ? `Autopilot approves proposals up to ${sol(view.config.guardrails.autopilotMaxSol)}; larger ones land here.`
+                  : "New proposals land here."
+            }
           />
         </div>
         <Section title="Today (UTC)">
@@ -46,6 +53,7 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
             ))}
           </dl>
         </Section>
+        <AutopilotList view={view} />
       </>
     );
   return (
@@ -53,9 +61,39 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
       {waiting.map((p) => (
         <ProposalCard key={p.id} proposal={p} now={now} stopped={stopped} />
       ))}
+      <AutopilotList view={view} />
     </div>
   );
 }
+
+/** What autopilot approved on the owner's behalf; those proposals never wait in the list above. */
+function AutopilotList({ view }: { view: OfficeView }) {
+  const decided = autopilotDecisions(view.proposals);
+  if (decided.length === 0) return null;
+  return (
+    <Section title="Approved by autopilot">
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        {decided.map((p) => (
+          <li key={p.id} className="flex items-center gap-2 text-xs">
+            <BotIcon aria-hidden className="size-3.5 shrink-0 text-brand" />
+            <span className="min-w-0 flex-1 truncate">
+              {KIND_LABEL[p.kind]} {p.poolName ?? shortAddr(p.poolAddress)}
+            </span>
+            <span className="text-[0.6875rem] text-muted-foreground">{STATUS_TEXT[p.status] ?? p.status}</span>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+const STATUS_TEXT: Partial<Record<ProposalView["status"], string>> = {
+  approved: "waiting for the Executor",
+  executing: "executing",
+  done: "done",
+  failed: "failed",
+  rejected: "stopped",
+};
 
 function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; now: number; stopped: boolean }) {
   const decide = useOfficeMutation(decideProposalFn);

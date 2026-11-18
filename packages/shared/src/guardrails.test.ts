@@ -249,9 +249,15 @@ describe("autopilot", () => {
   });
 
   test("a rebalance or close weighs the position at cost, a claim its fees", () => {
-    const rebalance = { kind: "rebalance" as const, params: { strategy: "Spot", activeBin: 0, lowerBin: -3, upperBin: 3 } };
+    const rebalance = {
+      kind: "rebalance" as const,
+      params: { strategy: "Spot", activeBin: 0, lowerBin: -3, upperBin: 3 },
+    };
     expect(verdict(rebalance, 0.5).approve).toBe(true);
-    expect(verdict({ kind: "close", params: { reason: "stop_loss" } }, 0.6)).toEqual({ approve: false, nominalSol: 0.6 });
+    expect(verdict({ kind: "close", params: { reason: "stop_loss" } }, 0.6)).toEqual({
+      approve: false,
+      nominalSol: 0.6,
+    });
     expect(verdict({ kind: "claim", params: { feeSol: 0.02 } }).approve).toBe(true);
   });
 

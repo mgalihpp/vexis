@@ -304,7 +304,9 @@ describe("autopilot", () => {
 
   test("autopilot approves nothing while the office is paused", async () => {
     const s = setup({
-      offices: [office({ mode: "autopilot", guardrails: { autopilotMaxSol: 100 }, paused: true, pausedReason: KILL_SWITCH })],
+      offices: [
+        office({ mode: "autopilot", guardrails: { autopilotMaxSol: 100 }, paused: true, pausedReason: KILL_SWITCH }),
+      ],
       proposals: [proposal({ status: "risk_checked" })],
     });
     await s.run(tick());
