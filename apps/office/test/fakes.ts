@@ -22,7 +22,7 @@ import type { OpenSetup, RangeArrays } from "@vexis/shared/open-cost";
 import { Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";
-import { ChainError, LlmError, MeteoraError, TelegramError } from "../src/errors.ts";
+import { ChainError, DbError, LlmError, MeteoraError, TelegramError } from "../src/errors.ts";
 import type { OfficePool } from "../src/pools.ts";
 import { Chain, type PoolBins } from "../src/services/chain.ts";
 import { type BotTarget, Db, type Spike, type WalletTarget } from "../src/services/db.ts";
@@ -170,6 +170,8 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
     /** Office bots by user; none is linked unless a test adds one. */
     bots: new Map<string, BotTarget & { offset?: number | null }>(),
     briefings: [] as BriefingRow[],
+    /** Fails every briefing read, as a database without the briefings table would. */
+    briefingsDown: false,
   };
   let ids = 0;
   const id = (prefix: string) => `${prefix}-${++ids}`;
@@ -309,12 +311,14 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
           return Object.assign(p, { status: transition(p.status, "approved"), decidedBy: "autopilot" as const });
         }),
       lastBriefedDay: (userId) =>
-        Effect.sync(() =>
-          state.briefings
-            .filter((b) => b.userId === userId)
-            .map((b) => b.day)
-            .reduce<string | null>((a, d) => (a === null || d > a ? d : a), null),
-        ),
+        state.briefingsDown
+          ? Effect.fail(new DbError({ operation: "lastBriefedDay", cause: new Error("no table") }))
+          : Effect.sync(() =>
+              state.briefings
+                .filter((b) => b.userId === userId)
+                .map((b) => b.day)
+                .reduce<string | null>((a, d) => (a === null || d > a ? d : a), null),
+            ),
       insertBriefing: (userId, b) =>
         Effect.sync(() => {
           if (state.briefings.some((r) => r.userId === userId && r.day === b.day)) return;

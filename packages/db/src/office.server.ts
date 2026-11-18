@@ -562,10 +562,10 @@ export async function dayActivity({ db, userId }: UserScope, start: Date, end: D
       .select()
       .from(officeMessages)
       .where(and(eq(officeMessages.userId, userId), gte(officeMessages.at, start), lt(officeMessages.at, end)))
-      .orderBy(officeMessages.at)
+      .orderBy(desc(officeMessages.at))
       .limit(1000),
   ]);
-  return { proposals, closes, runs, messages };
+  return { proposals, closes, runs, messages: messages.reverse() };
 }
 
 // --- cross-user (apps/office only) -----------------------------------------------------------

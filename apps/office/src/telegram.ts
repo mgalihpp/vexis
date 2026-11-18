@@ -106,8 +106,8 @@ function cardDetails(p: ProposalRow) {
 export const cardText = (p: ProposalRow) => `${cardDetails(p)}\n\nExpires ${utcTime(p.expiresAt)}`;
 
 /** What autopilot sends instead of a card: no buttons and no expiry, since nothing waits for the owner. */
-export const autopilotText = (p: ProposalRow, nominalSol: number, limitSol: number) =>
-  `${cardDetails(p)}\n\n${outcome(p) ?? ""} It moves ${nominalSol.toFixed(4)} SOL, within your ${limitSol} SOL limit.`;
+export const autopilotText = (p: ProposalRow, moved: string, limitSol: number) =>
+  `${cardDetails(p)}\n\n${outcome(p) ?? ""} It moves ${moved}, within your ${limitSol} SOL limit.`;
 
 export const cardButtons = (proposalId: string): Button[] => [
   { text: "Approve", callback_data: callbackData("approve", proposalId) },

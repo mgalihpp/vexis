@@ -698,6 +698,12 @@ function GuardrailsPage({ config }: { config: ConfigView }) {
     Object.fromEntries(GUARDRAIL_FIELDS.map((f) => [f.key, String(config.guardrails[f.key])])),
   );
   const save = useOfficeMutation(saveGuardrailsFn);
+  const { data: prices } = useQuery(pricesQuery);
+  // A SOL amount the owner types also reads in USD, from the footer's SOL price.
+  const inUsd = (key: string) => {
+    const value = Number(draft[key]);
+    return Number.isFinite(value) && prices?.sol ? value * prices.sol : null;
+  };
   const parsed = Guardrails.safeParse(
     Object.fromEntries(Object.entries(draft).map(([k, v]) => [k, v.trim() === "" ? Number.NaN : Number(v)])),
   );
@@ -724,7 +730,11 @@ function GuardrailsPage({ config }: { config: ConfigView }) {
           }
         >
           {g.fields.map((f) => (
-            <Row key={f.key} label={<label htmlFor={`guardrail-${f.key}`}>{f.label}</label>} description={f.unit}>
+            <Row
+              key={f.key}
+              label={<label htmlFor={`guardrail-${f.key}`}>{f.label}</label>}
+              description={f.key === "autopilotMaxSol" ? `${f.unit} · ${usd(inUsd(f.key))}` : f.unit}
+            >
               <input
                 id={`guardrail-${f.key}`}
                 type="number"

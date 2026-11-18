@@ -266,11 +266,11 @@ describe("autopilot", () => {
     await s.run(tick());
     expect(s.db.proposals[0]).toMatchObject({ status: "approved", decidedBy: "autopilot" });
     expect(s.db.messages.at(-1)?.text).toBe(
-      "Autopilot approved the open of JUP-SOL: 1.0574 SOL, within the 1.0574 SOL limit.",
+      "Autopilot approved the open of JUP-SOL: 1.0574 SOL ($158.61), within the 1.0574 SOL limit.",
     );
     const [notice] = s.telegram.sent;
     expect(notice?.buttons).toEqual([]);
-    expect(notice?.text).toContain("✅ Approved by autopilot. It moves 1.0574 SOL");
+    expect(notice?.text).toContain("✅ Approved by autopilot. It moves 1.0574 SOL ($158.61)");
     expect(notice?.text).not.toContain("Expires");
     expect(s.db.proposals[0]?.telegramMessageId).toBe(notice?.messageId ?? -1);
   });
@@ -337,6 +337,13 @@ describe("daily briefing", () => {
     const sent = s.telegram.sent.find((m) => m.text.startsWith("Daily briefing, 2026-01-01 (UTC)"));
     expect(sent?.text).toContain("Realized PnL: no closes");
     expect(sent?.buttons).toEqual([]);
+  });
+
+  test("a failing briefing never keeps the desks from their tick", async () => {
+    const s = setup({ offices: [office({ createdAt: new Date(T0 - 86_400_000) })] });
+    s.db.briefingsDown = true;
+    await s.run(tick(), NEXT_DAY + 45 * MINUTE);
+    expect(statuses(s)).toEqual(["awaiting_approval"]);
   });
 
   test("a reply in the wrong shape is retried an hour later, not every minute", async () => {

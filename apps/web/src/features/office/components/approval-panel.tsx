@@ -1,7 +1,9 @@
+import { useQuery } from "@tanstack/react-query";
 import { BotIcon, CheckIcon, InboxIcon, OctagonPauseIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { FormError } from "@/features/agents/components/agent-ui";
+import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { shortAddr } from "@/lib/format";
 import {
   AGENT_INFO,
@@ -14,7 +16,7 @@ import {
   waitingProposals,
 } from "../office";
 import { decideProposalFn } from "../office.functions";
-import { Meter, PanelEmpty, Section, sol, useOfficeMutation } from "./office-ui";
+import { Meter, PanelEmpty, Section, sol, usd, useOfficeMutation } from "./office-ui";
 
 const TODAY: { status: "approved" | "rejected" | "expired" | "failed" | "done"; label: string }[] = [
   { status: "approved", label: "approved" },
@@ -27,6 +29,8 @@ const TODAY: { status: "approved" | "rejected" | "expired" | "failed" | "done"; 
 /** Proposals waiting for the owner, the one expiring first on top, each with a live countdown. */
 export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: number; stopped: boolean }) {
   const waiting = waitingProposals(view.proposals, now);
+  const { data: prices } = useQuery(pricesQuery);
+  const limit = view.config.guardrails.autopilotMaxSol;
   if (waiting.length === 0)
     return (
       <>
@@ -38,7 +42,7 @@ export function ApprovalPanel({ view, now, stopped }: { view: OfficeView; now: n
               stopped
                 ? undefined
                 : view.config.mode === "autopilot"
-                  ? `Autopilot approves proposals up to ${sol(view.config.guardrails.autopilotMaxSol)}; larger ones land here.`
+                  ? `Autopilot approves proposals up to ${sol(limit)} (${usd(prices?.sol ? limit * prices.sol : null)}); larger ones land here.`
                   : "New proposals land here."
             }
           />

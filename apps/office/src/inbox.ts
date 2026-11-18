@@ -53,18 +53,12 @@ const sendToOwner = (
 export const sendCard = (
   office: Office,
   proposal: ProposalRow,
-  autopilot: { readonly nominalSol: number; readonly limitSol: number } | null = null,
+  autopilot: { readonly moved: string; readonly limitSol: number } | null = null,
 ) =>
   Effect.gen(function* () {
     const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
     const messageId = autopilot
-      ? yield* sendToOwner(
-          office,
-          "notice",
-          autopilotText(proposal, autopilot.nominalSol, autopilot.limitSol),
-          [],
-          where,
-        )
+      ? yield* sendToOwner(office, "notice", autopilotText(proposal, autopilot.moved, autopilot.limitSol), [], where)
       : yield* sendToOwner(office, "card", cardText(proposal), cardButtons(proposal.id), where);
     if (messageId !== null) yield* (yield* Db).setCard(office.userId, proposal.id, messageId);
   });

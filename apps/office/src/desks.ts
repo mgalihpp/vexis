@@ -420,9 +420,12 @@ const present = (floor: Floor, proposal: ProposalRow, summary: string) =>
       : null;
     if (approved && verdict.nominalSol !== null) {
       const limitSol = floor.guardrails.autopilotMaxSol;
-      const text = `Autopilot approved the ${KIND_TEXT[proposal.kind]} of ${name}: ${verdict.nominalSol.toFixed(4)} SOL, within the ${limitSol} SOL limit.`;
+      // The last screener read's SOL price, from memory: no request.
+      const solUsd = (yield* (yield* Screener).current())?.solUsd ?? null;
+      const moved = `${verdict.nominalSol.toFixed(4)} SOL (${solUsd === null ? "—" : `$${(verdict.nominalSol * solUsd).toFixed(2)}`})`;
+      const text = `Autopilot approved the ${KIND_TEXT[proposal.kind]} of ${name}: ${moved}, within the ${limitSol} SOL limit.`;
       yield* say(floor, "manager", text, "good", where);
-      return yield* sendCard(floor, approved, { nominalSol: verdict.nominalSol, limitSol });
+      return yield* sendCard(floor, approved, { moved, limitSol });
     }
     const why =
       floor.row.mode !== "autopilot"
