@@ -824,7 +824,7 @@ function Money({ usd, solPrice }: { usd: number; solPrice: number | null }) {
 }
 
 function TradeIcons({ pool }: { pool: ScreenerPool }) {
-  return <LinkStack label={pool.name} links={tradeLinks(pool.address, pool.tokenX.mint, pool.tokenY.mint)} />;
+  return <LinkStack label={pool.name} links={tradeLinks(pool.address, pool.tokenX.mint)} />;
 }
 
 /** Covers the whole row so it opens Analytics, while the trade links above it stay separate anchors. */

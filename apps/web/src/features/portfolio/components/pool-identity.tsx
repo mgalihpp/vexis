@@ -165,10 +165,10 @@ export const bubblemapsUrl = (mint: string) => `https://v2.bubblemaps.io/map?add
 const hawkfiUrl = (pool: string) => `https://www.hawkfi.ag/meteora/${pool}?create=true`;
 
 /** Where to trade or chart a pool, shared by Analytics' Trade & Charts panel and the screener rows. */
-export const tradeLinks = (pool: string, x: string, y: string) => [
+export const tradeLinks = (pool: string, x: string) => [
   { name: "Meteora", logo: "/links/meteora.png", href: `https://app.meteora.ag/dlmm/${pool}` },
   { name: "HawkFi", logo: "/links/hawkfi.png", href: hawkfiUrl(pool) },
-  { name: "Jupiter", logo: "/brands/jupiter.png", href: `https://jup.ag/swap/${x}-${y}` },
+  { name: "Jupiter", logo: "/brands/jupiter.png", href: `https://jup.ag/tokens/${x}` },
   { name: "GMGN", logo: "/brands/gmgn.png", href: `https://gmgn.ai/sol/token/${x}` },
   { name: "Bubblemaps", logo: "/links/bubblemaps.png", href: bubblemapsUrl(x) },
 ];
