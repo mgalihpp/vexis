@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -370,6 +370,21 @@ function PickedPools({
   const remove = useAgentMutation(removeAgentPoolFn);
   // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
   const editable = agent.kind === "volume-watch";
+  const isMobile = useIsMobile();
+  const picker = (listClassName: string) => (
+    <>
+      <PoolPicker
+        taken={agent.pools.map((p) => p.address)}
+        count={agent.pools.length}
+        busy={add.isPending}
+        listClassName={listClassName}
+        onPick={(pool) =>
+          add.mutate({ data: { ...pool, agentId: agent.id } }, { onSuccess: () => toast.success("Pool added") })
+        }
+      />
+      <FormError error={add.error ?? remove.error} />
+    </>
+  );
   return (
     <div className="flex flex-col gap-4">
       <PoolsTable
@@ -393,22 +408,33 @@ function PickedPools({
           onRemove: editable ? () => remove.mutate({ data: { agentId: agent.id, poolId: p.id } }) : undefined,
         }))}
       />
-      {editable ? (
+      {editable && isMobile ? (
+        <Drawer open={addOpen} onOpenChange={setAddOpen}>
+          <DrawerContent className="h-[90dvh] data-[vaul-drawer-direction=bottom]:max-h-[90dvh]">
+            <div className="relative flex h-12 shrink-0 items-center justify-center border-b px-4">
+              <DrawerTitle className="text-sm font-semibold">Add a pool</DrawerTitle>
+              <DrawerDescription className="sr-only">Up to 20 pools, chosen by hand.</DrawerDescription>
+              <DrawerClose asChild>
+                <button type="button" className="absolute right-4 text-sm font-semibold text-brand">
+                  Done
+                </button>
+              </DrawerClose>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 pb-8">{picker("")}</div>
+          </DrawerContent>
+        </Drawer>
+      ) : editable ? (
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add a pool</DialogTitle>
-              <DialogDescription>Up to 20 pools, chosen by hand.</DialogDescription>
-            </DialogHeader>
-            <PoolPicker
-              taken={agent.pools.map((p) => p.address)}
-              count={agent.pools.length}
-              busy={add.isPending}
-              onPick={(pool) =>
-                add.mutate({ data: { ...pool, agentId: agent.id } }, { onSuccess: () => toast.success("Pool added") })
-              }
-            />
-            <FormError error={add.error ?? remove.error} />
+          <DialogContent className="flex h-[min(46rem,90dvh)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+            <div className="flex h-12 shrink-0 items-center border-b px-5 pr-12">
+              <DialogTitle className="text-sm font-semibold">Add a pool</DialogTitle>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-6">
+              <DialogDescription className="mb-3 text-xs text-muted-foreground">
+                Up to 20 pools, chosen by hand.
+              </DialogDescription>
+              {picker("max-h-[min(30rem,55dvh)]")}
+            </div>
           </DialogContent>
         </Dialog>
       ) : (

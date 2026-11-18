@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import {
   BadgeCheckIcon,
   CheckIcon,
@@ -10,15 +10,16 @@ import {
   XIcon,
   ZapIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { findPools } from "@/features/analytics/analytics.functions";
-import type { PoolSearchHit } from "@/features/analytics/analytics.types";
+import type { PoolSearchHit, PoolSearchToken } from "@/features/analytics/analytics.types";
 import { usePoolHits } from "@/features/analytics/components/pool-search";
 import { Badge, TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd, pct } from "@/features/portfolio/money";
+import type { ScreenerPool, ScreenerToken } from "@/features/screener/screener";
+import { screenerQuery } from "@/features/screener/screener.queries";
 import { shortAddr } from "@/lib/format";
 import {
   type AgentStatus,
@@ -225,6 +226,28 @@ export function RemovePoolButton({
   );
 }
 
+const TOP_POOLS = 50;
+
+function screenerToken(t: ScreenerToken): PoolSearchToken {
+  return { mint: t.mint, symbol: t.symbol, icon: t.icon, verified: t.verified, organicScore: t.organic, risks: null };
+}
+
+/** A screener row in the shape the picker draws; the screener's list is already at the 24h volume the picker shows. */
+function toPoolHit(p: ScreenerPool): PoolSearchHit {
+  return {
+    address: p.address,
+    name: p.name,
+    binStep: p.binStep,
+    baseFee: p.baseFeePct,
+    dynamicFee: null,
+    tvl: p.tvl,
+    volume24h: p.volume["24h"],
+    fees24h: p.fees24h,
+    tokenX: screenerToken(p.tokenX),
+    tokenY: screenerToken(p.tokenY),
+  };
+}
+
 /** Pool list to pick from: the busiest pools by default, narrowed by the search box. */
 export function PoolPicker({
   taken,
@@ -234,6 +257,7 @@ export function PoolPicker({
   busy = false,
   max = MAX_POOLS,
   hidden = [],
+  listClassName = "max-h-[22rem]",
 }: {
   /** Pools already picked; they leave the list (and are pinned above it with `onRemove`). */
   taken: string[];
@@ -246,26 +270,27 @@ export function PoolPicker({
   max?: number;
   /** Pools that cannot be picked here at all. */
   hidden?: string[];
+  listClassName?: string;
 }) {
   const [query, setQuery] = useState("");
-  const [top, setTop] = useState<PoolSearchHit[]>([]);
   const [seen, setSeen] = useState<Record<string, PoolSearchHit>>({});
   const found = usePoolHits(query, true);
-  useEffect(() => {
-    let live = true;
-    findPools({ data: { query: "" } })
-      .then((r) => live && setTop(r))
-      .catch(() => live && setTop([]));
-    return () => {
-      live = false;
-    };
-  }, []);
+  const { data: screener } = useQuery(screenerQuery);
+  const top = useMemo(
+    () =>
+      (screener?.pools ?? [])
+        .filter((p) => !p.blacklisted)
+        .sort((a, b) => b.volume["24h"] - a.volume["24h"])
+        .slice(0, TOP_POOLS)
+        .map(toPoolHit),
+    [screener],
+  );
   const searching = query.trim().length > 0;
   const hits = (searching ? found : top).filter((h) => !taken.includes(h.address) && !hidden.includes(h.address));
   const pinned = onRemove ? taken.map((a) => seen[a]).filter((h): h is PoolSearchHit => Boolean(h)) : [];
   const maxVol = Math.max(1, ...hits.map((h) => h.volume24h), ...pinned.map((h) => h.volume24h));
   const full = max > 1 && count >= max;
-  const label = "font-mono text-[0.6rem] tracking-[0.08em]";
+  const label = "text-xs";
   return (
     <div className="space-y-3">
       {pinned.length > 0 && (
@@ -309,7 +334,7 @@ export function PoolPicker({
           <span className="hidden text-right md:block">Fees 24h</span>
           <span />
         </div>
-        <ul className="max-h-[22rem] divide-y overflow-auto">
+        <ul className={`${listClassName} divide-y overflow-auto`}>
           {hits.map((h) => (
             <li key={h.address}>
               <PoolRow
