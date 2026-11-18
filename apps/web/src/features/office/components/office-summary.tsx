@@ -1,4 +1,4 @@
-import { LayersIcon, XIcon } from "lucide-react";
+import { LayersIcon, NewspaperIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -40,6 +40,68 @@ export function PnlCard({ view }: { view: OfficeView }) {
           </div>
         ))}
       </dl>
+    </Section>
+  );
+}
+
+/**
+ * The Manager's latest daily briefing: its prose, then the numbers worked out in code. Unknown PnL is a dash and is
+ * counted, never summed as zero.
+ */
+export function BriefingCard({ view }: { view: OfficeView }) {
+  const b = view.briefing;
+  if (!b) {
+    return (
+      <Section title="Daily briefing">
+        <PanelEmpty
+          icon={<NewspaperIcon />}
+          title="No briefing yet"
+          hint="Each day after 00:30 UTC the Manager briefs you on the day before."
+        />
+      </Section>
+    );
+  }
+  const s = b.stats;
+  const facts = [
+    {
+      label: "Realized PnL",
+      value: s.closes.count === 0 ? DASH : sol(s.closes.pnlSol, true),
+      sub:
+        s.closes.count === 0
+          ? "no closes"
+          : `${usd(s.closes.pnlUsd, true)} · ${s.closes.count} closed${s.closes.unknown > 0 ? `, ${s.closes.unknown} unknown` : ""}`,
+      tone: toneOf(s.closes.pnlSol),
+    },
+    {
+      label: "Proposals",
+      value: String(s.proposals.total),
+      sub: `${s.proposals.approvedByOwner} by you · ${s.proposals.approvedByAutopilot} autopilot · ${s.proposals.vetoed} vetoed`,
+    },
+    { label: "Open now", value: String(s.open.count), sub: sol(s.open.sol) },
+    { label: "LLM spend", value: cost(s.llm.usd), sub: `${s.llm.runs} calls` },
+  ];
+  return (
+    <Section
+      title="Daily briefing"
+      action={
+        <Badge variant="outline" className="font-mono">
+          {b.day}
+        </Badge>
+      }
+    >
+      <div className="flex flex-col gap-2.5">
+        <p className="text-xs font-medium">{b.headline}</p>
+        <p className="text-xs text-muted-foreground">{b.body}</p>
+        <dl className="m-0 grid grid-cols-2 gap-1.5">
+          {facts.map((f) => (
+            <div key={f.label} className="min-w-0 rounded-md border bg-background/90 px-2 py-1.5">
+              <dt className="text-[0.6875rem] text-muted-foreground">{f.label}</dt>
+              <dd className={`m-0 text-xs font-medium tabular-nums ${f.tone ?? ""}`}>{f.value}</dd>
+              <dd className="m-0 truncate text-[0.6875rem] text-muted-foreground tabular-nums">{f.sub}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </Section>
   );
 }

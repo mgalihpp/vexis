@@ -19,6 +19,7 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from
 import type { Db } from "./client.server.ts";
 import { type Executor, forUser, type UserScope } from "./queries.server.ts";
 import {
+  officeBriefings,
   officeConfig,
   officeJournal,
   officeMessages,
@@ -189,6 +190,18 @@ export async function decideProposal(s: UserScope, proposalId: string, decision:
   return moved
     ? ({ ok: true, proposal: moved } as const)
     : ({ ok: false, refusal: "decided" as DecisionRefusal } as const);
+}
+
+/**
+ * Autopilot's approval of a proposal already in front of the owner. It reads the office again, so a kill switch, an
+ * admin stop or a switch back to approval mode that landed after the tick started still wins; the owner's refusals
+ * (expired, paused, decided) apply unchanged. Undefined when it was refused or another actor moved the proposal.
+ */
+export async function approveByAutopilot(s: UserScope, proposalId: string, now: Date) {
+  const [config, proposal] = await Promise.all([getOfficeConfig(s), getProposal(s, proposalId)]);
+  if (config?.mode !== "autopilot") return undefined;
+  if (refuseDecision(pauseOf(config), proposal, "approve", now.getTime())) return undefined;
+  return moveProposal(s, proposalId, "awaiting_approval", "approved", { decidedBy: "autopilot" });
 }
 
 /** The owner's kill switch: pauses the office and rejects every proposal not yet executing. Null with no office. */
@@ -483,6 +496,76 @@ export async function closeJournal(
     .where(and(eq(officeJournal.id, journalId), eq(officeJournal.userId, userId), isNull(officeJournal.closedAt)))
     .returning();
   return row;
+}
+
+// --- daily briefing --------------------------------------------------------------------------
+
+export type BriefingRow = typeof officeBriefings.$inferSelect;
+
+export function latestBriefing({ db, userId }: UserScope) {
+  return db
+    .select()
+    .from(officeBriefings)
+    .where(eq(officeBriefings.userId, userId))
+    .orderBy(desc(officeBriefings.day))
+    .limit(1)
+    .then((rows) => rows[0]);
+}
+
+/** Undefined when the day already has a briefing: the unique index keeps it to one. */
+export async function insertBriefing(
+  { db, userId }: UserScope,
+  b: Omit<typeof officeBriefings.$inferInsert, "id" | "userId" | "createdAt">,
+) {
+  const [row] = await db
+    .insert(officeBriefings)
+    .values({ userId, ...b })
+    .onConflictDoNothing()
+    .returning();
+  return row;
+}
+
+/** How many calls ran `promptVersion` since `since`, and the last one: what bounds a failing briefing's retries. */
+export async function runAttempts({ db, userId }: UserScope, promptVersion: string, since: Date) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int`, lastAt: sql<Date | null>`max(${officeRuns.at})` })
+    .from(officeRuns)
+    .where(and(eq(officeRuns.userId, userId), eq(officeRuns.promptVersion, promptVersion), gte(officeRuns.at, since)));
+  return { count: row?.count ?? 0, lastAt: row?.lastAt ? new Date(row.lastAt) : null };
+}
+
+/** Everything that happened in `[start, end)`: what a day's briefing is written from. The feed is oldest first. */
+export async function dayActivity({ db, userId }: UserScope, start: Date, end: Date) {
+  const [proposals, closes, runs, messages] = await Promise.all([
+    db
+      .select()
+      .from(officeProposals)
+      .where(
+        and(
+          eq(officeProposals.userId, userId),
+          gte(officeProposals.createdAt, start),
+          lt(officeProposals.createdAt, end),
+        ),
+      )
+      .orderBy(officeProposals.createdAt),
+    db
+      .select()
+      .from(officeJournal)
+      .where(
+        and(eq(officeJournal.userId, userId), gte(officeJournal.closedAt, start), lt(officeJournal.closedAt, end)),
+      ),
+    db
+      .select({ costUsd: officeRuns.costUsd, error: officeRuns.error })
+      .from(officeRuns)
+      .where(and(eq(officeRuns.userId, userId), gte(officeRuns.at, start), lt(officeRuns.at, end))),
+    db
+      .select()
+      .from(officeMessages)
+      .where(and(eq(officeMessages.userId, userId), gte(officeMessages.at, start), lt(officeMessages.at, end)))
+      .orderBy(desc(officeMessages.at))
+      .limit(1000),
+  ]);
+  return { proposals, closes, runs, messages: messages.reverse() };
 }
 
 // --- cross-user (apps/office only) -----------------------------------------------------------

@@ -6,6 +6,7 @@ import {
   insertProposal,
   journalPnl,
   killOffice,
+  latestBriefing,
   latestRuns,
   listJournal,
   listMessages,
@@ -20,6 +21,7 @@ import {
   updateOfficeConfig,
 } from "@vexis/db/office-queries";
 import { forUser } from "@vexis/db/queries";
+import { BriefingStats } from "@vexis/shared/briefing";
 import {
   AgentModel,
   activeModels,
@@ -29,6 +31,7 @@ import {
   LLM_PROVIDERS,
   type LlmProvider,
   type OfficeAgent,
+  type OfficeMode,
   type OfficeModels,
   type OfficeScreen,
   OPEN_STATUSES,
@@ -100,7 +103,7 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
   if (!config) return { enabled: false };
 
   const now = new Date();
-  const [open, recent, messages, runs, threads, positions, pnl, spend, counts] = await Promise.all([
+  const [open, recent, messages, runs, threads, positions, pnl, spend, counts, briefing] = await Promise.all([
     listProposals(s, { statuses: OPEN_STATUSES, limit: 100 }),
     listProposals(s, { limit: 10 }),
     listMessages(s, { limit: 60 }),
@@ -110,7 +113,9 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
     journalPnl(s, utcDayStart(now)),
     llmSpendToday(s, now),
     proposalCountsSince(s, utcDayStart(now)),
+    latestBriefing(s),
   ]);
+  const briefingStats = briefing && BriefingStats.safeParse(briefing.stats);
   const proposals = [...new Map([...open, ...recent].map((p) => [p.id, p])).values()];
 
   const view: ConfigView = {
@@ -183,6 +188,16 @@ export async function loadOffice(userId: string): Promise<OfficeData> {
       runs: r.runs,
     })),
     today: Object.fromEntries(counts.map((c) => [c.status, c.count])),
+    briefing:
+      briefing && briefingStats?.success
+        ? {
+            day: briefing.day,
+            headline: briefing.headline,
+            body: briefing.body,
+            stats: briefingStats.data,
+            at: briefing.createdAt.getTime(),
+          }
+        : null,
   };
 }
 
@@ -262,6 +277,9 @@ async function refuseWithOpenPositions(userId: string) {
 async function patch(userId: string, values: Parameters<typeof updateOfficeConfig>[1]) {
   if (!(await updateOfficeConfig(scope(userId), values))) throw new Error(NO_OFFICE);
 }
+
+/** Approval or autopilot; the office runtime reads it again before each autopilot approval. */
+export const saveMode = (userId: string, mode: OfficeMode) => patch(userId, { mode });
 
 export const saveModels = (userId: string, models: OfficeModels) => patch(userId, { models });
 

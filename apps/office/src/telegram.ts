@@ -1,4 +1,5 @@
 import type { ProposalRow } from "@vexis/db/office-queries";
+import type { BriefingStats } from "@vexis/shared/briefing";
 import { type Decision, PROPOSAL_PARAMS, RiskNotes } from "@vexis/shared/office";
 import { z } from "zod";
 
@@ -69,8 +70,8 @@ const DASH = "—";
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const utcTime = (d: Date) => `${d.toISOString().slice(11, 16)} UTC`;
 
-/** The card: pool, action, range, amount in SOL and USD, the Manager's summary, every guardrail, the expiry. */
-export function cardText(p: ProposalRow) {
+/** The card without its expiry: pool, action, range, amount in SOL and USD, the Manager's summary, every guardrail. */
+function cardDetails(p: ProposalRow) {
   const name = p.poolName ?? p.poolAddress;
   const lines = [`Proposal: ${p.kind} ${name}`, `Pool ${p.poolAddress}`];
   const open = p.kind === "open" ? PROPOSAL_PARAMS.open.safeParse(p.params) : null;
@@ -98,9 +99,15 @@ export function cardText(p: ProposalRow) {
     lines.push("", "Guardrails:", ...risk.data.checks.map((c) => `${c.ok ? "✅" : "❌"} ${c.rule}: ${c.value}`));
     if (risk.data.llm) lines.push(`Risk Manager: ${risk.data.llm.note}`);
   }
-  lines.push("", `Expires ${utcTime(p.expiresAt)}`);
   return lines.join("\n");
 }
+
+/** The approval card: the details and when its window closes. */
+export const cardText = (p: ProposalRow) => `${cardDetails(p)}\n\nExpires ${utcTime(p.expiresAt)}`;
+
+/** What autopilot sends instead of a card: no buttons and no expiry, since nothing waits for the owner. */
+export const autopilotText = (p: ProposalRow, moved: string, limitSol: number) =>
+  `${cardDetails(p)}\n\n${outcome(p) ?? ""} It moves ${moved}, within your ${limitSol} SOL limit.`;
 
 export const cardButtons = (proposalId: string): Button[] => [
   { text: "Approve", callback_data: callbackData("approve", proposalId) },
@@ -109,6 +116,7 @@ export const cardButtons = (proposalId: string): Button[] => [
 
 /** How the card ends once the proposal stopped waiting; null while it still waits. */
 export function outcome(p: Pick<ProposalRow, "status" | "decidedBy" | "simulated" | "signature" | "txError">) {
+  const approved = p.decidedBy === "autopilot" ? "✅ Approved by autopilot." : "✅ Approved.";
   switch (p.status) {
     case "draft":
     case "risk_checked":
@@ -121,14 +129,39 @@ export function outcome(p: Pick<ProposalRow, "status" | "decidedBy" | "simulated
       return p.decidedBy === "risk" ? "❌ Stopped by the guardrails." : "❌ Rejected.";
     case "approved":
     case "executing":
-      return "✅ Approved.";
+      return approved;
     case "done":
-      if (p.simulated) return "✅ Approved. Preview: simulated, nothing was signed.";
+      if (p.simulated) return `${approved} Preview: simulated, nothing was signed.`;
       return p.signature ? `✅ Done: https://solscan.io/tx/${p.signature}` : "✅ Done.";
     case "failed":
       return `⚠️ Failed: ${p.txError ?? "unknown error"}`;
   }
 }
 
-/** The card as it reads after the outcome, with its buttons gone. */
-export const settledText = (p: ProposalRow) => `${cardText(p)}\n\n${outcome(p) ?? ""}`.trimEnd();
+/** The card as it reads after the outcome, with its buttons gone. An autopilot notice never had an expiry. */
+export const settledText = (p: ProposalRow) =>
+  `${p.decidedBy === "autopilot" ? cardDetails(p) : cardText(p)}\n\n${outcome(p) ?? ""}`.trimEnd();
+
+/** The daily briefing as the office bot sends it: the LLM's prose, then the numbers computed in code. */
+export function briefingText(b: { headline: string; body: string; stats: BriefingStats }) {
+  const s = b.stats;
+  const pnl =
+    s.closes.count === 0
+      ? "no closes"
+      : `${s.closes.pnlSol === null ? DASH : `${signed(s.closes.pnlSol)} SOL`} / ${s.closes.pnlUsd === null ? DASH : signedUsd(s.closes.pnlUsd)} over ${s.closes.count} close(s)${s.closes.unknown > 0 ? `, ${s.closes.unknown} unknown` : ""}`;
+  return [
+    `Daily briefing, ${s.day} (UTC)`,
+    "",
+    b.headline,
+    "",
+    b.body,
+    "",
+    `Realized PnL: ${pnl}`,
+    `Proposals: ${s.proposals.total} (${s.proposals.approvedByOwner} approved by you, ${s.proposals.approvedByAutopilot} by autopilot, ${s.proposals.vetoed} vetoed, ${s.proposals.expired} expired)`,
+    `Open now: ${s.open.count}, ${s.open.sol.toFixed(3)} SOL at cost`,
+    `LLM: ${s.llm.runs} call(s), $${s.llm.usd.toFixed(4)}`,
+  ].join("\n");
+}
+
+const signed = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(4)}`;
+const signedUsd = (n: number) => `${n >= 0 ? "+" : "-"}${usd(Math.abs(n))}`;

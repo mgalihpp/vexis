@@ -2,6 +2,8 @@ import {
   type GuardrailCheck,
   type Guardrails,
   type KeySource,
+  type OfficeMode,
+  PROPOSAL_PARAMS,
   type ProposalKind,
   type ProposalParams,
   utcDayStart,
@@ -284,6 +286,38 @@ export function checkManage(g: Guardrails, f: ManageFacts): GuardrailCheck[] {
     },
     cooldownCheck(g, f),
   ];
+}
+
+/**
+ * The SOL a checked proposal moves, which autopilot weighs against its limit: an open's deposit plus its quoted setup,
+ * a rebalance's or close's position at cost (`positionCostSol`, from the office's journal), a claim's fees. Null when
+ * a number it needs is unknown, which never counts as zero.
+ */
+export function nominalSol(kind: ProposalKind, params: unknown, positionCostSol: number | null): number | null {
+  switch (kind) {
+    case "open": {
+      const p = PROPOSAL_PARAMS.open.safeParse(params);
+      return p.success && p.data.setupSol !== null ? p.data.amountSol + p.data.setupSol : null;
+    }
+    case "claim": {
+      const p = PROPOSAL_PARAMS.claim.safeParse(params);
+      return p.success ? p.data.feeSol : null;
+    }
+    case "rebalance":
+    case "close":
+      return positionCostSol;
+  }
+}
+
+/** Whether autopilot approves a checked proposal on its own, and the SOL it weighed. In approval mode it never does. */
+export function autopilotVerdict(
+  mode: OfficeMode,
+  g: Guardrails,
+  proposal: { readonly kind: ProposalKind; readonly params: unknown },
+  positionCostSol: number | null,
+) {
+  const moved = nominalSol(proposal.kind, proposal.params, positionCostSol);
+  return { approve: mode === "autopilot" && moved !== null && moved <= g.autopilotMaxSol, nominalSol: moved };
 }
 
 function poolVerdict(pool: FilterPool | null, filter: PoolFilter | null) {

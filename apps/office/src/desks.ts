@@ -1,5 +1,12 @@
 import type { ProposalRow } from "@vexis/db/office-queries";
-import { checkManage, checkOpen, freeSol, positionBudget, slotOverheadSol } from "@vexis/shared/guardrails";
+import {
+  autopilotVerdict,
+  checkManage,
+  checkOpen,
+  freeSol,
+  positionBudget,
+  slotOverheadSol,
+} from "@vexis/shared/guardrails";
 import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/shared/office";
 import {
   managerPrompt,
@@ -390,7 +397,10 @@ export function manageSummary(proposal: Pick<ProposalRow, "kind" | "params" | "r
   }
 }
 
-/** Puts a checked proposal in front of the owner, on the web and on Telegram. */
+/**
+ * Puts a checked proposal in front of the owner, on the web and on Telegram. Under autopilot, one that moves no more
+ * than the limit is then approved on the owner's behalf, through the same lifecycle move as their approval.
+ */
 const present = (floor: Floor, proposal: ProposalRow, summary: string) =>
   Effect.gen(function* () {
     const db = yield* Db;
@@ -399,12 +409,37 @@ const present = (floor: Floor, proposal: ProposalRow, summary: string) =>
       expiresAt: new Date(floor.now + floor.guardrails.approvalTtlSec * 1000),
     });
     if (!moved) return;
-    yield* say(floor, "manager", `${proposal.poolName ?? "A pool"} is ready for your approval.`, "info", {
-      poolAddress: proposal.poolAddress,
-      proposalId: proposal.id,
-    });
+    const name = proposal.poolName ?? "A pool";
+    const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
+    const held = floor.book.open.find(
+      (j) => j.positionAddress !== null && j.positionAddress === proposal.positionAddress,
+    );
+    const verdict = autopilotVerdict(floor.row.mode, floor.guardrails, proposal, held?.amountSol ?? null);
+    const approved = verdict.approve
+      ? yield* db.autopilotApprove(floor.userId, proposal.id, new Date(floor.now))
+      : null;
+    if (approved && verdict.nominalSol !== null) {
+      const limitSol = floor.guardrails.autopilotMaxSol;
+      // The last screener read's SOL price, from memory: no request.
+      const solUsd = (yield* (yield* Screener).current())?.solUsd ?? null;
+      const moved = `${verdict.nominalSol.toFixed(4)} SOL (${solUsd === null ? "—" : `$${(verdict.nominalSol * solUsd).toFixed(2)}`})`;
+      const text = `Autopilot approved the ${KIND_TEXT[proposal.kind]} of ${name}: ${moved}, within the ${limitSol} SOL limit.`;
+      yield* say(floor, "manager", text, "good", where);
+      return yield* sendCard(floor, approved, { moved, limitSol });
+    }
+    const why =
+      floor.row.mode !== "autopilot"
+        ? ""
+        : verdict.nominalSol === null
+          ? " Autopilot left it to you: the amount it moves is unknown."
+          : verdict.nominalSol > floor.guardrails.autopilotMaxSol
+            ? ` Autopilot left it to you: ${verdict.nominalSol.toFixed(4)} SOL is over the ${floor.guardrails.autopilotMaxSol} SOL limit.`
+            : "";
+    yield* say(floor, "manager", `${name} is ready for your approval.${why}`, "info", where);
     yield* sendCard(floor, moved);
   });
+
+const KIND_TEXT = { open: "open", rebalance: "rebalance", claim: "fee claim", close: "close" } as const;
 
 /** The Manager summarises each checked proposal and puts it in front of the owner, on the web and on Telegram. */
 export const presentChecked = (floor: Floor) =>

@@ -2,32 +2,68 @@ import type { ProposalRow } from "@vexis/db/office-queries";
 import { REFUSAL_TEXT } from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
-import { Db, type PolledBot } from "./services/db.ts";
+import { Db, type NewMessage, type PolledBot } from "./services/db.ts";
 import { Telegram } from "./services/telegram.ts";
-import { cardButtons, cardText, HELP_TEXT, type Inbound, readUpdate, settledText } from "./telegram.ts";
+import {
+  autopilotText,
+  type Button,
+  cardButtons,
+  cardText,
+  HELP_TEXT,
+  type Inbound,
+  readUpdate,
+  settledText,
+} from "./telegram.ts";
 
 /**
- * Puts a proposal that now waits for the owner on their office bot. No linked bot means no card, and the web panel
- * still works; a failed send never blocks the proposal, the feed just says the card did not arrive.
+ * Sends `text` to the owner's office bot and hands back the message id. No linked bot sends nothing; a failed send
+ * never blocks anything, the feed just says what did not arrive.
  */
-export const sendCard = (office: Office, proposal: ProposalRow) =>
+const sendToOwner = (
+  office: Office,
+  what: string,
+  text: string,
+  buttons: ReadonlyArray<Button>,
+  where: Partial<NewMessage> = {},
+) =>
   Effect.gen(function* () {
-    const db = yield* Db;
-    const bot = yield* db.officeBot(office.userId);
-    if (bot._tag === "missing") return;
-    const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
+    const bot = yield* (yield* Db).officeBot(office.userId);
+    if (bot._tag === "missing") return null;
     const undelivered = (why: string) =>
-      say(office, "manager", `The Telegram card was not delivered (${why}). Decide here instead.`, "warn", where);
-    if (bot._tag === "unreadable") return yield* undelivered("the bot token needs to be linked again");
-    yield* (yield* Telegram).send(bot.token, bot.chatId, cardText(proposal), cardButtons(proposal.id)).pipe(
-      Effect.flatMap((messageId) => db.setCard(office.userId, proposal.id, messageId)),
+      say(office, "manager", `The Telegram ${what} was not delivered (${why}). It is here instead.`, "warn", where);
+    if (bot._tag === "unreadable") {
+      yield* undelivered("the bot token needs to be linked again");
+      return null;
+    }
+    return yield* (yield* Telegram).send(bot.token, bot.chatId, text, buttons).pipe(
+      Effect.map((id): number | null => id),
       Effect.catchTag("TelegramError", (error) =>
-        Effect.logWarning(`office ${office.userId}: card not sent: ${error.message}`).pipe(
+        Effect.logWarning(`office ${office.userId}: ${what} not sent: ${error.message}`).pipe(
           Effect.andThen(undelivered("Telegram did not accept it")),
+          Effect.as(null),
         ),
       ),
     );
   });
+
+/**
+ * Puts a proposal on the owner's office bot: an approval card with buttons, or, once autopilot approved it, a notice
+ * with none. Either is edited with the outcome later (`settleCards`).
+ */
+export const sendCard = (
+  office: Office,
+  proposal: ProposalRow,
+  autopilot: { readonly moved: string; readonly limitSol: number } | null = null,
+) =>
+  Effect.gen(function* () {
+    const where = { poolAddress: proposal.poolAddress, proposalId: proposal.id };
+    const messageId = autopilot
+      ? yield* sendToOwner(office, "notice", autopilotText(proposal, autopilot.moved, autopilot.limitSol), [], where)
+      : yield* sendToOwner(office, "card", cardText(proposal), cardButtons(proposal.id), where);
+    if (messageId !== null) yield* (yield* Db).setCard(office.userId, proposal.id, messageId);
+  });
+
+export const sendBriefing = (office: Office, text: string) => sendToOwner(office, "briefing", text, []);
 
 const RESUME_TEXT = {
   no_office: "There is no office on this account.",

@@ -1,5 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { Guardrails, KEY_SOURCES, LLM_PROVIDERS, OFFICE_AGENTS, OfficeModels } from "@vexis/shared/office";
+import {
+  Guardrails,
+  KEY_SOURCES,
+  LLM_PROVIDERS,
+  OFFICE_AGENTS,
+  OFFICE_MODES,
+  OfficeModels,
+} from "@vexis/shared/office";
 import { PoolFilter, PRESETS } from "@vexis/shared/screen";
 import { z } from "zod";
 import { RpcUrlInput, SecretKeyInput } from "@/features/agents/wallet.server";
@@ -19,6 +26,7 @@ import {
   saveKeySource,
   saveLive,
   saveLlmKey,
+  saveMode,
   saveModels,
   saveOfficeWallet,
   saveScreen,
@@ -73,6 +81,11 @@ export const saveLiveFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])
   .validator(z.object({ live: z.boolean() }))
   .handler(({ context, data }) => saveLive(context.viewer.id, data.live));
+
+export const saveModeFn = createServerFn({ method: "POST" })
+  .middleware([requireViewer])
+  .validator(z.object({ mode: z.enum(OFFICE_MODES) }))
+  .handler(({ context, data }) => saveMode(context.viewer.id, data.mode));
 
 export const saveModelsFn = createServerFn({ method: "POST" })
   .middleware([requireViewer])

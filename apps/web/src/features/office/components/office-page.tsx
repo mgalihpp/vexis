@@ -35,7 +35,7 @@ import { createSound } from "./floor/sound";
 import { OfficeFloor } from "./office-floor";
 import { OfficeLog } from "./office-log";
 import { OfficeSettings } from "./office-settings";
-import { PnlCard, PositionsCard, SpendCard } from "./office-summary";
+import { BriefingCard, PnlCard, PositionsCard, SpendCard } from "./office-summary";
 import { useNow, useOfficeMutation, utcClock } from "./office-ui";
 
 type SideTab = "overview" | "approval" | "log";
@@ -214,6 +214,7 @@ function Office({
               {tab === "overview" && (
                 <>
                   <PnlCard view={view} />
+                  <BriefingCard view={view} />
                   <PositionsCard view={view} now={now} />
                   <SpendCard view={view} />
                 </>

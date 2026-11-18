@@ -255,6 +255,107 @@ describe("office tick", () => {
   });
 });
 
+describe("autopilot", () => {
+  const autopilot = (autopilotMaxSol: number) => office({ mode: "autopilot", guardrails: { autopilotMaxSol } });
+  const linked = (s: ReturnType<typeof setup>) =>
+    s.db.bots.set("user-1", { _tag: "ready", token: BOT_TOKEN, chatId: CHAT });
+
+  test("an open at the limit (deposit plus setup) is approved by autopilot, with a notice and no buttons", async () => {
+    const s = setup({ offices: [autopilot(openParams.amountSol + SETUP.totalSol)] });
+    linked(s);
+    await s.run(tick());
+    expect(s.db.proposals[0]).toMatchObject({ status: "approved", decidedBy: "autopilot" });
+    expect(s.db.messages.at(-1)?.text).toBe(
+      "Autopilot approved the open of JUP-SOL: 1.0574 SOL ($158.61), within the 1.0574 SOL limit.",
+    );
+    const [notice] = s.telegram.sent;
+    expect(notice?.buttons).toEqual([]);
+    expect(notice?.text).toContain("✅ Approved by autopilot. It moves 1.0574 SOL ($158.61)");
+    expect(notice?.text).not.toContain("Expires");
+    expect(s.db.proposals[0]?.telegramMessageId).toBe(notice?.messageId ?? -1);
+  });
+
+  test("over the limit, or in approval mode, the owner still decides on a card", async () => {
+    const over = setup({ offices: [autopilot(1)] });
+    linked(over);
+    await over.run(tick());
+    expect(over.db.proposals[0]).toMatchObject({ status: "awaiting_approval", decidedBy: null });
+    expect(over.db.messages.at(-1)?.text).toContain("1.0574 SOL is over the 1 SOL limit");
+    expect(over.telegram.sent[0]?.buttons.map((b) => b.text)).toEqual(["Approve", "Reject"]);
+
+    const asking = setup({ offices: [office({ guardrails: { autopilotMaxSol: 100 } })] });
+    await asking.run(tick());
+    expect(asking.db.proposals[0]).toMatchObject({ status: "awaiting_approval", decidedBy: null });
+  });
+
+  test("a close weighs the position it closes at cost", async () => {
+    const close = () =>
+      proposal({ kind: "close", proposedBy: "monitor", positionAddress: "POS1", params: { reason: "stop_loss" } });
+    const within = setup({ offices: [autopilot(1)], proposals: [close()] });
+    within.db.journal.push(journal({ positionAddress: "POS1", amountSol: 1 }));
+    await within.run(tick());
+    expect(within.db.proposals[0]).toMatchObject({ status: "approved", decidedBy: "autopilot" });
+
+    const over = setup({ offices: [autopilot(1)], proposals: [close()] });
+    over.db.journal.push(journal({ positionAddress: "POS1", amountSol: 2 }));
+    await over.run(tick());
+    expect(over.db.proposals[0]).toMatchObject({ status: "awaiting_approval", decidedBy: null });
+  });
+
+  test("autopilot approves nothing while the office is paused", async () => {
+    const s = setup({
+      offices: [
+        office({ mode: "autopilot", guardrails: { autopilotMaxSol: 100 }, paused: true, pausedReason: KILL_SWITCH }),
+      ],
+      proposals: [proposal({ status: "risk_checked" })],
+    });
+    await s.run(tick());
+    expect(statuses(s)).toEqual(["risk_checked"]);
+  });
+});
+
+describe("daily briefing", () => {
+  const NEXT_DAY = Date.UTC(2026, 0, 2);
+  const briefing = JSON.stringify({ headline: "A quiet day.", body: "One open was approved. Nothing closed." });
+  const briefed = () => {
+    const s = setup({ offices: [office({ createdAt: new Date(T0 - 86_400_000) })] });
+    s.llm.replies = { manager: briefing };
+    s.db.bots.set("user-1", { _tag: "ready", token: BOT_TOKEN, chatId: CHAT });
+    return s;
+  };
+
+  test("yesterday is briefed once, after 00:30 UTC, stored, posted to the feed and sent to the bot", async () => {
+    const s = briefed();
+    await s.run(tick(), NEXT_DAY + 29 * MINUTE);
+    expect(s.db.briefings).toHaveLength(0);
+
+    await s.run(tick(), NEXT_DAY + 45 * MINUTE);
+    await s.run(tick(), NEXT_DAY + 46 * MINUTE);
+    expect(s.db.briefings.map((b) => [b.day, b.headline])).toEqual([["2026-01-01", "A quiet day."]]);
+    expect(s.db.runs.filter((r) => r.promptVersion === "briefing-v1")).toHaveLength(1);
+    expect(s.db.messages.some((m) => m.text === "Briefing for 2026-01-01: A quiet day.")).toBe(true);
+    const sent = s.telegram.sent.find((m) => m.text.startsWith("Daily briefing, 2026-01-01 (UTC)"));
+    expect(sent?.text).toContain("Realized PnL: no closes");
+    expect(sent?.buttons).toEqual([]);
+  });
+
+  test("a failing briefing never keeps the desks from their tick", async () => {
+    const s = setup({ offices: [office({ createdAt: new Date(T0 - 86_400_000) })] });
+    s.db.briefingsDown = true;
+    await s.run(tick(), NEXT_DAY + 45 * MINUTE);
+    expect(statuses(s)).toEqual(["awaiting_approval"]);
+  });
+
+  test("a reply in the wrong shape is retried an hour later, not every minute", async () => {
+    const s = briefed();
+    s.llm.replies = { manager: "not json" };
+    await s.run(tick(), NEXT_DAY + 45 * MINUTE);
+    await s.run(tick(), NEXT_DAY + 46 * MINUTE);
+    expect(s.llm.calls.filter((c) => c.system.includes("briefing"))).toHaveLength(1);
+    expect(s.db.briefings).toHaveLength(0);
+  });
+});
+
 describe("office on Telegram", () => {
   const linked = (s: ReturnType<typeof setup>) =>
     s.db.bots.set("user-1", { _tag: "ready", token: BOT_TOKEN, chatId: CHAT });

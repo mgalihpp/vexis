@@ -100,6 +100,7 @@ describe("config", () => {
       maxDailyLossPct: 5,
       solReserve: 0.1,
       txFeeBufferSol: 0.03,
+      autopilotMaxSol: 0.1,
       cooldownSec: 300,
       maxConsecutiveFailures: 3,
       approvalTtlSec: 900,
