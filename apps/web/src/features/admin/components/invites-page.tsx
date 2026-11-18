@@ -477,12 +477,7 @@ function InviteReady({ invite, onDone }: { invite: CreatedInvite; onDone: () => 
         </DialogDescription>
       </DialogHeader>
       <div className="flex gap-2">
-        <Input
-          readOnly
-          value={invite.link}
-          aria-label="Join link"
-          onFocus={(e) => e.currentTarget.select()}
-        />
+        <Input readOnly value={invite.link} aria-label="Join link" onFocus={(e) => e.currentTarget.select()} />
         <CopyButton text={invite.link} label="Copy link" />
       </div>
       <div className="flex justify-center gap-6 text-muted-foreground">

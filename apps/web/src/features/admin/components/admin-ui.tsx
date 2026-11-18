@@ -132,7 +132,9 @@ export function Gauge({
       <svg viewBox="0 0 100 60" className="w-full" aria-hidden="true">
         <path d={arc(0, 1)} className="fill-none stroke-muted" strokeWidth="9" />
         {share > 0 && <path d={arc(0, share - gap)} className={`fill-none ${goodStroke}`} strokeWidth="9" />}
-        {share < 1 && total > 0 && <path d={arc(share + gap, 1)} className={`fill-none ${badStroke}`} strokeWidth="9" />}
+        {share < 1 && total > 0 && (
+          <path d={arc(share + gap, 1)} className={`fill-none ${badStroke}`} strokeWidth="9" />
+        )}
       </svg>
       <div className="-mt-0.75 flex justify-between gap-1 text-[0.625rem] tabular-nums">
         <span className={`truncate ${goodText}`}>{goodLabel ?? good}</span>
