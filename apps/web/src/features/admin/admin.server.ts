@@ -29,7 +29,7 @@ import { inviteEmail } from "@vexis/db/emails";
 import { listHeartbeats } from "@vexis/db/heartbeat-queries";
 import { type CreateInvite, type Role, redact } from "@vexis/shared/admin";
 import { BACKGROUND_RESERVE, processBudget } from "@vexis/shared/datapi-budget";
-import { SCHEDULES } from "@vexis/shared/heartbeat";
+import { SCHEDULES, type ScheduleName } from "@vexis/shared/heartbeat";
 import { sendMail } from "@vexis/shared/mail";
 import { trackerUsage } from "@/features/analytics/traders.server";
 import { limited } from "./admin.middleware";
@@ -45,12 +45,14 @@ async function schedules(now: number) {
     const row = rows.get(name);
     const lastTickAt = row?.lastTickAt?.getTime() ?? null;
     return {
-      name,
+      name: name as ScheduleName,
       runtime: spec.runtime,
+      staleMs: spec.staleMs,
       lastTickAt,
       stale: lastTickAt !== null && now - lastTickAt > spec.staleMs,
       lastError: row?.lastError ? redact(row.lastError, 300) : null,
       lastErrorAt: row?.lastErrorAt?.getTime() ?? null,
+      alertedAt: row?.alertedAt?.getTime() ?? null,
     };
   });
 }

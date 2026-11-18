@@ -7,6 +7,9 @@ import {
   CircleCheckIcon,
   ClockIcon,
   CopyIcon,
+  InboxIcon,
+  MailCheckIcon,
+  MailIcon,
   MoreHorizontalIcon,
   PlusIcon,
   SendIcon,
@@ -161,6 +164,9 @@ export function InvitesPage({ search }: { search: InviteSearch }) {
   );
 }
 
+const REQUEST_TABS = ["all", "pending", "sent"] as const;
+const REQUEST_TAB_LABEL = { all: "All", pending: "Pending", sent: "Sent" } as const;
+
 function RequestsCard({
   requests,
   now,
@@ -168,6 +174,7 @@ function RequestsCard({
   requests: { email: string; createdAt: Date; invitedAt: Date | null }[];
   now: number;
 }) {
+  const [tab, setTab] = useState<(typeof REQUEST_TABS)[number]>("all");
   const send = useAdminAction(
     (email: string) => sendRequestFn({ data: { email } }),
     (result) => {
@@ -176,50 +183,70 @@ function RequestsCard({
     },
   );
   const pending = requests.filter((r) => r.invitedAt === null).length;
+  const sent = requests.length - pending;
+  const counts = { all: requests.length, pending, sent };
+  const shown = requests.filter((r) =>
+    tab === "all" ? true : tab === "pending" ? r.invitedAt === null : r.invitedAt !== null,
+  );
+
   return (
-    <section aria-labelledby="requests-h" className="min-w-0 overflow-hidden rounded-xl border bg-card">
-      <div className="flex items-center gap-2 border-b px-4 py-3.5">
-        <h2 id="requests-h" className="text-sm font-medium">
-          Requests
-        </h2>
-        <Chip on>{pending}</Chip>
-      </div>
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="pl-4">Email</TableHead>
-            <TableHead>Asked</TableHead>
-            <TableHead className="pr-4 text-right">
-              <span className="sr-only">Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requests.length === 0 && <EmptyRow cols={3}>No requests.</EmptyRow>}
-          {requests.map((r) => (
-            <TableRow key={r.email}>
-              <TableCell className="max-w-48 truncate pl-4 font-medium">{r.email}</TableCell>
-              <TableCell className="text-muted-foreground">{timeAgo(r.createdAt.getTime(), now)}</TableCell>
-              <TableCell className="pr-4 text-right">
-                {r.invitedAt ? (
-                  <Pill tone="profit">Sent</Pill>
-                ) : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={send.isPending && send.variables === r.email}
-                    onClick={() => send.mutate(r.email)}
+    <TabCard
+      label="Requests"
+      tabs={REQUEST_TABS.map((id) => ({ id, label: REQUEST_TAB_LABEL[id], count: counts[id] }))}
+      active={tab}
+      onChange={setTab}
+    >
+      {shown.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-xs text-muted-foreground">
+          <span className="flex size-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground">
+            <InboxIcon className="size-4" />
+          </span>
+          <span>{tab === "pending" ? "No pending requests." : "No invite requests."}</span>
+        </div>
+      ) : (
+        <ul className="divide-y divide-border">
+          {shown.map((r) => {
+            const busy = send.isPending && send.variables === r.email;
+            return (
+              <li
+                key={r.email}
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/25"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={`flex size-8 shrink-0 items-center justify-center rounded-lg border ${
+                      r.invitedAt
+                        ? "border-profit/20 bg-profit/10 text-profit"
+                        : "border-brand/25 bg-brand/10 text-brand"
+                    }`}
                   >
-                    {send.isPending && send.variables === r.email ? <Spinner /> : <SendIcon />}
-                    {send.isPending && send.variables === r.email ? "Sending" : "Send"}
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </section>
+                    {r.invitedAt ? <MailCheckIcon className="size-4" /> : <MailIcon className="size-4" />}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium sm:text-sm">{r.email}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[0.7rem] text-muted-foreground">
+                      <span>Asked {timeAgo(r.createdAt.getTime(), now)}</span>
+                      {r.invitedAt && <span>· Sent {timeAgo(r.invitedAt.getTime(), now)}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  {r.invitedAt ? (
+                    <Pill tone="profit">Sent</Pill>
+                  ) : (
+                    <Button variant="outline" size="sm" disabled={busy} onClick={() => send.mutate(r.email)}>
+                      {busy ? <Spinner /> : <SendIcon />}
+                      {busy ? "Sending" : "Send"}
+                    </Button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </TabCard>
   );
 }
 
@@ -454,7 +481,6 @@ function InviteReady({ invite, onDone }: { invite: CreatedInvite; onDone: () => 
           readOnly
           value={invite.link}
           aria-label="Join link"
-          className="font-mono"
           onFocus={(e) => e.currentTarget.select()}
         />
         <CopyButton text={invite.link} label="Copy link" />
