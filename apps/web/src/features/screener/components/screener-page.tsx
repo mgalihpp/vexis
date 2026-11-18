@@ -826,10 +826,7 @@ function Money({ usd, solPrice }: { usd: number; solPrice: number | null }) {
 function TradeIcons({ pool }: { pool: ScreenerPool }) {
   return (
     <span className="relative z-10 flex shrink-0 items-center gap-1.5">
-      {[
-        { name: "Meteora", logo: "/links/meteora.png", href: `https://app.meteora.ag/dlmm/${pool.address}` },
-        ...tradeLinks(pool.tokenX.mint, pool.tokenY.mint),
-      ].map((l) => (
+      {tradeLinks(pool.address, pool.tokenX.mint, pool.tokenY.mint).map((l) => (
         <a
           key={l.name}
           href={l.href}

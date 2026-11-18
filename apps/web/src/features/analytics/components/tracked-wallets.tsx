@@ -5,11 +5,9 @@ import {
   CircleXIcon,
   ExternalLinkIcon,
   FilterIcon,
-  InfoIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import { InfoTip } from "@/components/info-tip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -34,12 +32,12 @@ import {
   type TrackedSort,
   type TrackedWallet,
 } from "../tracked";
-import { amount, CollapsiblePanel, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
+import { amount, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Token = { symbol: string; icon: string | null };
 
-const NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
+export const TRACKED_NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
 // Five digits, not formatPrice's three, so the two ends of a narrow range stay distinct.
 const price = (v: number | null) =>
@@ -574,27 +572,7 @@ function RefreshButton({
   );
 }
 
-export function TrackedWallets(props: { pool: string; base: Token; quote: Token }) {
-  return (
-    <CollapsiblePanel
-      storageKey="vexis-tracked-open"
-      name="tracked wallets"
-      className="@container"
-      title={
-        <span className="flex items-center gap-1.5">
-          Tracked wallets
-          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
-            <InfoIcon className="size-3.5 text-muted-foreground" />
-          </InfoTip>
-        </span>
-      }
-    >
-      <TrackedBody {...props} />
-    </CollapsiblePanel>
-  );
-}
-
-function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
+export function TrackedBody({ pool, base, quote }: { pool: string; base: Token; quote: Token }) {
   // Paging state belongs to one pool, so switching pools starts again on the first page.
   const [paging, setPaging] = useState<{ pool: string; page: number; size: TrackedPageSize }>({
     pool,

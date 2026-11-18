@@ -40,28 +40,6 @@ export function CollapseToggle({ open, onToggle, name }: { open: boolean; onTogg
   );
 }
 
-/** A Panel with a collapse toggle. Collapsed, `children` is not rendered, so its queries do not run. */
-export function CollapsiblePanel({
-  storageKey,
-  name,
-  title,
-  className = "",
-  children,
-}: {
-  storageKey: string;
-  name: string;
-  title: ReactNode;
-  className?: string;
-  children: ReactNode;
-}) {
-  const [open, toggle] = usePanelOpen(storageKey);
-  return (
-    <Panel className={className} title={title} aside={<CollapseToggle open={open} onToggle={toggle} name={name} />}>
-      {open && children}
-    </Panel>
-  );
-}
-
 /** How long ago a section's data was fetched on the server, ticking; the exact time is in the tooltip. */
 export function Updated({ at }: { at: number }) {
   const stamp = useStamp();

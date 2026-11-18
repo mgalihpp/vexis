@@ -154,7 +154,8 @@ const LINKS = [
 export const bubblemapsUrl = (mint: string) => `https://v2.bubblemaps.io/map?address=${mint}&chain=solana`;
 
 /** Where to trade or chart a pool, shared by Analytics' Trade & Charts panel and the screener rows. */
-export const tradeLinks = (x: string, y: string) => [
+export const tradeLinks = (pool: string, x: string, y: string) => [
+  { name: "Meteora", logo: "/links/meteora.png", href: `https://app.meteora.ag/dlmm/${pool}` },
   { name: "Jupiter", logo: "/brands/jupiter.png", href: `https://jup.ag/swap/${x}-${y}` },
   { name: "GMGN", logo: "/brands/gmgn.png", href: `https://gmgn.ai/sol/token/${x}` },
   { name: "Bubblemaps", logo: "/links/bubblemaps.png", href: bubblemapsUrl(x) },

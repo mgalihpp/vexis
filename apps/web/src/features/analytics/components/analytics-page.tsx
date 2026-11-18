@@ -7,9 +7,8 @@ import type { loadAnalytics } from "../analytics.server";
 import type { ChartBar } from "./candle-chart";
 import { ChartPanel, VolumeStats } from "./center-column";
 import { AdvancedMetrics, LiquidityDistribution, PoolHeader, PoolTokens } from "./left-column";
+import { PoolActivity } from "./pool-activity";
 import { FeesPanel, Links, TokenInfo, TvlDistribution, VolumeSparkline } from "./right-column";
-import { TrackedWallets } from "./tracked-wallets";
-import { Traders } from "./traders";
 
 export type AnalyticsData = Awaited<ReturnType<typeof loadAnalytics>>;
 
@@ -81,10 +80,7 @@ export function AnalyticsPage({
           />
         </div>
         <div className="max-xl:order-4">
-          <TrackedWallets pool={pool.address} base={pool.tokenX} quote={pool.tokenY} />
-        </div>
-        <div className="max-xl:order-4">
-          <Traders key={pool.address} pool={pool.address} />
+          <PoolActivity pool={pool.address} base={pool.tokenX} quote={pool.tokenY} />
         </div>
       </div>
       <div className="flex flex-col gap-2 max-xl:contents xl:min-h-0 xl:overflow-y-auto">
