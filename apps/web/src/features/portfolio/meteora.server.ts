@@ -1,4 +1,4 @@
-import { datapiFetch, FOREGROUND_MAX_WAIT_MS } from "@vexis/shared/datapi-budget";
+import { datapiFetch } from "@vexis/shared/datapi-budget";
 import { num, PnlPage, type PositionPnl, positionAmounts } from "@vexis/shared/pnl";
 import { z } from "zod";
 import type { WatchPosition } from "@/features/notifications/notifications";
@@ -104,25 +104,10 @@ export async function get<T>(
   const url = new URL(path, API);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
   // Waits out a low budget or a 429 (shared with the runner and the office through the API's own headers). Background
-  // jobs stop BACKGROUND_RESERVE short of the limit, so pages someone has open never queue behind a job; a page waits
-  // at most FOREGROUND_MAX_WAIT_MS, then fails so nginx does not turn the wait into a 504.
-  const started = Date.now();
-  const maxWaitMs = opts.background ? undefined : FOREGROUND_MAX_WAIT_MS;
-  let ok = false;
-  try {
-    const res = await datapiFetch(url.href, { headers: { accept: "application/json" } }, { ...opts, maxWaitMs });
-    if (!res.ok) throw new Error(`Meteora API ${res.status} for ${url.pathname}`);
-    const data = schema.parse(await res.json());
-    ok = true;
-    return data;
-  } finally {
-    const took = Date.now() - started;
-    if (!ok || took > 2_000) {
-      console.info(
-        `[datapi] ${url.pathname} ${ok ? "ok" : "failed"} in ${took} ms (background=${opts.background ?? false})`,
-      );
-    }
-  }
+  // jobs stop BACKGROUND_RESERVE short of the limit, so pages someone has open never queue behind a job.
+  const res = await datapiFetch(url.href, { headers: { accept: "application/json" } }, opts);
+  if (!res.ok) throw new Error(`Meteora API ${res.status} for ${url.pathname}`);
+  return schema.parse(await res.json());
 }
 
 async function allPages<T>(fetchPage: (page: number) => Promise<{ hasNext: boolean; items: T[] }>): Promise<T[]> {
