@@ -294,7 +294,7 @@ const linkClass =
   "flex min-w-0 items-center justify-between gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:border-brand hover:text-brand";
 
 export function Links({ pool }: { pool: PoolView }) {
-  const items = tradeLinks(pool.tokenX.address, pool.tokenY.address);
+  const items = tradeLinks(pool.address, pool.tokenX.address, pool.tokenY.address);
   return (
     <Panel title="Trade & Charts">
       <div className="grid grid-cols-2 gap-2">

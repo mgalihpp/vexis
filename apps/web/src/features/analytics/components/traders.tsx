@@ -5,7 +5,6 @@ import {
   ExternalLinkIcon,
   FilterIcon,
   FishSymbolIcon,
-  InfoIcon,
   type LucideIcon,
   MegaphoneIcon,
 } from "lucide-react";
@@ -36,7 +35,7 @@ import {
   WHALE_HOLD_USD,
   WHALE_TRADE_USD,
 } from "../traders";
-import { amount, CollapsiblePanel, NA, short, sol, solAmount, solCompact, solRound, tone, Updated, usd } from "./ui";
+import { amount, NA, short, sol, solAmount, solCompact, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
 type Ok = Extract<TradersResult, { ok: true }>;
@@ -608,31 +607,11 @@ function Loaded({ data }: { data: Ok }) {
   );
 }
 
-const NOTE =
+export const TRADERS_NOTE =
   "Recent trades are this pool's own swaps, refreshed every minute. Whale, smart money and KOL lists cover the token on every pool and refresh once a day.";
 
 /** Loaded on the client only, since the trader lists count against the Solana Tracker quota. */
-export function Traders({ pool }: { pool: string }) {
-  return (
-    <CollapsiblePanel
-      storageKey="vexis-traders-open"
-      name="traders"
-      className="@container"
-      title={
-        <span className="flex items-center gap-1.5">
-          Traders
-          <InfoTip aria-label={NOTE} content={NOTE} contentClassName="max-w-56">
-            <InfoIcon className="size-3.5 text-muted-foreground" />
-          </InfoTip>
-        </span>
-      }
-    >
-      <TradersBody pool={pool} />
-    </CollapsiblePanel>
-  );
-}
-
-function TradersBody({ pool }: { pool: string }) {
+export function TradersBody({ pool }: { pool: string }) {
   const { data, isError } = useQuery(tradersQuery(pool));
   return (
     <>
