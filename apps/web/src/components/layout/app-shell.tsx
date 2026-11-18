@@ -34,8 +34,8 @@ const MOBILE_LINKS: { to: NavTarget; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
   { to: "/analytics", label: "Analytics" },
   { to: "/screener", label: "Screener" },
-  { to: "/agents", label: "Agents" },
-  { to: "/office", label: "Office" },
+  { to: "/agents", label: "Agents", badge: "BETA" },
+  { to: "/office", label: "Office", badge: "BETA" },
 ];
 
 const THEMES: { value: Theme; label: string; Icon: typeof SunIcon }[] = [
@@ -104,8 +104,12 @@ function AppHeader({ isAdmin }: { isAdmin: boolean }) {
           <NavItem to="/portfolio">Portfolio</NavItem>
           <NavItem to="/analytics">Analytics</NavItem>
           <NavItem to="/screener">Screener</NavItem>
-          <NavItem to="/agents">Agents</NavItem>
-          <NavItem to="/office">Office</NavItem>
+          <NavItem to="/agents" badge="BETA">
+            Agents
+          </NavItem>
+          <NavItem to="/office" badge="BETA">
+            Office
+          </NavItem>
           {isAdmin && <NavItem to="/admin/invites">Admin</NavItem>}
         </nav>
         <HeaderActions />
