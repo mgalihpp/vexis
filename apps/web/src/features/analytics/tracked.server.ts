@@ -155,7 +155,7 @@ const scanFor = (pool: string) =>
   cached(scanCache, pool, SCAN_CACHE_MS, async () => ({ at: Date.now(), groups: await scanOwners(pool) }));
 
 const detailFor = (pool: string, owner: string) =>
-  cached(detailCache, `${pool}:${owner}`, DETAIL_CACHE_MS, () => fetchOwnerDetail(pool, owner));
+  cached(detailCache, `${pool}:${owner}`, DETAIL_CACHE_MS, () => fetchOwnerDetail(pool, owner, true));
 
 /**
  * Meteora detail for every wallet in the pool, so fees and PnL can be totaled across pages. One job per pool and
