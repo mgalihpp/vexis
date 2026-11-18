@@ -1,5 +1,5 @@
 import type { ProposalRow } from "@vexis/db/office-queries";
-import { checkManage, checkOpen, freeSol, officeCapital } from "@vexis/shared/guardrails";
+import { checkManage, checkOpen, freeSol, positionBudget, slotOverheadSol } from "@vexis/shared/guardrails";
 import { PROPOSAL_PARAMS, type ProposalKind, RiskNotes } from "@vexis/shared/office";
 import {
   managerPrompt,
@@ -28,6 +28,8 @@ const HOUR_MS = 60 * 60_000;
 export type Floor = Office & {
   /** Native SOL in the wallet now; null when there is no wallet or the read failed. */
   readonly walletSol: number | null;
+  /** Rent of a new position account, read on chain this tick; null when unread. */
+  readonly positionRentSol: number | null;
   /** The office's capital at the first read of the UTC day; null until a balance was read today. */
   readonly dayStartCapital: number | null;
   /** The office's open positions and today's closes, read at the start of the tick. */
@@ -73,6 +75,11 @@ export const scoutAndDraft = (floor: Floor) =>
     if (!due) return;
     const open = yield* db.openJournal(floor.userId);
     if (open.length >= floor.guardrails.maxActivePositions) return;
+    if (positionBudget(floor.guardrails, floor) === 0) {
+      const text = "Not enough SOL above the reserve for another position's deposit, rent and fees. Waiting.";
+      yield* sayOnce(floor, "no-budget", "scout", text, "info");
+      return;
+    }
     yield* state.markScout(floor.userId, floor.now);
     // Seated before the pool list, so an office with no key or budget left costs no datapi request.
     const scout = yield* seat(floor, "scout");
@@ -121,14 +128,19 @@ const draft = (
 ) =>
   Effect.gen(function* () {
     if (!floor.models.strategist) return;
-    if (!floor.rpc || floor.walletSol === null) {
-      const why = floor.rpc ? "I could not read the wallet balance" : "There is no wallet or RPC URL";
+    if (!floor.rpc || floor.walletSol === null || floor.positionRentSol === null) {
+      const why = !floor.rpc
+        ? "There is no wallet or RPC URL"
+        : floor.walletSol === null
+          ? "I could not read the wallet balance"
+          : "I could not read the position rent on chain";
       yield* sayOnce(floor, "no-wallet", "strategist", `${why}, so I cannot size a position.`, "warn");
       return;
     }
-    const { rpc } = floor;
-    const walletSol = freeSol(floor.walletSol, floor.book.open);
-    const maxPositionSol = (officeCapital(floor.walletSol, floor.book.open) * floor.guardrails.maxPositionPct) / 100;
+    const { rpc, guardrails: g } = floor;
+    const overheadSol = slotOverheadSol(g, floor.positionRentSol);
+    const walletSol = freeSol(floor.walletSol, floor.book.open, overheadSol);
+    const maxPositionSol = positionBudget(g, floor) ?? 0;
     const db = yield* Db;
     const chain = yield* Chain;
 
@@ -153,7 +165,8 @@ const draft = (
       candidates: ready,
       walletSol,
       maxPositionSol,
-      guardrails: floor.guardrails,
+      overheadSol,
+      guardrails: g,
       openPositions: open.map((j) => ({ name: j.poolName, amountSol: j.amountSol })),
     });
     if (Option.isNone(answer)) return;
@@ -168,13 +181,48 @@ const draft = (
       yield* Effect.logWarning(`strategist picked ${decision.pool}, which is not a candidate`);
       return;
     }
+    const where = { poolAddress: pick.address };
+    const setup = yield* chain
+      .openSetup(rpc.url, pick.address, rpc.owner, decision.lowerBin, decision.upperBin)
+      .pipe(Effect.option);
+    if (Option.isNone(setup)) {
+      yield* say(
+        floor,
+        "strategist",
+        `Dropped my ${pick.name} draft: could not quote its setup cost on chain.`,
+        "warn",
+        where,
+      );
+      return;
+    }
+    const setupSol = setup.value.totalSol;
+    const budget = positionBudget(g, floor, setupSol) ?? 0;
+    // Whole lamports, rounded down, so the trimmed amount never reads above the budget.
+    const amountSol = Math.floor(Math.min(decision.amountSol, budget) * 1e9) / 1e9;
+    if (amountSol <= 0) {
+      const text = `Dropped my ${pick.name} draft: its ${setupSol.toFixed(4)} SOL setup leaves nothing above the reserve.`;
+      yield* say(floor, "strategist", text, "info", where);
+      return;
+    }
+    if (setup.value.binArrays > 0 || amountSol < decision.amountSol) {
+      const arrays =
+        setup.value.binArrays > 0
+          ? ` The range needs ${setup.value.binArrays} new bin array(s), ${setup.value.binArraySol.toFixed(4)} SOL that is not refunded.`
+          : "";
+      const trimmed =
+        amountSol < decision.amountSol
+          ? ` Trimmed ${decision.amountSol} to ${amountSol.toFixed(4)} SOL to fit the setup cost.`
+          : "";
+      yield* say(floor, "strategist", `${pick.name}:${arrays}${trimmed}`, "info", where);
+    }
     const params = PROPOSAL_PARAMS.open.safeParse({
       strategy: decision.strategy,
       activeBin: pick.activeBin,
       lowerBin: decision.lowerBin,
       upperBin: decision.upperBin,
-      amountSol: decision.amountSol,
+      amountSol,
       solUsd,
+      setupSol,
     });
     if (!params.success) {
       yield* say(floor, "strategist", `Dropped my ${pick.name} draft: the range misses the active bin.`, "warn", {
@@ -237,6 +285,7 @@ const review = (floor: Floor, proposal: ProposalRow, pools: ReadonlyArray<Office
     const checks = checkOpen(floor.guardrails, floor.filter, {
       params: params.data,
       walletSol: floor.walletSol,
+      positionRentSol: floor.positionRentSol,
       dayStartCapital: floor.dayStartCapital,
       book: floor.book,
       pool: pools.find((p) => p.address === proposal.poolAddress) ?? null,
@@ -285,10 +334,29 @@ const reviewManage = (
         `Vetoed the ${kind} of ${name}: its parameters do not parse.`,
       );
     }
+    // A rebalance's new range may need bin arrays nobody created yet; their rent is read on chain.
+    const range = kind === "rebalance" ? PROPOSAL_PARAMS.rebalance.safeParse(proposal.params) : null;
+    const setupSol =
+      range?.success && floor.rpc
+        ? yield* (yield* Chain)
+            .rangeArrays(floor.rpc.url, proposal.poolAddress, range.data.lowerBin, range.data.upperBin)
+            .pipe(
+              Effect.map((q): number | null => q.totalSol),
+              Effect.catchTag("ChainError", (error) =>
+                Effect.logWarning(`office ${floor.userId}: bin array read failed: ${error.message}`).pipe(
+                  Effect.as(null),
+                ),
+              ),
+            )
+        : kind === "rebalance"
+          ? null
+          : 0;
     const checks = checkManage(floor.guardrails, {
       kind,
       officePosition: floor.book.open.some((j) => !j.simulated && j.positionAddress === proposal.positionAddress),
       walletSol: floor.walletSol,
+      positionRentSol: floor.positionRentSol,
+      setupSol,
       book: floor.book,
       rebalanceManaged: managed.has(proposal.poolAddress),
       lastExecutionAt: yield* db.lastExecutionAt(floor.userId, proposal.poolAddress),

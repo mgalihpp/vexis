@@ -330,6 +330,11 @@ export function proposalFacts(p: ProposalView): { label: string; value: string; 
           value: x ? sol(x.amountSol) : DASH,
           sub: x?.solUsd ? usd(x.amountSol * x.solUsd) : DASH,
         },
+        {
+          label: "Setup cost",
+          value: x?.setupSol != null ? sol(x.setupSol) : DASH,
+          sub: "Rent and new bin arrays, read on chain",
+        },
       ];
     }
     case "rebalance": {

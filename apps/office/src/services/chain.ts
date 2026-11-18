@@ -1,5 +1,12 @@
 import DLMM from "@meteora-ag/dlmm";
 import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import {
+  type OpenSetup,
+  positionRentSol,
+  quoteOpenSetup,
+  quoteRangeArrays,
+  type RangeArrays,
+} from "@vexis/shared/open-cost";
 import { Context, Effect, Layer } from "effect";
 import { ChainError } from "../errors.ts";
 
@@ -20,6 +27,23 @@ export class Chain extends Context.Service<
     pool(rpcUrl: string, poolAddress: string): Effect.Effect<PoolBins, ChainError>;
     /** The wallet's native SOL. */
     balanceSol(rpcUrl: string, owner: string): Effect.Effect<number, ChainError>;
+    /** Rent of a new position account, read on chain. */
+    positionRentSol(rpcUrl: string): Effect.Effect<number, ChainError>;
+    /** What an open over these bins costs beyond its deposit, read on chain (`quoteOpenSetup`). */
+    openSetup(
+      rpcUrl: string,
+      poolAddress: string,
+      owner: string,
+      lowerBin: number,
+      upperBin: number,
+    ): Effect.Effect<OpenSetup, ChainError>;
+    /** Rent the bin arrays and bitmap a position moved to these bins still needs, read on chain. */
+    rangeArrays(
+      rpcUrl: string,
+      poolAddress: string,
+      lowerBin: number,
+      upperBin: number,
+    ): Effect.Effect<RangeArrays, ChainError>;
   }
 >()("vexis/office/Chain") {
   static readonly layer = Layer.sync(Chain, () => {
@@ -48,6 +72,11 @@ export class Chain extends Context.Service<
           const active = await dlmm.getActiveBin();
           return { activeBin: active.binId, binStep: dlmm.lbPair.binStep };
         }),
+      positionRentSol: (rpcUrl) => read(rpcUrl, "position rent", positionRentSol),
+      openSetup: (rpcUrl, poolAddress, owner, lowerBin, upperBin) =>
+        read(rpcUrl, `setup cost ${poolAddress}`, (c) => quoteOpenSetup(c, poolAddress, owner, lowerBin, upperBin)),
+      rangeArrays: (rpcUrl, poolAddress, lowerBin, upperBin) =>
+        read(rpcUrl, `bin arrays ${poolAddress}`, (c) => quoteRangeArrays(c, poolAddress, lowerBin, upperBin)),
       balanceSol: (rpcUrl, owner) =>
         read(rpcUrl, "balance", async (c) => (await c.getBalance(new PublicKey(owner))) / LAMPORTS_PER_SOL),
     });

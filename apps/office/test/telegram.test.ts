@@ -17,7 +17,7 @@ const checked = proposal({
   summary: "1 SOL Spot in JUP-SOL for its fees.",
   riskNotes: {
     checks: [
-      { rule: "max_position_pct", ok: true, value: "1.000 SOL of max 2.500 SOL (25%)" },
+      { rule: "position_size", ok: true, value: "1.000 SOL of max 2.500 SOL (25%)" },
       { rule: "cooldown", ok: true, value: "no execution yet" },
     ],
     llm: { veto: false, note: "Range suits the bin step." },
@@ -32,11 +32,12 @@ describe("approval card", () => {
         `Pool ${POOL}`,
         "Range: bins 90 to 110 (active 100), Spot",
         "Amount: 1 SOL / $150.00",
+        "Setup: 0.0574 SOL (rent and new bin arrays, read on chain)",
         "",
         "1 SOL Spot in JUP-SOL for its fees.",
         "",
         "Guardrails:",
-        "✅ max_position_pct: 1.000 SOL of max 2.500 SOL (25%)",
+        "✅ position_size: 1.000 SOL of max 2.500 SOL (25%)",
         "✅ cooldown: no execution yet",
         "Risk Manager: Range suits the bin step.",
         "",

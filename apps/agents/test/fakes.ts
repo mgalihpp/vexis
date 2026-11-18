@@ -1,6 +1,7 @@
 import { Keypair } from "@solana/web3.js";
 import { type AgentKind, REBALANCE_FAILURE_LIMIT } from "@vexis/shared/agents";
 import type { Beat } from "@vexis/shared/heartbeat";
+import type { OpenSetup, RangeArrays } from "@vexis/shared/open-cost";
 import type { PositionPnl } from "@vexis/shared/pnl";
 import { Effect, Layer, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
@@ -384,12 +385,36 @@ export const poolState = (overrides: Partial<PoolState> = {}): PoolState => ({
   ...overrides,
 });
 
+/** A quote for an open into existing bin arrays with both token accounts in place: the position rent alone. */
+export const SETUP = {
+  positionSol: 0.0574,
+  binArrays: 0,
+  binArraySol: 0,
+  bitmapSol: 0,
+  tokenAccountSol: 0,
+  totalSol: 0.0574,
+};
+
 /** Chain stand-in: `pools` maps a pool address to what the next read returns; a missing pool fails. */
 export function fakeChain(pools: Record<string, PoolState> = {}) {
-  const state = { pools, calls: [] as { rpcUrl: string; pool: string; owner: string }[] };
+  const state = {
+    pools,
+    calls: [] as { rpcUrl: string; pool: string; owner: string }[],
+    positionRentSol: SETUP.positionSol,
+    setup: SETUP as OpenSetup,
+    arrays: { binArrays: 0, binArraySol: 0, bitmapSol: 0, totalSol: 0 } as RangeArrays,
+    arrayCalls: [] as string[],
+  };
   const layer = Layer.succeed(
     Chain,
     Chain.of({
+      positionRentSol: () => Effect.sync(() => state.positionRentSol),
+      openSetup: () => Effect.sync(() => state.setup),
+      rangeArrays: (_rpcUrl, poolAddress, lower, upper) =>
+        Effect.sync(() => {
+          state.arrayCalls.push(`${poolAddress} ${lower}..${upper}`);
+          return state.arrays;
+        }),
       pool: (rpcUrl, poolAddress, owner) => {
         state.calls.push({ rpcUrl, pool: poolAddress, owner });
         const found = state.pools[poolAddress];

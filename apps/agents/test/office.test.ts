@@ -64,7 +64,8 @@ describe("office executor", () => {
         amountSol: 0.2,
         singleSidedSol: true,
         slippageBps: 50,
-        reserveLamports: SOL / 10n,
+        // The 0.1 SOL reserve, the 0.03 fee buffer and the 0.0574 setup the recheck quoted on chain.
+        reserveLamports: 187_400_000n,
       },
     ]);
     expect(s.office.proposals[0]).toMatchObject({ status: "done", simulated: false, signature: "OPEN1" });
@@ -106,6 +107,29 @@ describe("office executor", () => {
     ]);
     expect(s.office.journal[0]).toMatchObject({ closeReason: "stop_loss", closeProposalId: "proposal-1" });
     expect(s.office.journal[0]?.closedAt).not.toBeNull();
+  });
+
+  test("a rebalance whose new range needs bin arrays is stopped when their rent would cut into the reserve", async () => {
+    const rebalance = () =>
+      officeProposal({
+        kind: "rebalance",
+        positionAddress: "POS1",
+        params: { strategy: "Spot", activeBin: 100, lowerBin: 90, upperBin: 110 },
+      });
+    // 0.2 SOL in the wallet, two new bin arrays at 0.0521 each: 0.2 - 0.1042 - 0.03 fee buffer = 0.066, under 0.1.
+    const s = setup({ offices: [live()], journal: [journalRow()], proposals: [rebalance()] }, SOL / 5n);
+    s.chain.arrays = { binArrays: 2, binArraySol: 0.1042, bitmapSol: 0, totalSol: 0.1042 };
+    await s.run(officeExecutor());
+    // Quoted around today's active bin (110), with the proposal's half width.
+    expect(s.chain.arrayCalls).toEqual([`${OFFICE_POOL} 100..120`]);
+    expect(s.office.proposals[0]).toMatchObject({ status: "rejected", decidedBy: "risk" });
+    expect(RiskNotes.parse(s.office.proposals[0]?.riskNotes).checks.find((c) => !c.ok)?.rule).toBe("sol_reserve");
+    expect(s.zap.calls).toEqual([]);
+
+    const funded = setup({ offices: [live()], journal: [journalRow()], proposals: [rebalance()] }, SOL / 2n);
+    funded.chain.arrays = s.chain.arrays;
+    await funded.run(officeExecutor());
+    expect(funded.office.proposals[0]).toMatchObject({ status: "done" });
   });
 
   test("never touches a position the office did not open", async () => {

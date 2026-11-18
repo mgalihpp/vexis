@@ -10,6 +10,7 @@ import {
   transition,
   utcDayStart,
 } from "@vexis/shared/office";
+import type { OpenSetup, RangeArrays } from "@vexis/shared/open-cost";
 import { Effect, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { AppConfig } from "../src/config.ts";
@@ -71,6 +72,16 @@ export function office(overrides: Partial<OfficeConfigRow> = {}): OfficeConfigRo
   };
 }
 
+/** A quote for an open into existing bin arrays with both token accounts in place: the position rent alone. */
+export const SETUP = {
+  positionSol: 0.0574,
+  binArrays: 0,
+  binArraySol: 0,
+  bitmapSol: 0,
+  tokenAccountSol: 0,
+  totalSol: 0.0574,
+};
+
 export const openParams = {
   strategy: "Spot",
   activeBin: 100,
@@ -79,6 +90,7 @@ export const openParams = {
   amountSol: 1,
   solUsd: 150,
   singleSidedSol: false,
+  setupSol: SETUP.totalSol,
 };
 
 export function proposal(overrides: Partial<ProposalRow> = {}): ProposalRow {
@@ -333,9 +345,17 @@ export function fakeMeteora(pools: OfficePool[] = [pool()]) {
   return { state, layer };
 }
 
-/** Chain stand-in: every pool's bins and one wallet balance. */
+/** Chain stand-in: every pool's bins, one wallet balance, the position rent and one setup quote. */
 export function fakeChain(bins: Record<string, PoolBins> = { [POOL]: { activeBin: 100, binStep: 10 } }) {
-  const state = { bins, balanceSol: 10, calls: [] as string[] };
+  const state = {
+    bins,
+    balanceSol: 10,
+    positionRentSol: SETUP.positionSol as number | null,
+    setup: SETUP as OpenSetup | null,
+    arrays: { binArrays: 0, binArraySol: 0, bitmapSol: 0, totalSol: 0 } as RangeArrays,
+    calls: [] as string[],
+    setupCalls: [] as string[],
+  };
   const layer = Layer.succeed(
     Chain,
     Chain.of({
@@ -346,6 +366,18 @@ export function fakeChain(bins: Record<string, PoolBins> = { [POOL]: { activeBin
           return found ? Effect.succeed(found) : Effect.fail(new ChainError({ message: "rpc down" }));
         }),
       balanceSol: () => Effect.sync(() => state.balanceSol),
+      positionRentSol: () =>
+        Effect.suspend(() =>
+          state.positionRentSol === null
+            ? Effect.fail(new ChainError({ message: "rpc down" }))
+            : Effect.succeed(state.positionRentSol),
+        ),
+      rangeArrays: () => Effect.sync(() => state.arrays),
+      openSetup: (_rpcUrl, address, owner, lower, upper) =>
+        Effect.suspend(() => {
+          state.setupCalls.push(`${address} ${owner} ${lower}..${upper}`);
+          return state.setup ? Effect.succeed(state.setup) : Effect.fail(new ChainError({ message: "rpc down" }));
+        }),
     }),
   );
   return { state, layer };

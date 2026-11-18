@@ -34,6 +34,11 @@ export type Book = {
 export type MoneyFacts = {
   /** Native SOL in the wallet now; null when it could not be read. */
   readonly walletSol: number | null;
+  /**
+   * Rent a new position account takes, read on chain (`positionRentSol` in `@vexis/shared/open-cost`): the cost
+   * of every slot whose range is not chosen yet. Null when unread, which fails every rule that spends SOL.
+   */
+  readonly positionRentSol: number | null;
   /** The office's capital at the first read of this UTC day (`officeCapital`); null when unknown. */
   readonly dayStartCapital: number | null;
   readonly book: Book;
@@ -61,13 +66,53 @@ const sum = (xs: ReadonlyArray<number>) => xs.reduce((a, b) => a + b, 0);
 /** An open position's value is trusted this long; the Monitor reads it every minute. */
 export const VALUE_FRESH_MS = 5 * 60_000;
 
-/** Native SOL the office may still spend: a simulated position acts as if it had taken its SOL. */
-export const freeSol = (walletSol: number, open: ReadonlyArray<BookPosition>) =>
-  walletSol - sum(open.filter((p) => p.simulated).map((p) => p.amountSol));
+/** What one open is expected to take beyond its deposit before its range is chosen: rent plus the fee buffer. */
+export const slotOverheadSol = (g: Guardrails, positionRentSol: number) => positionRentSol + g.txFeeBufferSol;
+
+/** Native SOL the office may still spend: a simulated position acts as if it had taken its SOL, rent and fees. */
+export const freeSol = (walletSol: number, open: ReadonlyArray<BookPosition>, overheadSol: number) =>
+  walletSol - sum(open.filter((p) => p.simulated).map((p) => p.amountSol + overheadSol));
 
 /** Free SOL plus what the office's real open positions cost: the base for position size and daily loss. */
 export const officeCapital = (walletSol: number, open: ReadonlyArray<BookPosition>) =>
   walletSol + sum(open.filter((p) => !p.simulated).map((p) => p.amountSol));
+
+/**
+ * The largest deposit the office can open now: the owner's share of capital, and no more than an even split of the
+ * SOL above the reserve over every slot still free, after this open's setup and fee buffer and every other free
+ * slot's rent and fee buffer, so the last slot still fits. `setupSol` is this open's on-chain quote, or the position
+ * rent while its range is not chosen. Null when the wallet or the rent is unread.
+ */
+export function positionBudget(
+  g: Guardrails,
+  f: Pick<MoneyFacts, "walletSol" | "positionRentSol" | "book">,
+  setupSol: number | null = f.positionRentSol,
+) {
+  const { walletSol, positionRentSol } = f;
+  if (walletSol === null || positionRentSol === null || setupSol === null) return null;
+  const open = f.book.open;
+  const slots = g.maxActivePositions - open.length;
+  if (slots <= 0) return 0;
+  const overhead = slotOverheadSol(g, positionRentSol);
+  const shareCap = (officeCapital(walletSol, open) * g.maxPositionPct) / 100;
+  const spendable =
+    freeSol(walletSol, open, overhead) - g.solReserve - setupSol - g.txFeeBufferSol - (slots - 1) * overhead;
+  return Math.max(0, Math.min(shareCap, spendable / slots));
+}
+
+/** Free SOL once this open's deposit, setup and fee buffer are paid; null when any of them is unknown. */
+function leftAfterOpen(g: Guardrails, f: MoneyFacts, amountSol: number, setupSol: number | null) {
+  if (f.walletSol === null || f.positionRentSol === null || setupSol === null) return null;
+  const free = freeSol(f.walletSol, f.book.open, slotOverheadSol(g, f.positionRentSol));
+  return free - amountSol - setupSol - g.txFeeBufferSol;
+}
+
+/** Why a money rule could not be evaluated. */
+function unknownMoney(f: Pick<MoneyFacts, "walletSol" | "positionRentSol">, setupSol: number | null) {
+  if (f.walletSol === null) return "wallet unread";
+  if (f.positionRentSol === null) return "rent unread";
+  return setupSol === null ? "setup cost not quoted" : null;
+}
 
 /**
  * The office's PnL today in SOL: realized on positions closed today plus unrealized on open ones (value minus cost).
@@ -126,26 +171,38 @@ function cooldownCheck(g: Guardrails, f: Pick<MoneyFacts, "lastExecutionAt" | "n
  * The money and timing rules for an open of `amountSol`. The Executor runs these again right before it signs; the
  * pool screen and the LLM budget were checked at review and would cost a screener request to read again.
  */
-export function openMoneyChecks(g: Guardrails, amountSol: number, f: MoneyFacts): GuardrailCheck[] {
-  const { open } = f.book;
-  const free = f.walletSol === null ? null : freeSol(f.walletSol, open);
-  const cap = f.walletSol === null ? null : (officeCapital(f.walletSol, open) * g.maxPositionPct) / 100;
+export function openMoneyChecks(
+  g: Guardrails,
+  proposal: { readonly amountSol: number; readonly setupSol: number | null },
+  f: MoneyFacts,
+): GuardrailCheck[] {
+  const { amountSol, setupSol } = proposal;
+  const book = f.book.open;
+  const cap = positionBudget(g, f, setupSol);
+  const left = leftAfterOpen(g, f, amountSol, setupSol);
+  const unknown = unknownMoney(f, setupSol);
   const loss = dailyLossPct(f.dayStartCapital, dayPnlSol(f.book, f.now));
   return [
     {
-      rule: "max_position_pct",
+      rule: "position_size",
       ok: cap !== null && amountSol <= cap,
-      value: cap === null ? "wallet unread" : `${sol(amountSol)} of max ${sol(cap)} (${g.maxPositionPct}%)`,
+      value:
+        cap === null
+          ? (unknown ?? "unknown")
+          : `${sol(amountSol)} of max ${sol(cap)} (${g.maxPositionPct}% of capital, room for ${g.maxActivePositions} positions)`,
     },
     {
       rule: "sol_reserve",
-      ok: free !== null && free - amountSol >= g.solReserve,
-      value: free === null ? "wallet unread" : `${sol(free - amountSol)} left, reserve ${sol(g.solReserve)}`,
+      ok: left !== null && left >= g.solReserve,
+      value:
+        left === null
+          ? (unknown ?? "unknown")
+          : `${sol(left)} left after ${sol(setupSol ?? 0)} rent and ${sol(g.txFeeBufferSol)} fee buffer, reserve ${sol(g.solReserve)}`,
     },
     {
       rule: "max_active_positions",
-      ok: open.length < g.maxActivePositions,
-      value: `${open.length} open of ${g.maxActivePositions}`,
+      ok: book.length < g.maxActivePositions,
+      value: `${book.length} open of ${g.maxActivePositions}`,
     },
     {
       rule: "daily_loss",
@@ -163,7 +220,7 @@ export function openMoneyChecks(g: Guardrails, amountSol: number, f: MoneyFacts)
  */
 export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts): GuardrailCheck[] {
   return [
-    ...openMoneyChecks(g, f.params.amountSol, f),
+    ...openMoneyChecks(g, f.params, f),
     {
       rule: "pool_alertable",
       ok: f.pool !== null && filter !== null && alertable(f.pool, filter),
@@ -178,10 +235,18 @@ export function checkOpen(g: Guardrails, filter: PoolFilter | null, f: RiskFacts
 }
 
 /** What the rules for a rebalance, claim or close read. */
-export type ManageFacts = Pick<MoneyFacts, "walletSol" | "book" | "rebalanceManaged" | "lastExecutionAt" | "now"> & {
+export type ManageFacts = Pick<
+  MoneyFacts,
+  "walletSol" | "positionRentSol" | "book" | "rebalanceManaged" | "lastExecutionAt" | "now"
+> & {
   readonly kind: Exclude<ProposalKind, "open">;
   /** One of the office's open journal rows holds the proposal's position. */
   readonly officePosition: boolean;
+  /**
+   * Rent a rebalance's new range still needs (bin arrays and bitmap, `quoteRangeArrays`), read on chain; 0 for a claim.
+   * Null when it could not be quoted, which fails the reserve rule.
+   */
+  readonly setupSol: number | null;
 };
 
 /**
@@ -198,13 +263,24 @@ export function checkManage(g: Guardrails, f: ManageFacts): GuardrailCheck[] {
     rebalanceCheck(f.rebalanceManaged),
   ];
   if (f.kind === "close") return checks;
-  const free = f.walletSol === null ? null : freeSol(f.walletSol, f.book.open);
+  const free =
+    f.walletSol === null || f.positionRentSol === null
+      ? null
+      : freeSol(f.walletSol, f.book.open, slotOverheadSol(g, f.positionRentSol));
+  // A rebalance pays the rent of any bin array its new range creates, and its transactions' fees.
+  const cost = f.setupSol === null ? null : f.kind === "rebalance" ? f.setupSol + g.txFeeBufferSol : 0;
+  const left = free === null || cost === null ? null : free - cost;
   return [
     ...checks,
     {
       rule: "sol_reserve",
-      ok: free !== null && free >= g.solReserve,
-      value: free === null ? "wallet unread" : `${sol(free)} free, reserve ${sol(g.solReserve)}`,
+      ok: left !== null && left >= g.solReserve,
+      value:
+        left === null
+          ? (unknownMoney(f, f.setupSol) ?? "unknown")
+          : cost
+            ? `${sol(left)} left after ${sol(f.setupSol ?? 0)} new bin arrays and ${sol(g.txFeeBufferSol)} fee buffer, reserve ${sol(g.solReserve)}`
+            : `${sol(left)} free, reserve ${sol(g.solReserve)}`,
     },
     cooldownCheck(g, f),
   ];
