@@ -7,6 +7,15 @@ type Headers = { get(name: string): string | null };
 /** Background work stops this far above zero, so a page someone has open never queues behind a job or a schedule. */
 export const BACKGROUND_RESERVE = 60;
 export const MAX_ATTEMPTS = 6;
+/** A page request waits at most this long for the budget; nginx gives up on the page at 60 s. */
+export const FOREGROUND_MAX_WAIT_MS = 5_000;
+
+export class DatapiBudgetError extends Error {
+  constructor(readonly waitMs: number) {
+    super(`Meteora data API is rate limited; retry in ${Math.ceil(waitMs / 1000)} s`);
+    this.name = "DatapiBudgetError";
+  }
+}
 
 export class DatapiBudget {
   remaining = Number.POSITIVE_INFINITY;
@@ -45,19 +54,24 @@ type Clock = {
 /**
  * `fetch` for the datapi: waits out a low budget or a 429 and retries, up to MAX_ATTEMPTS, then returns the last
  * response for the caller to judge. `background` requests leave BACKGROUND_RESERVE requests to the web app's users.
+ * `maxWaitMs` caps one wait; past it the call throws DatapiBudgetError instead of holding the page open.
  */
 export async function datapiFetch(
   input: string | URL,
   init: RequestInit | undefined,
-  opts: Clock & { background?: boolean } = {},
+  opts: Clock & { background?: boolean; maxWaitMs?: number } = {},
 ): Promise<Response> {
   const budget = opts.budget ?? processBudget;
   const send = opts.fetch ?? fetch;
   const now = opts.now ?? Date.now;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const maxWaitMs = opts.maxWaitMs ?? Number.POSITIVE_INFINITY;
   for (let attempt = 1; ; attempt++) {
     const background = opts.background ?? false;
-    while (budget.waitMs(now(), background) > 0) await sleep(budget.waitMs(now(), background));
+    for (let wait = budget.waitMs(now(), background); wait > 0; wait = budget.waitMs(now(), background)) {
+      if (wait > maxWaitMs) throw new DatapiBudgetError(wait);
+      await sleep(wait);
+    }
     const res = await send(input, init);
     budget.observe(res.headers, res.status, now(), attempt);
     if (res.status !== 429 || attempt === MAX_ATTEMPTS) return res;

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { BACKGROUND_RESERVE, DatapiBudget, datapiBackgroundFetch, datapiFetch, MAX_ATTEMPTS } from "./datapi-budget";
+import {
+  BACKGROUND_RESERVE,
+  DatapiBudget,
+  DatapiBudgetError,
+  datapiBackgroundFetch,
+  datapiFetch,
+  MAX_ATTEMPTS,
+} from "./datapi-budget";
 
 const ORIGIN = "https://datapi.test";
 
@@ -59,6 +66,29 @@ describe("datapiFetch", () => {
     expect(w.sleeps).toEqual([]);
     await datapiFetch(`${ORIGIN}/bg`, undefined, { ...w.opts, budget, background: true });
     expect(w.sleeps[0]).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it("fails a user request that would wait past maxWaitMs, and leaves background work to wait", async () => {
+    const budget = new DatapiBudget();
+    budget.remaining = 0;
+    budget.resetAt = 1_000_000 + 30_000;
+    const w = world([{ status: 200 }]);
+    await expect(
+      datapiFetch(`${ORIGIN}/user`, undefined, { ...w.opts, budget, maxWaitMs: 5_000 }),
+    ).rejects.toBeInstanceOf(DatapiBudgetError);
+    expect(w.calls).toEqual([]);
+    await datapiFetch(`${ORIGIN}/bg`, undefined, { ...w.opts, budget, background: true, maxWaitMs: undefined });
+    expect(w.sleeps[0]).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it("still waits a short budget gap for a user request", async () => {
+    const budget = new DatapiBudget();
+    budget.remaining = 0;
+    budget.resetAt = 1_000_000 + 2_000;
+    const w = world([{ status: 200 }]);
+    const res = await datapiFetch(`${ORIGIN}/user`, undefined, { ...w.opts, budget, maxWaitMs: 5_000 });
+    expect(res.status).toBe(200);
+    expect(w.sleeps[0]).toBeGreaterThanOrEqual(2_000);
   });
 
   it("does not crash or wait on missing or garbage headers", async () => {
