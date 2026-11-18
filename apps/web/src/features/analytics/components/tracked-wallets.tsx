@@ -178,7 +178,7 @@ function Cell({ label, className = "", children }: { label: string; className?: 
 
 // One grid for the header and every row, so the columns line up at the wide layout.
 const ROW_GRID =
-  "grid grid-cols-2 gap-x-3 gap-y-2 @md:grid-cols-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,0.9fr)] @2xl:items-center @2xl:gap-y-0";
+  "grid grid-cols-2 gap-x-3 gap-y-2 @md:grid-cols-4 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,0.8fr)] @2xl:items-center @2xl:gap-y-0";
 
 function PositionHeader() {
   return (
@@ -190,6 +190,7 @@ function PositionHeader() {
       <span>Deposits</span>
       <span className="text-right">Liquidity</span>
       <span className="text-right">Fees</span>
+      <span className="text-right">Unclaimed</span>
       <span className="text-right">PnL</span>
       <span className="text-right">Created</span>
     </div>
@@ -305,6 +306,10 @@ function PositionRow({
       <Cell label="Fees" className="@2xl:items-end">
         <span className="font-semibold">{usd(p.feesUsd)}</span>
         <span className="text-muted-foreground">{solAmount(p.feesSol)}</span>
+      </Cell>
+      <Cell label="Unclaimed" className="@2xl:items-end">
+        <span className="font-semibold">{usd(p.unclaimedUsd)}</span>
+        <span className="text-muted-foreground">{solAmount(p.unclaimedSol)}</span>
       </Cell>
       <Cell label="PnL" className="@2xl:items-end">
         <span className={`font-semibold ${tone(p.pnlUsd)}`}>{usd(p.pnlUsd, true)}</span>

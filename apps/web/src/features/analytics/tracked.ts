@@ -20,6 +20,8 @@ export interface TrackedPosition {
   liquiditySol: number | null;
   feesUsd: number | null;
   feesSol: number | null;
+  unclaimedUsd: number | null;
+  unclaimedSol: number | null;
   pnlUsd: number | null;
   pnlSol: number | null;
 }
