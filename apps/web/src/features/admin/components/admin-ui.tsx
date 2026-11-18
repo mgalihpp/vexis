@@ -3,9 +3,10 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PAGE_SIZE } from "@vexis/shared/admin";
-import { ChevronLeftIcon, ChevronRightIcon, CopyIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, CopyIcon, InfoIcon } from "lucide-react";
 import { type ReactNode, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import { InfoTip } from "@/components/info-tip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,28 +43,102 @@ export function Pill({ tone, children }: { tone: Tone | "brand"; children: React
   );
 }
 
+function StatLabel({ label, info }: { label: string; info?: string }) {
+  return (
+    <span className="flex items-center gap-1.25 text-xs text-muted-foreground">
+      {label}
+      {info && (
+        <InfoTip aria-label={info} content={info} contentClassName="max-w-52">
+          <InfoIcon className="size-2.75 text-muted-foreground" />
+        </InfoTip>
+      )}
+    </span>
+  );
+}
+
 export function Stat({
   label,
+  info,
   value,
   tone = "",
   chip,
+  gauge,
   children,
 }: {
   label: string;
+  info?: string;
   value: ReactNode;
   tone?: string;
   chip?: ReactNode;
+  gauge?: ReactNode;
   children?: ReactNode;
 }) {
+  if (gauge) {
+    return (
+      <div className="flex h-[7.5rem] items-center justify-between gap-1.5 rounded-lg bg-card px-3.25">
+        <div className="min-w-0">
+          <StatLabel label={label} info={info} />
+          <div className={`mt-2.5 truncate text-[1.5rem] leading-none font-bold tabular-nums ${tone}`}>{value}</div>
+        </div>
+        {gauge}
+      </div>
+    );
+  }
   return (
-    <div className="flex min-h-[6rem] flex-col justify-center gap-2.5 rounded-lg bg-card px-3.25 py-3">
+    <div className="flex h-[7.5rem] flex-col justify-center gap-2.5 rounded-lg bg-card px-3.25">
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>{label}</span>
+        <StatLabel label={label} info={info} />
         {chip}
       </div>
       <div className="flex items-end justify-between gap-3">
         <div className={`truncate text-[1.5rem] leading-none font-bold tabular-nums ${tone}`}>{value}</div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+/** Semicircle arc meter from 180° to 0°, like the portfolio stat cards. */
+export function Gauge({
+  good,
+  bad,
+  goodLabel,
+  badLabel,
+  goodStroke = "stroke-profit",
+  badStroke = "stroke-loss",
+  goodText = "text-profit",
+  badText = "text-loss",
+}: {
+  good: number;
+  bad: number;
+  goodLabel?: ReactNode;
+  badLabel?: ReactNode;
+  goodStroke?: string;
+  badStroke?: string;
+  goodText?: string;
+  badText?: string;
+}) {
+  const total = good + bad;
+  const share = total > 0 ? Math.min(1, Math.max(0, good / total)) : 0;
+  const r = 46;
+  const point = (t: number) => {
+    const a = Math.PI * (1 - t);
+    return `${50 + r * Math.cos(a)} ${54 - r * Math.sin(a)}`;
+  };
+  const arc = (from: number, to: number) => `M ${point(from)} A ${r} ${r} 0 0 1 ${point(to)}`;
+  const gap = total > 0 && share > 0 && share < 1 ? 0.025 : 0;
+  return (
+    <div className="w-[6rem] shrink-0">
+      <svg viewBox="0 0 100 60" className="w-full" aria-hidden="true">
+        <path d={arc(0, 1)} className="fill-none stroke-muted" strokeWidth="9" />
+        {share > 0 && <path d={arc(0, share - gap)} className={`fill-none ${goodStroke}`} strokeWidth="9" />}
+        {share < 1 && total > 0 && (
+          <path d={arc(share + gap, 1)} className={`fill-none ${badStroke}`} strokeWidth="9" />
+        )}
+      </svg>
+      <div className="-mt-0.75 flex justify-between gap-1 text-[0.625rem] tabular-nums">
+        <span className={`truncate ${goodText}`}>{goodLabel ?? good}</span>
+        <span className={`truncate ${badText}`}>{badLabel ?? bad}</span>
       </div>
     </div>
   );
@@ -109,7 +184,7 @@ export function Page({ title, action, children }: { title: string; action?: Reac
   return (
     <div className="flex flex-col gap-5">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="truncate font-brand text-xl font-bold tracking-tight md:text-2xl">{title}</h1>
+        <h1 className="truncate text-lg font-semibold tracking-tight md:text-xl">{title}</h1>
         {action}
       </header>
       {children}
