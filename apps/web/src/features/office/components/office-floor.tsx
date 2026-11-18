@@ -322,7 +322,7 @@ function Roster({
 function HudChip({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground uppercase tabular-nums ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground tabular-nums ${className}`}
     >
       {children}
     </span>

@@ -72,7 +72,7 @@ function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; n
       className="flex flex-col gap-2.5 rounded-lg bg-card p-3.5"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-[0.625rem] tracking-[0.08em] text-brand uppercase">
+        <span className="font-mono text-[0.625rem] tracking-[0.08em] text-brand">
           Proposed by {p.proposedBy === "owner" ? "you" : AGENT_INFO[p.proposedBy].name}
         </span>
         <span className={`font-medium tabular-nums ${left.expired ? "text-loss" : "text-amber-500"}`}>
