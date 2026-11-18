@@ -12,7 +12,7 @@ import {
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
 import { type Floor, presentChecked, reviewDrafts, scoutAndDraft } from "./desks.ts";
-import { BadOfficeConfig } from "./errors.ts";
+import { BadOfficeConfig, type ChainError } from "./errors.ts";
 import { Chain } from "./services/chain.ts";
 import { Db } from "./services/db.ts";
 
@@ -87,13 +87,29 @@ const readFloor = (office: Office) =>
     const wallet = yield* db.wallet(office.row);
     if (wallet._tag !== "ready") {
       if (wallet._tag === "unreadable") yield* Effect.logWarning(`office ${office.userId}: RPC URL does not decrypt`);
-      return { ...office, walletSol: null, dayStartCapital: null, book, rpc: null } satisfies Floor;
+      return {
+        ...office,
+        walletSol: null,
+        positionRentSol: null,
+        dayStartCapital: null,
+        book,
+        rpc: null,
+      } satisfies Floor;
     }
-    const walletSol = yield* (yield* Chain).balanceSol(wallet.rpcUrl, wallet.owner).pipe(
-      Effect.map((sol): number | null => sol),
-      Effect.catchTag("ChainError", (error) =>
-        Effect.logWarning(`office ${office.userId}: balance read failed: ${error.message}`).pipe(Effect.as(null)),
-      ),
+    const chain = yield* Chain;
+    const orNull = (what: string, read: Effect.Effect<number, ChainError>) =>
+      read.pipe(
+        Effect.map((sol): number | null => sol),
+        Effect.catchTag("ChainError", (error) =>
+          Effect.logWarning(`office ${office.userId}: ${what} read failed: ${error.message}`).pipe(Effect.as(null)),
+        ),
+      );
+    const [walletSol, positionRentSol] = yield* Effect.all(
+      [
+        orNull("balance", chain.balanceSol(wallet.rpcUrl, wallet.owner)),
+        orNull("position rent", chain.positionRentSol(wallet.rpcUrl)),
+      ],
+      { concurrency: 2 },
     );
     // Stored on the office row so the runner's Executor reads the same baseline and a restart keeps it.
     let dayStartCapital = storedDayCapital(office.row, office.now);
@@ -104,6 +120,7 @@ const readFloor = (office: Office) =>
     return {
       ...office,
       walletSol,
+      positionRentSol,
       dayStartCapital,
       book,
       rpc: { owner: wallet.owner, url: wallet.rpcUrl },

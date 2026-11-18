@@ -586,6 +586,7 @@ const GUARDRAIL_GROUPS: {
       { key: "maxPositionPct", label: "Largest position", unit: "% of office capital", step: "1" },
       { key: "maxActivePositions", label: "Active positions", unit: "At most", step: "1" },
       { key: "solReserve", label: "SOL reserve", unit: "SOL always kept", step: "0.01" },
+      { key: "txFeeBufferSol", label: "Fee buffer", unit: "SOL per open, on top of rent read on chain", step: "0.01" },
     ],
   },
   {

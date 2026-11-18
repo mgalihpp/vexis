@@ -99,6 +99,7 @@ describe("config", () => {
       maxActivePositions: 3,
       maxDailyLossPct: 5,
       solReserve: 0.1,
+      txFeeBufferSol: 0.03,
       cooldownSec: 300,
       maxConsecutiveFailures: 3,
       approvalTtlSec: 900,

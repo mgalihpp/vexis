@@ -10,11 +10,12 @@ import {
   type ProposalKind,
   pauseOf,
   RiskNotes,
+  rebalanceHalfWidth,
   utcDayStart,
 } from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { lamportsToSol, solToLamports } from "../rebalance/fees.ts";
-import { Chain } from "../services/chain.ts";
+import { Chain, type PoolState } from "../services/chain.ts";
 import { Db } from "../services/db.ts";
 import { type OfficeConfigRow, OfficeDb, type OfficeWallet, type ProposalRow } from "../services/office-db.ts";
 import { WalletLock } from "../services/wallet-lock.ts";
@@ -119,35 +120,63 @@ const runOffice = (office: Office) =>
     }
   });
 
-/** The guardrails as they stand now, from a fresh balance read. */
-const recheck = (office: Office, p: ProposalRow, kind: ProposalKind, walletSol: number, now: number) =>
+/**
+ * The guardrails as they stand now, from fresh chain reads: the balance, the position rent, and the rent the action's
+ * range still needs (an open's whole setup, a rebalance's new bin arrays around today's active bin), which is what the
+ * send keeps above the reserve. A close reads none of it: it is the way out.
+ */
+const recheck = (office: Office, p: ProposalRow, state: PoolState, now: number) =>
   Effect.gen(function* () {
     const db = yield* OfficeDb;
+    const chain = yield* Chain;
     const { userId } = office.row;
+    const { rpcUrl, owner } = office.wallet;
+    const walletSol = lamportsToSol(state.nativeLamports);
     const book = yield* db.book(userId, utcDayStart(now));
     const managed = (yield* db.rebalancePools(userId)).has(p.poolAddress);
     const lastExecutionAt = yield* db.lastExecutionAt(userId, p.poolAddress);
-    if (kind === "open") {
+    const unparsed = { checks: [{ rule: "params", ok: false, value: "the parameters do not parse" }], setupSol: null };
+    const positionRentSol = p.kind === "close" ? null : yield* chain.positionRentSol(rpcUrl);
+    if (p.kind === "open") {
       const params = PROPOSAL_PARAMS.open.safeParse(p.params);
-      if (!params.success) return [{ rule: "params", ok: false, value: "the parameters do not parse" }];
-      return openMoneyChecks(office.g, params.data.amountSol, {
-        walletSol,
-        dayStartCapital: storedDayCapital(office.row, now),
-        book,
-        rebalanceManaged: managed,
-        lastExecutionAt,
-        now,
-      });
+      if (!params.success) return unparsed;
+      const { lowerBin, upperBin, amountSol } = params.data;
+      const setup = yield* chain.openSetup(rpcUrl, p.poolAddress, owner, lowerBin, upperBin);
+      const checks = openMoneyChecks(
+        office.g,
+        { amountSol, setupSol: setup.totalSol },
+        {
+          walletSol,
+          positionRentSol,
+          dayStartCapital: storedDayCapital(office.row, now),
+          book,
+          rebalanceManaged: managed,
+          lastExecutionAt,
+          now,
+        },
+      );
+      return { checks, setupSol: setup.totalSol };
     }
-    return checkManage(office.g, {
-      kind,
+    let setupSol = 0;
+    if (p.kind === "rebalance") {
+      const params = PROPOSAL_PARAMS.rebalance.safeParse(p.params);
+      if (!params.success) return unparsed;
+      const half = rebalanceHalfWidth(params.data);
+      const active = state.activeBinId;
+      setupSol = (yield* chain.rangeArrays(rpcUrl, p.poolAddress, active - half, active + half)).totalSol;
+    }
+    const checks = checkManage(office.g, {
+      kind: p.kind,
       officePosition: book.open.some((j) => !j.simulated && j.positionAddress === p.positionAddress),
       walletSol,
+      positionRentSol,
+      setupSol,
       book,
       rebalanceManaged: managed,
       lastExecutionAt,
       now,
     });
+    return { checks, setupSol };
   });
 
 type Outcome =
@@ -166,7 +195,7 @@ const execute = (office: Office, p: ProposalRow, now: number) =>
     const chain = yield* Chain;
     const { userId, live } = office.row;
     const state = yield* chain.pool(office.wallet.rpcUrl, p.poolAddress, office.wallet.owner);
-    const checks: GuardrailCheck[] = yield* recheck(office, p, p.kind, lamportsToSol(state.nativeLamports), now);
+    const { checks, setupSol } = yield* recheck(office, p, state, now);
     const failed = checks.filter((c) => !c.ok).map((c) => c.rule);
     if (failed.length > 0) {
       const prior = RiskNotes.safeParse(p.riskNotes);
@@ -179,7 +208,7 @@ const execute = (office: Office, p: ProposalRow, now: number) =>
     const claimed = yield* db.move(userId, p.id, "approved", "executing", { simulated: !live });
     if (!claimed) return false;
 
-    const outcome = live ? yield* send(office, claimed) : yield* simulate(claimed);
+    const outcome = live ? yield* send(office, claimed, setupSol) : yield* simulate(claimed);
     if (outcome._tag === "done") {
       yield* db.move(userId, p.id, "executing", "done", { signature: outcome.signature });
       yield* say(p, "executor", outcome.note, "good");
@@ -218,20 +247,23 @@ const simulate = (p: ProposalRow) =>
     return done(null, `Preview: ${what}. Nothing was signed or sent.`);
   });
 
-/** Live: decrypts the office's wallet through `Db.walletSigner` and sends through `Zap`. */
-const send = (office: Office, p: ProposalRow) =>
+/**
+ * Live: decrypts the office's wallet through `Db.walletSigner` and sends through `Zap`. `setupSol` is the open's setup
+ * cost the recheck just quoted on chain; null for the other kinds.
+ */
+const send = (office: Office, p: ProposalRow, setupSol: number | null) =>
   Effect.gen(function* () {
     const signer = yield* (yield* Db).walletSigner(office.row.userId, "office");
     if (signer._tag !== "ready") {
       const why = signer._tag === "missing" ? "no wallet secret is saved" : "the wallet secret does not decrypt";
       return failed(why);
     }
-    return yield* act(office, p, signer.signer).pipe(
+    return yield* act(office, p, signer.signer, setupSol).pipe(
       Effect.catchTag("ZapError", (error) => Effect.succeed(failed(error.message))),
     );
   });
 
-const act = (office: Office, p: ProposalRow, signer: Keypair) =>
+const act = (office: Office, p: ProposalRow, signer: Keypair, setupSol: number | null) =>
   Effect.gen(function* () {
     const db = yield* OfficeDb;
     const zap = yield* Zap;
@@ -242,6 +274,7 @@ const act = (office: Office, p: ProposalRow, signer: Keypair) =>
       case "open": {
         const parsed = PROPOSAL_PARAMS.open.safeParse(p.params);
         if (!parsed.success) return BAD_PARAMS;
+        if (setupSol === null) return failed("the setup cost was not quoted");
         const params = parsed.data;
         const opened = yield* zap.open(rpc, signer, {
           poolAddress: p.poolAddress,
@@ -251,7 +284,8 @@ const act = (office: Office, p: ProposalRow, signer: Keypair) =>
           amountSol: params.amountSol,
           singleSidedSol: params.singleSidedSol,
           slippageBps: OFFICE_SLIPPAGE_BPS,
-          reserveLamports: solToLamports(office.g.solReserve),
+          // The deposit leaves this open's on-chain setup cost and the fee buffer above the reserve.
+          reserveLamports: solToLamports(office.g.solReserve + office.g.txFeeBufferSol + setupSol),
         });
         yield* db.insertJournal(p.userId, {
           openProposalId: p.id,
@@ -281,7 +315,7 @@ const act = (office: Office, p: ProposalRow, signer: Keypair) =>
           positionAddress: position,
           strategy: params.strategy,
           slippageBps: OFFICE_SLIPPAGE_BPS,
-          halfWidth: Math.max(1, Math.floor((params.upperBin - params.lowerBin) / 2)),
+          halfWidth: rebalanceHalfWidth(params),
         });
         return done(signature, `Re-centered ${nameOf(p)}: ${signature}`);
       }

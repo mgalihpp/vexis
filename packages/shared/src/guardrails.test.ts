@@ -43,8 +43,11 @@ const facts = (overrides: Partial<RiskFacts> = {}): RiskFacts => ({
     amountSol: 1,
     solUsd: 150,
     singleSidedSol: false,
+    setupSol: 0.06,
   },
   walletSol: 10,
+  // Round test numbers: 0.06 SOL rent, so a slot's overhead with the 0.03 fee buffer is 0.09.
+  positionRentSol: 0.06,
   dayStartCapital: 10,
   book: { open: [], closedToday: [] },
   pool: pool(),
@@ -68,7 +71,7 @@ const position = (o: Partial<BookPosition> = {}): BookPosition => ({
 const open = (...ps: BookPosition[]) => ({ book: { open: ps, closedToday: [] } });
 const closed = (...ps: BookPosition[]) => ({ book: { open: [], closedToday: ps } });
 
-const params = (amountSol: number) => ({ ...facts().params, amountSol });
+const params = (amountSol: number, setupSol: number | null = 0.06) => ({ ...facts().params, amountSol, setupSol });
 const verdict = (rule: string, f: RiskFacts) => checkOpen(g, BLUE_CHIP, f).find((c) => c.rule === rule)?.ok;
 
 describe("checkOpen", () => {
@@ -77,16 +80,29 @@ describe("checkOpen", () => {
   });
 
   test.each([
-    ["max_position_pct", facts({ params: params(2.5) }), true],
-    ["max_position_pct", facts({ params: params(2.51) }), false],
-    ["max_position_pct", facts({ walletSol: null }), false],
+    ["position_size", facts({ params: params(2.5) }), true],
+    ["position_size", facts({ params: params(2.51) }), false],
+    ["position_size", facts({ walletSol: null }), false],
     // SOL locked in a real position still counts toward the base: 8 free + 2 committed = 10.
-    ["max_position_pct", facts({ walletSol: 8, params: params(2.5), ...open(position({ amountSol: 2 })) }), true],
-    ["sol_reserve", facts({ walletSol: 0.2, params: params(0.05) }), true],
-    ["sol_reserve", facts({ walletSol: 0.12, params: params(0.03) }), false],
-    // A simulated position never left the wallet, so it is taken off the free SOL.
-    ["sol_reserve", facts({ params: params(0.05), ...open(position({ amountSol: 9.85, simulated: true })) }), true],
-    ["sol_reserve", facts({ params: params(0.06), ...open(position({ amountSol: 9.85, simulated: true })) }), false],
+    ["position_size", facts({ walletSol: 8, params: params(2.5), ...open(position({ amountSol: 2 })) }), true],
+    // 1 SOL over 3 slots: (1 - 0.1 reserve - 3 x 0.09 rent and fees) / 3 = 0.21 each, under the 25% share.
+    ["position_size", facts({ walletSol: 1, params: params(0.2) }), true],
+    ["position_size", facts({ walletSol: 1, params: params(0.22) }), false],
+    // The last free slot takes what is left above the reserve, its rent and fees.
+    ["position_size", facts({ walletSol: 0.5, params: params(0.3), ...open(position(), position()) }), true],
+    // Two new bin arrays (0.0714 each, never refunded) make this open's setup 0.2029: (1 - 0.1 - 0.2029 - 0.03 - 2 x 0.09) / 3 = 0.162.
+    ["position_size", facts({ walletSol: 1, params: params(0.16, 0.2029) }), true],
+    ["position_size", facts({ walletSol: 1, params: params(0.17, 0.2029) }), false],
+    ["position_size", facts({ params: params(1, null) }), false],
+    ["position_size", facts({ positionRentSol: null }), false],
+    ["sol_reserve", facts({ walletSol: 0.3, params: params(0.1) }), true],
+    ["sol_reserve", facts({ walletSol: 0.5, params: params(0.2, 0.2029) }), false],
+    ["sol_reserve", facts({ params: params(1, null) }), false],
+    ["sol_reserve", facts({ positionRentSol: null }), false],
+    ["sol_reserve", facts({ walletSol: 0.3, params: params(0.12) }), false],
+    // A simulated position never left the wallet, so it and its rent and fees are taken off the free SOL.
+    ["sol_reserve", facts({ params: params(0.1), ...open(position({ amountSol: 9.6, simulated: true })) }), true],
+    ["sol_reserve", facts({ params: params(0.13), ...open(position({ amountSol: 9.6, simulated: true })) }), false],
     ["max_active_positions", facts(open(position(), position())), true],
     ["max_active_positions", facts(open(position(), position(), position())), false],
     ["daily_loss", facts(closed(position({ pnlSol: -0.49 }))), true],
@@ -115,7 +131,9 @@ describe("checkOpen", () => {
     const pooled = checkOpen(g, BLUE_CHIP, facts({ pool: pool({ blacklisted: true }) }));
     expect(pooled.find((c) => c.rule === "pool_alertable")?.value).toBe("blacklisted");
     const wallet = checkOpen(g, BLUE_CHIP, facts({ walletSol: null }));
-    expect(wallet.find((c) => c.rule === "max_position_pct")?.value).toBe("wallet unread");
+    expect(wallet.find((c) => c.rule === "position_size")?.value).toBe("wallet unread");
+    const unquoted = checkOpen(g, BLUE_CHIP, facts({ params: params(1, null) }));
+    expect(unquoted.find((c) => c.rule === "sol_reserve")?.value).toBe("setup cost not quoted");
   });
 
   test("pool_alertable reads the office's own filter, and an unknown organic score fails an organic bound", () => {
@@ -137,6 +155,8 @@ describe("checkManage", () => {
     kind: "rebalance",
     officePosition: true,
     walletSol: 1,
+    positionRentSol: 0.06,
+    setupSol: 0,
     book: { open: [], closedToday: [] },
     rebalanceManaged: false,
     lastExecutionAt: null,
@@ -158,6 +178,16 @@ describe("checkManage", () => {
     expect(ok(manage({ ...tight, kind: "close" }))).toBe(true);
     expect(ok(manage({ kind: "claim", walletSol: null }))).toBe(false);
   });
+
+  test("a rebalance pays the rent of the bin arrays its new range creates, read on chain", () => {
+    // 0.3 free - 0.1042 for two new arrays - 0.03 fee buffer = 0.1658 over the 0.1 reserve; 0.2 free is not enough.
+    const arrays = { kind: "rebalance" as const, setupSol: 0.1042 };
+    expect(ok(manage({ ...arrays, walletSol: 0.3 }))).toBe(true);
+    expect(ok(manage({ ...arrays, walletSol: 0.2 }))).toBe(false);
+    expect(ok(manage({ kind: "rebalance", setupSol: null }))).toBe(false);
+    // A close never waits on a quote or a rent read.
+    expect(ok(manage({ kind: "close", setupSol: null, positionRentSol: null, walletSol: null }))).toBe(true);
+  });
 });
 
 describe("daily loss and budget", () => {
@@ -177,10 +207,10 @@ describe("daily loss and budget", () => {
     expect(dayPnlSol({ open: [position({ valueSol: null })], closedToday: [] }, T0)).toBeNull();
   });
 
-  test("capital counts real positions at cost, free SOL takes simulated ones off", () => {
+  test("capital counts real positions at cost, free SOL takes simulated ones off with their rent and fees", () => {
     const ps = [position({ amountSol: 2 }), position({ amountSol: 3, simulated: true })];
     expect(officeCapital(5, ps)).toBe(7);
-    expect(freeSol(5, ps)).toBe(2);
+    expect(freeSol(5, ps, 0.09)).toBeCloseTo(1.91);
   });
 
   test("loss is measured against the day's starting capital and hits at the limit", () => {

@@ -1,5 +1,12 @@
 import DLMM from "@meteora-ag/dlmm";
-import { PublicKey } from "@solana/web3.js";
+import { type Connection, PublicKey } from "@solana/web3.js";
+import {
+  type OpenSetup,
+  positionRentSol,
+  quoteOpenSetup,
+  quoteRangeArrays,
+  type RangeArrays,
+} from "@vexis/shared/open-cost";
 import { Context, Effect, Layer } from "effect";
 import { ChainError } from "../errors.ts";
 import type { OnChainPosition } from "../rebalance/range.ts";
@@ -35,6 +42,23 @@ export class Chain extends Context.Service<
   {
     /** The pool's active bin and mints, the owner's positions in it and the owner's SOL balance. */
     pool(rpcUrl: string, poolAddress: string, owner: string): Effect.Effect<PoolState, ChainError>;
+    /** Rent of a new position account, read on chain. */
+    positionRentSol(rpcUrl: string): Effect.Effect<number, ChainError>;
+    /** What an open over these bins costs beyond its deposit, read on chain (`quoteOpenSetup`). */
+    openSetup(
+      rpcUrl: string,
+      poolAddress: string,
+      owner: string,
+      lowerBin: number,
+      upperBin: number,
+    ): Effect.Effect<OpenSetup, ChainError>;
+    /** Rent the bin arrays and bitmap a position moved to these bins still needs, read on chain. */
+    rangeArrays(
+      rpcUrl: string,
+      poolAddress: string,
+      lowerBin: number,
+      upperBin: number,
+    ): Effect.Effect<RangeArrays, ChainError>;
   }
 >()("vexis/agents/Chain") {
   static readonly layer = Layer.sync(Chain, () => {
@@ -81,6 +105,24 @@ export class Chain extends Context.Service<
         }),
       );
 
-    return Chain.of({ pool });
+    const read = <A>(rpcUrl: string, poolAddress: string, f: (c: Connection) => Promise<A>) =>
+      Effect.tryPromise({
+        try: () => f(connectionFor(rpcUrl)),
+        catch: (cause) => new ChainError({ poolAddress, cause: new Error(redactRpc(String(cause), rpcUrl)) }),
+      }).pipe(
+        Effect.timeoutOrElse({
+          duration: "30 seconds",
+          orElse: () => Effect.fail(new ChainError({ poolAddress, cause: new Error("timed out") })),
+        }),
+      );
+
+    return Chain.of({
+      pool,
+      positionRentSol: (rpcUrl) => read(rpcUrl, "-", positionRentSol),
+      openSetup: (rpcUrl, poolAddress, owner, lowerBin, upperBin) =>
+        read(rpcUrl, poolAddress, (c) => quoteOpenSetup(c, poolAddress, owner, lowerBin, upperBin)),
+      rangeArrays: (rpcUrl, poolAddress, lowerBin, upperBin) =>
+        read(rpcUrl, poolAddress, (c) => quoteRangeArrays(c, poolAddress, lowerBin, upperBin)),
+    });
   });
 }

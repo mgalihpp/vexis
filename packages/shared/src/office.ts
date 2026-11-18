@@ -126,6 +126,11 @@ export const Guardrails = z.object({
   maxDailyLossPct: z.number().gt(0).max(100).default(5),
   /** SOL that always stays in the wallet. */
   solReserve: z.number().min(0).max(100).default(0.1),
+  /**
+   * SOL set aside per position for its open and close transactions (base fee, priority fee, the zap's temporary
+   * accounts), on top of the rent read on chain. Fees are only known once sent; 0.03 is what Meteora advises keeping.
+   */
+  txFeeBufferSol: z.number().min(0).max(1).default(0.03),
   /** Quiet time per pool after an execution, in seconds. */
   cooldownSec: z.number().int().min(0).max(86_400).default(300),
   /** Failed executions in a row that pause the office. */
@@ -234,6 +239,11 @@ export const PROPOSAL_PARAMS = {
       solUsd: z.number().positive().nullable(),
       /** Deposit only SOL on its side of the pair, instead of swapping part of it for the other token. */
       singleSidedSol: z.boolean().default(false),
+      /**
+       * SOL the open pays beyond its deposit, quoted on chain for this range when it was drafted: position rent plus any
+       * bin array or bitmap extension the range still needs. Null when not quoted, which fails the money rules.
+       */
+      setupSol: z.number().min(0).nullable().default(null),
     })
     .refine((p) => p.lowerBin <= p.activeBin && p.activeBin <= p.upperBin, {
       path: ["activeBin"],
@@ -243,6 +253,10 @@ export const PROPOSAL_PARAMS = {
   claim: z.object({ feeSol: z.number().nonnegative().nullable() }),
   close: z.object({ reason: z.enum(["take_profit", "stop_loss", "out_of_range", "manual"]) }),
 } as const satisfies Record<ProposalKind, z.ZodType>;
+
+/** The half width a rebalance re-centers on the active bin with: the proposal's range, at least one bin. */
+export const rebalanceHalfWidth = (p: { readonly lowerBin: number; readonly upperBin: number }) =>
+  Math.max(1, Math.floor((p.upperBin - p.lowerBin) / 2));
 
 export type ProposalParams<K extends ProposalKind> = z.infer<(typeof PROPOSAL_PARAMS)[K]>;
 

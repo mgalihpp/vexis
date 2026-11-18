@@ -79,6 +79,7 @@ export function cardText(p: ProposalRow) {
     lines.push(
       `Range: bins ${x.lowerBin} to ${x.upperBin} (active ${x.activeBin}), ${x.strategy}${x.singleSidedSol ? ", SOL only" : ""}`,
       `Amount: ${x.amountSol} SOL / ${x.solUsd === null ? DASH : usd(x.amountSol * x.solUsd)}`,
+      `Setup: ${x.setupSol === null ? DASH : `${x.setupSol.toFixed(4)} SOL`} (rent and new bin arrays, read on chain)`,
     );
   }
   if (p.positionAddress) lines.push(`Position ${p.positionAddress}`);

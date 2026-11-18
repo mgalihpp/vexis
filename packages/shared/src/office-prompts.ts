@@ -117,26 +117,31 @@ export type StrategistInput = {
   readonly walletSol: number;
   /** The largest position the guardrails allow, in SOL. */
   readonly maxPositionSol: number;
+  /** What each open takes beyond its deposit before its range is chosen: position rent read on chain plus the fee buffer. */
+  readonly overheadSol: number;
   readonly guardrails: Guardrails;
   readonly openPositions: readonly { readonly name: string | null; readonly amountSol: number }[];
 };
 
 export const strategistPrompt: Prompt<StrategistInput, StrategistDecision> = {
-  version: "strategist-v2",
+  version: "strategist-v3",
   schema: StrategistDecision,
   system: [
     "You are the Strategist of a Meteora DLMM liquidity desk on Solana.",
     "Pick at most one candidate and draft one position in it, sized in SOL, or skip when none is worth it.",
     "Strategy is Spot (even), Curve (concentrated at the active bin) or BidAsk (weighted to the edges).",
     "lowerBin and upperBin are bin ids that must hold the active bin; keep the range within 69 bins.",
-    "Stay inside the limits you are given: position size and the SOL that must stay in the wallet.",
+    "Max position is already worked out for you: the SOL above the reserve, split over every free position slot,",
+    "after each slot's position rent and fee buffer. Size at or under it. Code quotes the real setup cost for your range",
+    "on chain afterwards (a new bin array costs extra and is not refunded) and trims the amount if it no longer fits.",
     `${PLAIN} ${JSON_ONLY}`,
     'Shape: {"action":"open","pool":"<address>","strategy":"Spot|Curve|BidAsk","lowerBin":0,"upperBin":0,"amountSol":0,"rationale":"<two sentences>"}',
     'or {"action":"skip","reason":"<one sentence>"}',
   ].join("\n"),
-  user: ({ candidates, walletSol, maxPositionSol, guardrails, openPositions }) =>
+  user: ({ candidates, walletSol, maxPositionSol, overheadSol, guardrails, openPositions }) =>
     [
-      `Wallet: ${walletSol.toFixed(3)} SOL free. Max position: ${maxPositionSol.toFixed(3)} SOL. Keep at least ${guardrails.solReserve} SOL.`,
+      `Wallet: ${walletSol.toFixed(3)} SOL free. Keep at least ${guardrails.solReserve} SOL.`,
+      `Max position: ${maxPositionSol.toFixed(3)} SOL (each open also takes about ${overheadSol.toFixed(3)} SOL for rent and fees).`,
       `Open positions (${openPositions.length} of max ${guardrails.maxActivePositions}):`,
       ...openPositions.map((p) => `- ${p.name ?? "?"}: ${p.amountSol} SOL`),
       "Candidates (address | pair | TVL | 24h volume | 24h fee/TVL | bin step | active bin | Scout's reason):",

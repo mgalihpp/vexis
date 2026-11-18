@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { DAILY_LOSS, KILL_SWITCH, RiskNotes } from "@vexis/shared/office";
+import { DAILY_LOSS, KILL_SWITCH, PROPOSAL_PARAMS, RiskNotes } from "@vexis/shared/office";
 import { SCREENER_PRESETS } from "@vexis/shared/screen";
 import { Effect } from "effect";
 import { TestClock } from "effect/testing";
@@ -16,6 +16,7 @@ import {
   POOL,
   PROPOSAL_ID,
   proposal,
+  SETUP,
   setup,
   T0,
 } from "./fakes.ts";
@@ -36,7 +37,7 @@ describe("office tick", () => {
     expect(notes.llm).toEqual({ veto: false, note: "Range suits the bin step." });
     expect(s.db.runs.map((r) => [r.agent, r.promptVersion, r.costUsd])).toEqual([
       ["scout", "scout-v1", 0.0002],
-      ["strategist", "strategist-v2", 0.0002],
+      ["strategist", "strategist-v3", 0.0002],
       ["risk", "risk-v1", 0.0002],
       ["manager", "manager-v1", 0.0002],
     ]);
@@ -54,13 +55,35 @@ describe("office tick", () => {
     expect([scoutThread?.system, scoutThread?.userMessage]).toEqual([scoutCall?.system, scoutCall?.user]);
   });
 
+  test("the Strategist's amount is trimmed to fit the setup quoted on chain for its range", async () => {
+    const s = setup();
+    s.chain.balanceSol = 1;
+    // Two missing bin arrays at 0.0714 each, on top of the 0.0574 position rent.
+    s.chain.setup = { ...SETUP, binArrays: 2, binArraySol: 0.1428, totalSol: 0.2002 };
+    await s.run(tick());
+    expect(s.chain.setupCalls).toEqual([`${POOL} OWNER1 90..110`]);
+    // (1 - 0.1 reserve - 0.2002 setup - 0.03 fees - 2 x 0.0874 other slots) / 3 = 0.165.
+    const params = PROPOSAL_PARAMS.open.parse(s.db.proposals[0]?.params);
+    expect([params.amountSol, params.setupSol]).toEqual([0.164999999, 0.2002]);
+    expect(s.db.messages.map((m) => m.text)).toContain(
+      "JUP-SOL: The range needs 2 new bin array(s), 0.1428 SOL that is not refunded. Trimmed 1 to 0.1650 SOL to fit the setup cost.",
+    );
+  });
+
+  test("an open whose setup cannot be quoted on chain is never drafted", async () => {
+    const s = setup();
+    s.chain.setup = null;
+    await s.run(tick());
+    expect(s.db.proposals).toEqual([]);
+  });
+
   test("a code veto rejects the draft without asking the Risk agent", async () => {
     const s = setup({ proposals: [proposal({ params: { ...openParams, amountSol: 5 } })] });
     s.llm.replies = {};
     await s.run(tick());
     expect(s.db.proposals[0]).toMatchObject({ status: "rejected", decidedBy: "risk" });
     const notes = RiskNotes.parse(s.db.proposals[0]?.riskNotes);
-    expect(notes.checks.filter((c) => !c.ok).map((c) => c.rule)).toEqual(["max_position_pct"]);
+    expect(notes.checks.filter((c) => !c.ok).map((c) => c.rule)).toEqual(["position_size"]);
     expect(s.llm.calls.filter((c) => c.agent === "risk")).toHaveLength(0);
     // A call that failed still keeps its thread: the two messages, the error, and no answer.
     const scout = s.db.threads.get("user-1:scout");
