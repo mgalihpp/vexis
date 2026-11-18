@@ -36,7 +36,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { age } from "@/features/analytics/analytics";
 import { Updated } from "@/features/analytics/components/ui";
 import { Notice } from "@/features/portfolio/components/notice";
-import { Badge, TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
+import { Badge, LinkStack, TokenIcon, tradeLinks } from "@/features/portfolio/components/pool-identity";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { PoolFilter } from "@/features/portfolio/components/table-controls";
 import { compactSol, compactUsd, tone } from "@/features/portfolio/money";
@@ -824,23 +824,7 @@ function Money({ usd, solPrice }: { usd: number; solPrice: number | null }) {
 }
 
 function TradeIcons({ pool }: { pool: ScreenerPool }) {
-  return (
-    <span className="relative z-10 flex shrink-0 items-center gap-1.5">
-      {tradeLinks(pool.address, pool.tokenX.mint, pool.tokenY.mint).map((l) => (
-        <a
-          key={l.name}
-          href={l.href}
-          target="_blank"
-          rel="noreferrer"
-          aria-label={`${pool.name} on ${l.name}`}
-          title={l.name}
-          className="opacity-80 transition-opacity hover:opacity-100"
-        >
-          <img src={l.logo} alt="" className="size-3.5 rounded-[0.15rem]" />
-        </a>
-      ))}
-    </span>
-  );
+  return <LinkStack label={pool.name} links={tradeLinks(pool.address, pool.tokenX.mint, pool.tokenY.mint)} />;
 }
 
 /** Covers the whole row so it opens Analytics, while the trade links above it stay separate anchors. */
