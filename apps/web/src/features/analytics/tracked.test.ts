@@ -106,6 +106,8 @@ const pos = (over: Partial<TrackedPosition> & Pick<TrackedPosition, "address" | 
   liquiditySol: null,
   feesUsd: null,
   feesSol: null,
+  unclaimedUsd: null,
+  unclaimedSol: null,
   pnlUsd: null,
   pnlSol: null,
   ...over,

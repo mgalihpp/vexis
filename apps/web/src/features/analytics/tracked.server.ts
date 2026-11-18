@@ -65,7 +65,14 @@ const PnlRow = z.object({
   allTimeFees: Pair,
   pnlUsd: maybeNum,
   pnlSol: maybeNum,
-  unrealizedPnl: z.object({ balances: maybeNum, balancesSol: maybeNum }).nullish(),
+  unrealizedPnl: z
+    .object({
+      balances: maybeNum,
+      balancesSol: maybeNum,
+      unclaimedFeeTokenX: TokenAmount,
+      unclaimedFeeTokenY: TokenAmount,
+    })
+    .nullish(),
 });
 type PnlRow = z.infer<typeof PnlRow>;
 
@@ -212,6 +219,7 @@ function poolTotals(job: TotalsJob): PoolTotals {
 const ms = (t: number) => (t < 1e12 ? t * 1000 : t);
 
 function buildPosition(p: OnChainPosition, row: PnlRow | undefined): TrackedPosition {
+  const u = row?.unrealizedPnl;
   return {
     address: p.address,
     owner: p.owner,
@@ -231,10 +239,12 @@ function buildPosition(p: OnChainPosition, row: PnlRow | undefined): TrackedPosi
       : null,
     depositX: row?.allTimeDeposits?.tokenX?.amount ?? null,
     depositY: row?.allTimeDeposits?.tokenY?.amount ?? null,
-    liquidityUsd: row?.unrealizedPnl?.balances ?? null,
-    liquiditySol: row?.unrealizedPnl?.balancesSol ?? null,
+    liquidityUsd: u?.balances ?? null,
+    liquiditySol: u?.balancesSol ?? null,
     feesUsd: row?.allTimeFees?.total?.usd ?? null,
     feesSol: row?.allTimeFees?.total?.sol ?? null,
+    unclaimedUsd: sumKnown([u?.unclaimedFeeTokenX?.usd ?? null, u?.unclaimedFeeTokenY?.usd ?? null]),
+    unclaimedSol: sumKnown([u?.unclaimedFeeTokenX?.amountSol ?? null, u?.unclaimedFeeTokenY?.amountSol ?? null]),
     pnlUsd: row?.pnlUsd ?? null,
     pnlSol: row?.pnlSol ?? null,
   };
