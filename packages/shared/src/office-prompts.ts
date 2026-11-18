@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { REBALANCE_STRATEGIES } from "./agents.ts";
+import type { BriefingStats } from "./briefing.ts";
 import type { Guardrails, LlmAgent, ProposalParams, RiskNotes } from "./office.ts";
 
 // What each LLM desk is asked and must answer. Shared with the web app so the owner sees the exact prompt a desk sends.
@@ -34,6 +35,12 @@ export type RiskDecision = z.infer<typeof RiskDecision>;
 
 export const ManagerDecision = z.object({ summary: z.string().min(1).max(800) });
 export type ManagerDecision = z.infer<typeof ManagerDecision>;
+
+export const BriefingDecision = z.object({
+  headline: z.string().min(1).max(160),
+  body: z.string().min(1).max(1500),
+});
+export type BriefingDecision = z.infer<typeof BriefingDecision>;
 
 export type Parsed<A> = { readonly ok: true; readonly value: A } | { readonly ok: false; readonly error: string };
 
@@ -186,6 +193,49 @@ export const managerPrompt: Prompt<ProposalBrief & { readonly riskNote: string |
     'Shape: {"summary":"<three sentences at most>"}',
   ].join("\n"),
   user: (b) => [briefLines(b), `Risk note: ${b.riskNote ?? "none"}`].join("\n"),
+};
+
+export type BriefingInput = {
+  readonly stats: BriefingStats;
+  /** The day's proposals, oldest first. */
+  readonly proposals: readonly {
+    readonly kind: string;
+    readonly poolName: string | null;
+    readonly status: string;
+    readonly decidedBy: string | null;
+  }[];
+  /** The day's feed, oldest first, already capped by the caller. */
+  readonly feed: readonly { readonly agent: string; readonly text: string; readonly tone: string | null }[];
+};
+
+const signed = (n: number, digits: number) => `${n >= 0 ? "+" : ""}${n.toFixed(digits)}`;
+
+/** The Manager's daily briefing. The numbers are worked out in code; the model writes the prose around them. */
+export const briefingPrompt: Prompt<BriefingInput, BriefingDecision> = {
+  version: "briefing-v1",
+  schema: BriefingDecision,
+  system: [
+    "You are the Manager of a Meteora DLMM liquidity desk on Solana, writing the owner's briefing on one UTC day.",
+    "Say what the desk did, what went well, what went wrong and what to watch today, from the numbers, proposals and",
+    "feed you are given. Use only those numbers; never guess one, and say a PnL is unknown when it is. No trading advice.",
+    "The headline is one sentence. The body is at most six short sentences.",
+    `${PLAIN} ${JSON_ONLY}`,
+    'Shape: {"headline":"<one sentence>","body":"<six sentences at most>"}',
+  ].join("\n"),
+  user: ({ stats: s, proposals, feed }) =>
+    [
+      `Day: ${s.day} (UTC)`,
+      `Proposals: ${s.proposals.total} made; approved ${s.proposals.approvedByOwner} by the owner and ${s.proposals.approvedByAutopilot} by autopilot; ${s.proposals.vetoed} vetoed by risk, ${s.proposals.rejected} rejected, ${s.proposals.expired} expired; ${s.proposals.done} done, ${s.proposals.failed} failed.`,
+      `Closes: ${s.closes.count}; realized PnL ${s.closes.pnlSol === null ? "unknown" : `${signed(s.closes.pnlSol, 4)} SOL`} / ${s.closes.pnlUsd === null ? "unknown" : `${signed(s.closes.pnlUsd, 2)} USD`}${s.closes.unknown > 0 ? ` (${s.closes.unknown} close(s) with unknown PnL left out)` : ""}.`,
+      `Open now: ${s.open.count} position(s), ${s.open.sol.toFixed(3)} SOL at cost.`,
+      `LLM: ${s.llm.runs} call(s), ${s.llm.failed} failed, $${s.llm.usd.toFixed(4)}.`,
+      "Proposals (kind | pool | status | decided by):",
+      ...(proposals.length === 0
+        ? ["none"]
+        : proposals.map((p) => `${p.kind} | ${p.poolName ?? "?"} | ${p.status} | ${p.decidedBy ?? "-"}`)),
+      "Feed (agent | tone | text):",
+      ...(feed.length === 0 ? ["none"] : feed.map((m) => `${m.agent} | ${m.tone ?? "info"} | ${m.text}`)),
+    ].join("\n"),
 };
 
 function briefLines({ poolName, params, rationale }: ProposalBrief) {

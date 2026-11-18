@@ -1,4 +1,12 @@
-import type { JournalRow, MessageRow, OfficeConfigRow, ProposalRow, RunRow, ThreadRow } from "@vexis/db/office-queries";
+import type {
+  BriefingRow,
+  JournalRow,
+  MessageRow,
+  OfficeConfigRow,
+  ProposalRow,
+  RunRow,
+  ThreadRow,
+} from "@vexis/db/office-queries";
 import {
   isPaused,
   KILL_SWITCH,
@@ -161,6 +169,7 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
     wallets: new Map<string, WalletTarget>([["user-1", { _tag: "ready", owner: "OWNER1", rpcUrl: TEST_RPC }]]),
     /** Office bots by user; none is linked unless a test adds one. */
     bots: new Map<string, BotTarget & { offset?: number | null }>(),
+    briefings: [] as BriefingRow[],
   };
   let ids = 0;
   const id = (prefix: string) => `${prefix}-${++ids}`;
@@ -292,6 +301,39 @@ export function fakeDb(seed: { offices?: OfficeConfigRow[]; proposals?: Proposal
           Object.assign(row, { paused: false, pausedReason: null, pausedUntil: null });
           return "resumed" as const;
         }),
+      autopilotApprove: (userId, proposalId, now) =>
+        Effect.sync(() => {
+          const row = state.offices.find((o) => o.userId === userId);
+          const p = mine(userId).find((r) => r.id === proposalId);
+          if (row?.mode !== "autopilot" || !p || refuseDecision(pauseOf(row), p, "approve", now.getTime())) return;
+          return Object.assign(p, { status: transition(p.status, "approved"), decidedBy: "autopilot" as const });
+        }),
+      lastBriefedDay: (userId) =>
+        Effect.sync(() =>
+          state.briefings
+            .filter((b) => b.userId === userId)
+            .map((b) => b.day)
+            .reduce<string | null>((a, d) => (a === null || d > a ? d : a), null),
+        ),
+      insertBriefing: (userId, b) =>
+        Effect.sync(() => {
+          if (state.briefings.some((r) => r.userId === userId && r.day === b.day)) return;
+          const row = { id: id("briefing"), userId, createdAt: new Date(), runId: null, ...b };
+          state.briefings.push(row);
+          return row;
+        }),
+      attempts: (userId, promptVersion) =>
+        Effect.sync(() => {
+          const runs = state.runs.filter((r) => r.userId === userId && r.promptVersion === promptVersion);
+          return { count: runs.length, lastAt: runs.at(-1)?.at ?? null };
+        }),
+      dayActivity: (userId, start, end) =>
+        Effect.sync(() => ({
+          proposals: mine(userId).filter((p) => p.createdAt >= start && p.createdAt < end),
+          closes: state.journal.filter((j) => j.userId === userId && j.closedAt && j.closedAt >= start && j.closedAt < end),
+          runs: [],
+          messages: [],
+        })),
       setPause: (userId, pause) =>
         Effect.sync(() => {
           const row = state.offices.find((o) => o.userId === userId);

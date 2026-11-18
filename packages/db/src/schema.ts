@@ -34,6 +34,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   doublePrecision,
   foreignKey,
   index,
@@ -632,6 +633,25 @@ export const officeJournal = pgTable(
     index("office_journal_user_opened_idx").on(t.userId, t.openedAt.desc()),
     index("office_journal_user_open_idx").on(t.userId).where(sql`${t.closedAt} is null`),
   ],
+).enableRLS();
+
+/**
+ * The Manager's daily briefing, one per office per UTC day (`day`). `stats` is parsed with `BriefingStats` and computed
+ * in code; `headline` and `body` are the LLM's prose. The unique index is what makes a day's briefing happen once.
+ */
+export const officeBriefings = pgTable(
+  "office_briefings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userId(),
+    day: date("day", { mode: "string" }).notNull(),
+    stats: jsonb("stats").$type<Record<string, unknown>>().notNull(),
+    headline: text("headline").notNull(),
+    body: text("body").notNull(),
+    runId: uuid("run_id").references(() => officeRuns.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("office_briefings_user_day_unique").on(t.userId, t.day)],
 ).enableRLS();
 
 /**

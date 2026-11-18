@@ -58,6 +58,8 @@ describe("approval card", () => {
   test.each([
     ["awaiting_approval", null, {}, null],
     ["approved", "owner", {}, "✅ Approved."],
+    ["approved", "autopilot", {}, "✅ Approved by autopilot."],
+    ["done", "autopilot", {}, "✅ Approved by autopilot. Preview: simulated, nothing was signed."],
     ["done", "owner", {}, "✅ Approved. Preview: simulated, nothing was signed."],
     ["done", "owner", { simulated: false, signature: "SIG1" }, "✅ Done: https://solscan.io/tx/SIG1"],
     ["failed", "owner", { simulated: false, txError: "slippage" }, "⚠️ Failed: slippage"],

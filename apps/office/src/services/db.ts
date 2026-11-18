@@ -1,8 +1,12 @@
 import { closeDb, createDb } from "@vexis/db/client";
 import { listHeartbeats, recordTick, setAlerted } from "@vexis/db/heartbeat-queries";
 import {
+  approveByAutopilot,
+  type BriefingRow,
+  dayActivity,
   decideProposal,
   expireProposals,
+  insertBriefing,
   insertMessage,
   insertProposal,
   insertRun,
@@ -10,6 +14,7 @@ import {
   journalBook,
   killOffice,
   lastExecutionAt,
+  latestBriefing,
   linkedOfficeBots,
   listJournal,
   listOffices,
@@ -20,6 +25,7 @@ import {
   type OfficeConfigRow,
   type ProposalRow,
   resumeOffice,
+  runAttempts,
   saveThread,
   setCardMessage,
   setDayCapital,
@@ -70,6 +76,9 @@ export type PolledBot = {
 export type DecideResult =
   | { readonly ok: true; readonly proposal: ProposalRow }
   | { readonly ok: false; readonly refusal: DecisionRefusal };
+
+export type DayActivity = Awaited<ReturnType<typeof dayActivity>>;
+export type NewBriefing = Parameters<typeof insertBriefing>[1];
 
 export type ResumeResult = Awaited<ReturnType<typeof resumeOffice>>;
 
@@ -125,6 +134,19 @@ export class Db extends Context.Service<
     /** The kill switch, as on the web: how many proposals it rejected, null with no office. */
     kill(userId: string): Effect.Effect<number | null, DbError>;
     resume(userId: string, now: Date): Effect.Effect<ResumeResult, DbError>;
+    /** Autopilot's approval; undefined when refused (not autopilot, paused, expired) or another actor moved it. */
+    autopilotApprove(userId: string, proposalId: string, now: Date): Effect.Effect<ProposalRow | undefined, DbError>;
+    /** The day (`YYYY-MM-DD`) of the newest briefing, null before the first. */
+    lastBriefedDay(userId: string): Effect.Effect<string | null, DbError>;
+    /** Undefined when the day already has one. */
+    insertBriefing(userId: string, b: NewBriefing): Effect.Effect<BriefingRow | undefined, DbError>;
+    /** Calls of `promptVersion` since `since`, and the last one. */
+    attempts(
+      userId: string,
+      promptVersion: string,
+      since: Date,
+    ): Effect.Effect<{ count: number; lastAt: Date | null }, DbError>;
+    dayActivity(userId: string, start: Date, end: Date): Effect.Effect<DayActivity, DbError>;
   }
 >()("vexis/office/Db") {
   static readonly layer = Layer.effect(
@@ -220,6 +242,13 @@ export class Db extends Context.Service<
         decide: (userId, id, decision, now) => run("decide", () => decideProposal(as(userId), id, decision, now)),
         kill: (userId) => run("kill", () => killOffice(as(userId))),
         resume: (userId, now) => run("resume", () => resumeOffice(as(userId), now)),
+        autopilotApprove: (userId, id, now) =>
+          run("autopilotApprove", () => approveByAutopilot(as(userId), id, now)),
+        lastBriefedDay: (userId) =>
+          run("lastBriefedDay", () => latestBriefing(as(userId))).pipe(Effect.map((row) => row?.day ?? null)),
+        insertBriefing: (userId, b) => run("insertBriefing", () => insertBriefing(as(userId), b)),
+        attempts: (userId, version, since) => run("attempts", () => runAttempts(as(userId), version, since)),
+        dayActivity: (userId, start, end) => run("dayActivity", () => dayActivity(as(userId), start, end)),
       });
     }),
   );

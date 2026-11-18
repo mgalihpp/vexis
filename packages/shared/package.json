@@ -14,7 +14,8 @@
     "./secret": "./src/secret.ts",
     "./mail": "./src/mail.ts",
     "./admin": "./src/admin.ts",
-    "./open-cost": "./src/open-cost.ts"
+    "./open-cost": "./src/open-cost.ts",
+    "./briefing": "./src/briefing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  autopilotVerdict,
   type BookPosition,
   checkManage,
   checkOpen,
@@ -226,5 +227,38 @@ describe("daily loss and budget", () => {
   test("the cap follows the key source", () => {
     expect(dailyCapUsd("vexis", 0.5, g)).toBe(0.5);
     expect(dailyCapUsd("own", 0.5, g)).toBe(1);
+  });
+});
+
+describe("autopilot", () => {
+  const limit = Guardrails.parse({ autopilotMaxSol: 0.5 });
+  const open = (amountSol: number, setupSol: number | null) => ({
+    kind: "open" as const,
+    params: { strategy: "Curve", activeBin: 0, lowerBin: -5, upperBin: 5, amountSol, solUsd: 150, setupSol },
+  });
+  const verdict = (p: Parameters<typeof autopilotVerdict>[2], cost: number | null = null) =>
+    autopilotVerdict("autopilot", limit, p, cost);
+
+  test("an open counts its deposit plus its setup, approved at the limit and asked just over it", () => {
+    expect(verdict(open(0.45, 0.05))).toEqual({ approve: true, nominalSol: 0.5 });
+    expect(verdict(open(0.45, 0.0501)).approve).toBe(false);
+  });
+
+  test("approval mode never approves, whatever the size", () => {
+    expect(autopilotVerdict("approval", limit, open(0.01, 0.01), null).approve).toBe(false);
+  });
+
+  test("a rebalance or close weighs the position at cost, a claim its fees", () => {
+    const rebalance = { kind: "rebalance" as const, params: { strategy: "Spot", activeBin: 0, lowerBin: -3, upperBin: 3 } };
+    expect(verdict(rebalance, 0.5).approve).toBe(true);
+    expect(verdict({ kind: "close", params: { reason: "stop_loss" } }, 0.6)).toEqual({ approve: false, nominalSol: 0.6 });
+    expect(verdict({ kind: "claim", params: { feeSol: 0.02 } }).approve).toBe(true);
+  });
+
+  test("an unknown amount asks the owner instead of counting as zero", () => {
+    expect(verdict(open(0.1, null))).toEqual({ approve: false, nominalSol: null });
+    expect(verdict({ kind: "claim", params: { feeSol: null } }).approve).toBe(false);
+    expect(verdict({ kind: "close", params: { reason: "manual" } }, null).approve).toBe(false);
+    expect(verdict({ kind: "open", params: { amountSol: 0.1 } }).approve).toBe(false);
   });
 });

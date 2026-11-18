@@ -113,7 +113,10 @@ export const VEXIS_MODELS: OfficeModels = {
 export const activeModels = (keySource: KeySource, models: OfficeModels): OfficeModels =>
   keySource === "vexis" ? VEXIS_MODELS : models;
 
-/** `autopilot` (V2) approves proposals under a nominal limit on its own. */
+/**
+ * `approval` asks the owner for every proposal. `autopilot` approves a checked proposal on its own when the SOL it
+ * moves is at or under `Guardrails.autopilotMaxSol` (`autopilotVerdict` in `guardrails.ts`); above it, it still asks.
+ */
 export const OFFICE_MODES = ["approval", "autopilot"] as const;
 export type OfficeMode = (typeof OFFICE_MODES)[number];
 
@@ -143,6 +146,11 @@ export const Guardrails = z.object({
   slPct: z.number().gt(0).max(100).default(5),
   /** Unclaimed fees, in percent of the position's cost, at which the Monitor proposes a claim. */
   claimFeePct: z.number().gt(0).max(100).default(1),
+  /**
+   * Under autopilot, the most SOL a proposal may move and still be approved without the owner: an open's deposit plus
+   * setup, a rebalance's or close's position at cost, a claim's fees. Ignored in approval mode.
+   */
+  autopilotMaxSol: z.number().min(0).max(1000).default(0.1),
   /** USD a day the office may spend on LLM calls with the user's own keys. The admin sets the Vexis-key cap. */
   dailyLlmUsd: z.number().min(0).max(1000).default(1),
 });

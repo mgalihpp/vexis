@@ -11,6 +11,7 @@ import {
 } from "@vexis/shared/office";
 import { Clock, Effect } from "effect";
 import { type Office, say } from "./ask.ts";
+import { dailyBriefing } from "./briefing.ts";
 import { type Floor, presentChecked, reviewDrafts, scoutAndDraft } from "./desks.ts";
 import { BadOfficeConfig, type ChainError } from "./errors.ts";
 import { Chain } from "./services/chain.ts";
@@ -65,6 +66,9 @@ const runOffice = Effect.fn("office.run")(function* (row: OfficeConfigRow) {
     yield* db.setPause(row.userId, null);
     yield* say(office, "manager", "The pause is over. Back to work.", "info");
   }
+
+  // Before the daily-loss check, so a loss that pauses the office today does not cost yesterday's briefing.
+  yield* dailyBriefing(office);
 
   const floor = yield* readFloor(office);
   const loss = dailyLossPct(floor.dayStartCapital, dayPnlSol(floor.book, now));
