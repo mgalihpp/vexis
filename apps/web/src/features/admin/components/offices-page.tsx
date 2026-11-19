@@ -23,8 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { trpc } from "@/trpc/client";
 import { officeStatus, presetLabel, usd } from "../admin";
-import { disableOfficeFn, enableOfficeFn, resumeAllFn, setOfficeCapFn, stopAllFn } from "../admin.functions";
 import { officesQuery } from "../admin.queries";
 import type { OfficeSearch } from "../admin.search";
 import {
@@ -56,7 +56,7 @@ export function OfficesPage({ search }: { search: OfficeSearch }) {
   const go = (next: Partial<OfficeSearch>) => navigate({ search: (prev) => ({ ...prev, ...next }), replace: true });
   const counts = { all: o.offices, live: o.live, paused: o.paused };
   const stop = useAdminAction(
-    () => stopAllFn(),
+    () => trpc.admin.stopAll.mutate(),
     (r) => {
       setStopping(false);
       toast.success(
@@ -65,7 +65,7 @@ export function OfficesPage({ search }: { search: OfficeSearch }) {
     },
   );
   const resume = useAdminAction(
-    () => resumeAllFn(),
+    () => trpc.admin.resumeAll.mutate(),
     (r) => toast.success(`Resumed ${r.resumed} office${r.resumed === 1 ? "" : "s"}`),
   );
   const state = o.adminStopped === 0 ? "Running" : o.adminStopped === o.offices ? "Stopped" : "Partly stopped";
@@ -179,7 +179,7 @@ function OfficeRow({ office: r }: { office: Office }) {
   const status = officeStatus(r);
   const over = r.cap > 0 && r.spend >= r.cap;
   const disable = useAdminAction(
-    () => disableOfficeFn({ data: { userId: r.userId } }),
+    () => trpc.admin.disableOffice.mutate({ userId: r.userId }),
     (result) => {
       setDisabling(false);
       if (result === "ok") toast.success("Office disabled");
@@ -265,7 +265,7 @@ function CapDialog({
   const [value, setValue] = useState(String(current));
   const cap = parseUsd(value);
   const save = useAdminAction(
-    () => setOfficeCapFn({ data: { userId, vexisDailyUsd: cap ?? 0 } }),
+    () => trpc.admin.setOfficeCap.mutate({ userId, vexisDailyUsd: cap ?? 0 }),
     (result) => {
       onOpenChange(false);
       if (result === "ok") toast.success("Cap saved");
@@ -317,7 +317,7 @@ function EnableOffice({ open, onOpenChange }: { open: boolean; onOpenChange: (op
   const cap = parseUsd(value);
   const valid = email.includes("@") && cap !== null;
   const enable = useAdminAction(
-    () => enableOfficeFn({ data: { email: email.trim(), vexisDailyUsd: cap ?? 0 } }),
+    () => trpc.admin.enableOffice.mutate({ email: email.trim(), vexisDailyUsd: cap ?? 0 }),
     (result) => {
       if (result === "ok") {
         toast.success("Office enabled");

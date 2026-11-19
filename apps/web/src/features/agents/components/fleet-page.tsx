@@ -24,6 +24,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { timeAgo } from "@/features/portfolio/money";
+import { trpc } from "@/trpc/client";
 import {
   AGENT_NAME,
   type AgentKind,
@@ -35,7 +36,6 @@ import {
   ruleSummary,
   screenerPreset,
 } from "../agents";
-import { setAgentRunning } from "../agents.functions";
 import { agentsQuery } from "../agents.queries";
 import { MENU_TRIGGER, PairLogo } from "./agent-layout";
 import { AgentAvatar, FormError, poolName, STATUS_STYLE, StatusDot, useAgentMutation } from "./agent-ui";
@@ -200,7 +200,7 @@ export function FleetPage() {
 
 function AgentRow({ agent, now }: { agent: AgentView; now: number }) {
   const status = agentStatus(agent);
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
+  const toggle = useAgentMutation((paused: boolean) => trpc.agents.setRunning.mutate({ agentId: agent.id, paused }));
   const [first, ...rest] = agent.pools;
   const preset = screenerPreset(agent);
   const pill = STATUS_PILL[status];

@@ -16,8 +16,8 @@ import {
 import { type FormEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import { isNetworkError } from "@/lib/query";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/trpc/client";
 import { INVITE_REQUEST_ERROR_MESSAGE, type InviteRequestError } from "./invite-request";
-import { requestInvite } from "./invite-request.functions";
 import {
   AlertPhone,
   AnalyticsWindow,
@@ -649,7 +649,7 @@ function InviteForm() {
     e.preventDefault();
     setState("pending");
     try {
-      const res = await requestInvite({ data: { email, website } });
+      const res = await trpc.invite.request.mutate({ email, website });
       setState(res.ok ? "sent" : res.error);
     } catch (error) {
       setState(isNetworkError(error) ? "network" : "server");

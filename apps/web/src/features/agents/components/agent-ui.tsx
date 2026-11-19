@@ -21,6 +21,7 @@ import { compactUsd, pct } from "@/features/portfolio/money";
 import type { ScreenerPool, ScreenerToken } from "@/features/screener/screener";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import { shortAddr } from "@/lib/format";
+import { trpc } from "@/trpc/client";
 import {
   type AgentStatus,
   BOT_TOKEN_PATTERN,
@@ -29,7 +30,6 @@ import {
   STATUS_LABEL,
   type TelegramKind,
 } from "../agents";
-import { connectTelegramBot, detectTelegramChat, disconnectTelegramLink } from "../agents.functions";
 import { AGENTS_KEY, telegramQuery } from "../agents.queries";
 
 export const STATUS_STYLE: Record<AgentStatus, { text: string; dot: string }> = {
@@ -69,7 +69,7 @@ export const poolName = (p: { label: string | null; address: string }) => p.labe
 /** Runs a server write, then refreshes everything the agent pages read. */
 export function useAgentMutation<V, R>(fn: (vars: V) => Promise<R>) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: AGENTS_KEY }) });
+  return useMutation({ mutationFn: (v: V) => fn(v), onSuccess: () => qc.invalidateQueries({ queryKey: AGENTS_KEY }) });
 }
 
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : "Something went wrong");
@@ -664,9 +664,9 @@ export function TelegramIcon({ className = "" }: { className?: string }) {
 export function TelegramPanel({ kind }: { kind: TelegramKind }) {
   const { data } = useSuspenseQuery(telegramQuery);
   const tg = data[kind];
-  const connect = useAgentMutation((token: string) => connectTelegramBot({ data: { kind, token } }));
-  const detect = useAgentMutation(() => detectTelegramChat({ data: { kind } }));
-  const disconnect = useAgentMutation(() => disconnectTelegramLink({ data: { kind } }));
+  const connect = useAgentMutation((token: string) => trpc.agents.telegram.connect.mutate({ kind, token }));
+  const detect = useAgentMutation(() => trpc.agents.telegram.detect.mutate({ kind }));
+  const disconnect = useAgentMutation(() => trpc.agents.telegram.disconnect.mutate({ kind }));
   const [token, setToken] = useState("");
   const [tokenError, setTokenError] = useState<string | null>(null);
   const bot = tg.bot;

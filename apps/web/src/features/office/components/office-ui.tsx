@@ -9,7 +9,7 @@ export const DASH = "—";
 /** Every office write refreshes everything under ["office"]. */
 export function useOfficeMutation<V, R>(fn: (vars: V) => Promise<R>) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: fn, onSuccess: () => qc.invalidateQueries({ queryKey: OFFICE_KEY }) });
+  return useMutation({ mutationFn: (v: V) => fn(v), onSuccess: () => qc.invalidateQueries({ queryKey: OFFICE_KEY }) });
 }
 
 /** The clock, ticking every `ms`. It starts at the server's `now` so SSR and hydration render the same text. */

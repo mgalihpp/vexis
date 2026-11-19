@@ -51,19 +51,8 @@ import { PresetPicker } from "@/features/agents/components/screener-source";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { shortAddr } from "@/lib/format";
+import { trpc } from "@/trpc/client";
 import { AGENT_INFO, type ConfigView, missingKeys } from "../office";
-import {
-  removeLlmKeyFn,
-  removeOfficeWalletFn,
-  saveGuardrailsFn,
-  saveKeySourceFn,
-  saveLiveFn,
-  saveLlmKeyFn,
-  saveModeFn,
-  saveModelsFn,
-  saveOfficeWalletFn,
-  saveScreenFn,
-} from "../office.functions";
 import { Portrait } from "./agent-card";
 import { sol, usd, useOfficeMutation } from "./office-ui";
 
@@ -197,13 +186,13 @@ function TelegramPage() {
 
 function PoolsPage({ config }: { config: ConfigView }) {
   const [preset, setPreset] = useState(config.screen.preset);
-  const save = useOfficeMutation(saveScreenFn);
+  const save = useOfficeMutation(trpc.office.saveScreen.mutate);
   return (
     <form
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        save.mutate({ data: { preset } }, { onSuccess: () => toast.success("Pool filter saved") });
+        save.mutate({ preset }, { onSuccess: () => toast.success("Pool filter saved") });
       }}
     >
       <section className="flex flex-col gap-1.5">
@@ -248,7 +237,7 @@ function ModelsPage({ config }: { config: ConfigView }) {
 
 function OwnModels({ config }: { config: ConfigView }) {
   const [draft, setDraft] = useState<Record<LlmAgent, AgentModel | null>>(config.models);
-  const save = useOfficeMutation(saveModelsFn);
+  const save = useOfficeMutation(trpc.office.saveModels.mutate);
   const parsed = OfficeModels.safeParse(draft);
   const setProvider = (agent: LlmAgent, provider: string) =>
     setDraft((d) => ({
@@ -262,8 +251,7 @@ function OwnModels({ config }: { config: ConfigView }) {
       className="flex flex-col gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (parsed.success)
-          save.mutate({ data: { models: parsed.data } }, { onSuccess: () => toast.success("Models saved") });
+        if (parsed.success) save.mutate({ models: parsed.data }, { onSuccess: () => toast.success("Models saved") });
       }}
     >
       <Group title="Agents">
@@ -355,7 +343,7 @@ function PromptsPage({ config }: { config: ConfigView }) {
 }
 
 function KeysPage({ config }: { config: ConfigView }) {
-  const source = useOfficeMutation(saveKeySourceFn);
+  const source = useOfficeMutation(trpc.office.saveKeySource.mutate);
   const missing = missingKeys(config);
   return (
     <div className="flex flex-col gap-5">
@@ -371,7 +359,7 @@ function KeysPage({ config }: { config: ConfigView }) {
         <Row icon={icon(CoinsIcon)} label="Pay with">
           <SegmentedControl
             value={config.keySource}
-            onChange={(keySource) => !source.isPending && source.mutate({ data: { keySource } })}
+            onChange={(keySource) => !source.isPending && source.mutate({ keySource })}
             options={KEY_SOURCES.map((k) => ({ value: k, label: k === "vexis" ? "Vexis key" : "Own keys" }))}
           />
         </Row>
@@ -390,8 +378,8 @@ function KeysPage({ config }: { config: ConfigView }) {
 
 function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) {
   const [key, setKey] = useState("");
-  const save = useOfficeMutation(saveLlmKeyFn);
-  const remove = useOfficeMutation(removeLlmKeyFn);
+  const save = useOfficeMutation(trpc.office.saveLlmKey.mutate);
+  const remove = useOfficeMutation(trpc.office.removeLlmKey.mutate);
   const error = save.error ?? remove.error;
   return (
     <Row
@@ -402,12 +390,7 @@ function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) 
       {saved ? (
         <div className="flex shrink-0 items-center gap-1.5">
           <Badge variant="profit">Saved</Badge>
-          <Button
-            variant="ghost"
-            size="xs"
-            disabled={remove.isPending}
-            onClick={() => remove.mutate({ data: { provider } })}
-          >
+          <Button variant="ghost" size="xs" disabled={remove.isPending} onClick={() => remove.mutate({ provider })}>
             Remove
           </Button>
         </div>
@@ -417,7 +400,7 @@ function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) 
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate(
-              { data: { provider, key } },
+              { provider, key },
               {
                 onSuccess: () => {
                   setKey("");
@@ -446,8 +429,8 @@ function KeyRow({ provider, saved }: { provider: LlmProvider; saved: boolean }) 
 }
 
 function WalletPage({ config }: { config: ConfigView }) {
-  const save = useOfficeMutation(saveOfficeWalletFn);
-  const remove = useOfficeMutation(removeOfficeWalletFn);
+  const save = useOfficeMutation(trpc.office.saveWallet.mutate);
+  const remove = useOfficeMutation(trpc.office.removeWallet.mutate);
   const [secretKey, setSecret] = useState("");
   const [rpcUrl, setRpc] = useState("");
   return (
@@ -476,7 +459,7 @@ function WalletPage({ config }: { config: ConfigView }) {
           onSubmit={(e) => {
             e.preventDefault();
             save.mutate(
-              { data: { secretKey, rpcUrl } },
+              { secretKey, rpcUrl },
               {
                 onSuccess: () => {
                   setSecret("");
@@ -530,8 +513,8 @@ function WalletPage({ config }: { config: ConfigView }) {
  */
 function ModeGroup({ config }: { config: ConfigView }) {
   const [confirming, setConfirming] = useState(false);
-  const save = useOfficeMutation(saveLiveFn);
-  const set = (live: boolean) => !save.isPending && save.mutate({ data: { live } });
+  const save = useOfficeMutation(trpc.office.saveLive.mutate);
+  const set = (live: boolean) => !save.isPending && save.mutate({ live });
   return (
     <>
       <Group
@@ -590,9 +573,9 @@ function ModeGroup({ config }: { config: ConfigView }) {
  */
 function ApprovalsGroup({ config }: { config: ConfigView }) {
   const [confirming, setConfirming] = useState(false);
-  const save = useOfficeMutation(saveModeFn);
+  const save = useOfficeMutation(trpc.office.saveMode.mutate);
   const { data: prices } = useQuery(pricesQuery);
-  const set = (mode: OfficeMode) => !save.isPending && save.mutate({ data: { mode } });
+  const set = (mode: OfficeMode) => !save.isPending && save.mutate({ mode });
   const limit = config.guardrails.autopilotMaxSol;
   const limitText = `${sol(limit)} (${usd(prices?.sol ? limit * prices.sol : null)})`;
   return (
@@ -697,7 +680,7 @@ function GuardrailsPage({ config }: { config: ConfigView }) {
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(GUARDRAIL_FIELDS.map((f) => [f.key, String(config.guardrails[f.key])])),
   );
-  const save = useOfficeMutation(saveGuardrailsFn);
+  const save = useOfficeMutation(trpc.office.saveGuardrails.mutate);
   const { data: prices } = useQuery(pricesQuery);
   // A SOL amount the owner types also reads in USD, from the footer's SOL price.
   const inUsd = (key: string) => {
@@ -716,7 +699,7 @@ function GuardrailsPage({ config }: { config: ConfigView }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (parsed.success)
-          save.mutate({ data: { guardrails: parsed.data } }, { onSuccess: () => toast.success("Guardrails saved") });
+          save.mutate({ guardrails: parsed.data }, { onSuccess: () => toast.success("Guardrails saved") });
       }}
     >
       {GUARDRAIL_GROUPS.map((g, i) => (

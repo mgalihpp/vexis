@@ -3,10 +3,10 @@ import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { z } from "zod";
 import { TIMEFRAMES, type TimeframeId } from "@/features/analytics/analytics";
-import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { analyticsQuery, chartQuery, trackedQuery } from "@/features/analytics/analytics.queries";
 import { AnalyticsPage } from "@/features/analytics/components/analytics-page";
 import { AnalyticsSkeleton } from "@/features/analytics/components/analytics-skeleton";
+import { PoolAddress } from "@/lib/address";
 import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
 

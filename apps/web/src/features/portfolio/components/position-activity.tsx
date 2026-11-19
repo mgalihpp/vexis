@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStamp } from "@/features/timezone/timezone";
 import { solscanTx } from "@/lib/format";
+import { trpc } from "@/trpc/client";
 import { compactUsd, money } from "../money";
 import {
   type ActivePool,
@@ -11,7 +12,6 @@ import {
   type PositionEvent,
   type Token,
 } from "../portfolio";
-import { getPositionActivity } from "../portfolio.functions";
 import { usePortfolio } from "../use-portfolio-view";
 import { SolscanLink, TokenIcon } from "./pool-identity";
 
@@ -31,7 +31,7 @@ export function useActivity(position: string, enabled: boolean): Activity {
     if (!enabled) return;
     let live = true;
     setState({ status: "loading" });
-    getPositionActivity({ data: { position } }).then(
+    trpc.portfolio.activity.query({ position }).then(
       (events) => {
         if (live) setState({ status: "ready", events });
       },

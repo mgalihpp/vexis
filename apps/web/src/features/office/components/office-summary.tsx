@@ -16,8 +16,8 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { FormError } from "@/features/agents/components/agent-ui";
 import { timeAgo } from "@/features/portfolio/money";
 import { shortAddr } from "@/lib/format";
+import { trpc } from "@/trpc/client";
 import { AGENT_INFO, deployed, deskUsage, type OfficeView, type PositionView, spendVsCap } from "../office";
-import { closePositionFn } from "../office.functions";
 import { Portrait } from "./agent-card";
 import { cost, DASH, Meter, PanelEmpty, Section, sol, toneOf, usd, useOfficeMutation } from "./office-ui";
 
@@ -138,7 +138,7 @@ export function PositionsCard({ view, now }: { view: OfficeView; now: number }) 
 
 function PositionRow({ position: p, now }: { position: PositionView; now: number }) {
   const [confirming, setConfirming] = useState(false);
-  const close = useOfficeMutation(closePositionFn);
+  const close = useOfficeMutation(trpc.office.closePosition.mutate);
   const name = p.poolName ?? shortAddr(p.poolAddress);
   return (
     <Item variant="outline" size="xs">
@@ -178,7 +178,7 @@ function PositionRow({ position: p, now }: { position: PositionView; now: number
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep it open</AlertDialogCancel>
-            <AlertDialogAction onClick={() => close.mutate({ data: { journalId: p.id } })}>
+            <AlertDialogAction onClick={() => close.mutate({ journalId: p.id })}>
               {p.simulated ? "Close position" : "Propose close"}
             </AlertDialogAction>
           </AlertDialogFooter>

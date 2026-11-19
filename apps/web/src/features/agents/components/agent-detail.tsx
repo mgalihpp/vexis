@@ -39,6 +39,7 @@ import { Pagination, PoolFilter, type Sort, sortBy } from "@/features/portfolio/
 import { compactUsd, timeAgo } from "@/features/portfolio/money";
 import { screenerQuery } from "@/features/screener/screener.queries";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { trpc } from "@/trpc/client";
 import {
   type AgentStatus,
   type AgentView,
@@ -56,13 +57,6 @@ import {
   type VolumeAgentView,
   watchedCount,
 } from "../agents";
-import {
-  addAgentPoolFn,
-  deleteAgentFn,
-  removeAgentPoolFn,
-  saveAgentConfig,
-  setAgentRunning,
-} from "../agents.functions";
 import { agentsQuery, alertsQuery } from "../agents.queries";
 import {
   AgentsBar,
@@ -127,7 +121,7 @@ function Rows({ rows }: { rows: [string, ReactNode][] }) {
 }
 
 function Detail({ agent, now, tab }: { agent: AgentView; now: number; tab: DetailTab }) {
-  const toggle = useAgentMutation((paused: boolean) => setAgentRunning({ data: { agentId: agent.id, paused } }));
+  const toggle = useAgentMutation((paused: boolean) => trpc.agents.setRunning.mutate({ agentId: agent.id, paused }));
   const hint = statusHint(agent);
   const [addOpen, setAddOpen] = useState(false);
   const canAdd = tab === "pools" && agent.kind === "volume-watch" && agent.config.source === "pools";
@@ -366,8 +360,8 @@ function PickedPools({
   addOpen: boolean;
   setAddOpen: (open: boolean) => void;
 }) {
-  const add = useAgentMutation(addAgentPoolFn);
-  const remove = useAgentMutation(removeAgentPoolFn);
+  const add = useAgentMutation(trpc.agents.addPool.mutate);
+  const remove = useAgentMutation(trpc.agents.removePool.mutate);
   // An auto-rebalance agent is created for one pool; the way out is deleting the agent.
   const editable = agent.kind === "volume-watch";
   const isMobile = useIsMobile();
@@ -378,9 +372,7 @@ function PickedPools({
         count={agent.pools.length}
         busy={add.isPending}
         listClassName={listClassName}
-        onPick={(pool) =>
-          add.mutate({ data: { ...pool, agentId: agent.id } }, { onSuccess: () => toast.success("Pool added") })
-        }
+        onPick={(pool) => add.mutate({ ...pool, agentId: agent.id }, { onSuccess: () => toast.success("Pool added") })}
       />
       <FormError error={add.error ?? remove.error} />
     </>
@@ -404,8 +396,8 @@ function PickedPools({
           label: p.label,
           tokens: p.tokens,
           lastAlertAt: p.lastAlertAt,
-          removing: remove.isPending && remove.variables?.data.poolId === p.id,
-          onRemove: editable ? () => remove.mutate({ data: { agentId: agent.id, poolId: p.id } }) : undefined,
+          removing: remove.isPending && remove.variables?.poolId === p.id,
+          onRemove: editable ? () => remove.mutate({ agentId: agent.id, poolId: p.id }) : undefined,
         }))}
       />
       {editable && isMobile ? (
@@ -641,7 +633,7 @@ function SettingsBody({
 }
 
 function AgentSection({ agent }: { agent: AgentView }) {
-  const power = useAgentMutation((enabled: boolean) => setAgentRunning({ data: { agentId: agent.id, enabled } }));
+  const power = useAgentMutation((enabled: boolean) => trpc.agents.setRunning.mutate({ agentId: agent.id, enabled }));
   return (
     <div className="space-y-3 p-4 sm:p-5">
       <div className="flex items-center justify-between gap-6">
@@ -670,7 +662,7 @@ function AgentSection({ agent }: { agent: AgentView }) {
 /** Deletes the agent with its pools and history, after a confirmation. */
 function DeleteAgent({ agent }: { agent: AgentView }) {
   const navigate = useNavigate();
-  const remove = useAgentMutation(() => deleteAgentFn({ data: { agentId: agent.id } }));
+  const remove = useAgentMutation(() => trpc.agents.remove.mutate({ agentId: agent.id }));
   const [confirming, setConfirming] = useState(false);
   return (
     <div className="flex items-center justify-between gap-6 border-t pt-3">
@@ -712,7 +704,7 @@ function DeleteAgent({ agent }: { agent: AgentView }) {
 function VolumeRuleSection({ agent, onDirty }: { agent: VolumeAgentView; onDirty: (dirty: boolean) => void }) {
   const saved = { fields: configFields(agent.config), source: sourceOf(agent.config) };
   const [form, setForm] = useState(saved);
-  const save = useAgentMutation(saveAgentConfig);
+  const save = useAgentMutation(trpc.agents.saveConfig.mutate);
   const result = parseConfigFields(form.fields, { ...agent.config, ...form.source });
   const dirty = JSON.stringify(form) !== JSON.stringify(saved);
   const update = (next: typeof form) => {
@@ -748,7 +740,7 @@ function VolumeRuleSection({ agent, onDirty }: { agent: VolumeAgentView; onDirty
           onClick={() =>
             result.ok &&
             save.mutate(
-              { data: { agentId: agent.id, kind: "volume-watch", config: result.config } },
+              { agentId: agent.id, kind: "volume-watch", config: result.config },
               {
                 onSuccess: () => {
                   onDirty(false);

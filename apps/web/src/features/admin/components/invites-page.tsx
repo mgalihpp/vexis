@@ -38,7 +38,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { timeAgo } from "@/features/portfolio/money";
-import { createInviteFn, extendInviteFn, revokeInviteFn, sendRequestFn } from "../admin.functions";
+import { trpc } from "@/trpc/client";
 import { invitesQuery } from "../admin.queries";
 import type { InviteSearch } from "../admin.search";
 import {
@@ -176,7 +176,7 @@ function RequestsCard({
 }) {
   const [tab, setTab] = useState<(typeof REQUEST_TABS)[number]>("all");
   const send = useAdminAction(
-    (email: string) => sendRequestFn({ data: { email } }),
+    (email: string) => trpc.admin.sendRequest.mutate({ email }),
     (result) => {
       if (result.ok) toast.success("Invite sent");
       else toast.error(SEND_ERROR[result.error]);
@@ -269,7 +269,7 @@ type Invite = {
 function InviteRow({ invite: i, now }: { invite: Invite; now: number }) {
   const [revoking, setRevoking] = useState(false);
   const revoke = useAdminAction(
-    () => revokeInviteFn({ data: { id: i.id } }),
+    () => trpc.admin.revokeInvite.mutate({ id: i.id }),
     (result) => {
       setRevoking(false);
       if (result === "ok") toast.success("Invite revoked");
@@ -277,7 +277,7 @@ function InviteRow({ invite: i, now }: { invite: Invite; now: number }) {
     },
   );
   const extend = useAdminAction(
-    () => extendInviteFn({ data: { id: i.id } }),
+    () => trpc.admin.extendInvite.mutate({ id: i.id }),
     (result) => (result.expiresAt ? toast.success("Extended by 7 days") : toast.error("That invite can't be extended")),
   );
   const live = i.status === "active" || i.status === "expired";
@@ -354,14 +354,12 @@ function NewInvite({
   const [send, setSend] = useState(false);
   const create = useAdminAction(
     () =>
-      createInviteFn({
-        data: {
-          email: email.trim() || undefined,
-          days,
-          uses: Number(uses),
-          note: note.trim() || undefined,
-          send: send && email.trim() !== "",
-        },
+      trpc.admin.createInvite.mutate({
+        email: email.trim() || undefined,
+        days,
+        uses: Number(uses),
+        note: note.trim() || undefined,
+        send: send && email.trim() !== "",
       }),
     (result) => {
       if (!result.ok) return toast.error("Too many invites. Try again later.");

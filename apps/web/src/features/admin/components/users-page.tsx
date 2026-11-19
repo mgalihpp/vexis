@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { trpc } from "@/trpc/client";
 import { dateUtc } from "../admin";
-import { changeRoleFn } from "../admin.functions";
 import { usersQuery } from "../admin.queries";
 import type { UserSearch } from "../admin.search";
 import {
@@ -119,7 +119,7 @@ function UserRow({ user: u }: { user: User }) {
   const [confirming, setConfirming] = useState(false);
   const to = u.role === "admin" ? "member" : "admin";
   const change = useAdminAction(
-    () => changeRoleFn({ data: { userId: u.id, role: to } }),
+    () => trpc.admin.changeRole.mutate({ userId: u.id, role: to }),
     (result) => {
       setConfirming(false);
       if (result === "ok") toast.success(to === "admin" ? "Now an admin" : "Admin removed");

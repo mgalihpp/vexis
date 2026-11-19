@@ -15,6 +15,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { compactUsd } from "@/features/portfolio/money";
+import { trpc } from "@/trpc/client";
 import {
   AGENT_TYPES,
   type AgentKind,
@@ -37,7 +38,6 @@ import {
   WIZARD_STEPS,
   type WizardStep,
 } from "../agents";
-import { createAgentFn } from "../agents.functions";
 import { agentsQuery, walletQuery } from "../agents.queries";
 import { ConfigForm, FormError, PoolPicker, TelegramPanel, useAgentMutation } from "./agent-ui";
 import { RebalanceConfigForm, WalletPanel } from "./rebalance-ui";
@@ -53,7 +53,7 @@ const STEP_META: Record<WizardStep, { title: string; sub: string; heading: strin
 /** `custom` is a filter handed over by the screener's "Alert on pools like these". */
 export function AgentWizard({ step, custom }: { step: WizardStep; custom: PoolFilter | null }) {
   const navigate = useNavigate();
-  const create = useAgentMutation(createAgentFn);
+  const create = useAgentMutation(trpc.agents.create.mutate);
   const { data: fleet } = useSuspenseQuery(agentsQuery);
   const { data: wallet } = useSuspenseQuery(walletQuery);
   // One volume-watch agent per user; auto-rebalance agents are one per pool, so that kind is always available.
@@ -75,13 +75,11 @@ export function AgentWizard({ step, custom }: { step: WizardStep; custom: PoolFi
     if (rebalance) {
       const parsed = parseRebalanceFields(draft.rebalanceFields);
       if (!parsed.ok) return;
-      created = await create.mutateAsync({
-        data: { kind: "auto-rebalance", pools: draft.pools, config: parsed.config },
-      });
+      created = await create.mutateAsync({ kind: "auto-rebalance", pools: draft.pools, config: parsed.config });
     } else {
       const parsed = draftConfig(draft);
       if (!parsed.ok) return;
-      created = await create.mutateAsync({ data: { kind: "volume-watch", pools: draft.pools, config: parsed.config } });
+      created = await create.mutateAsync({ kind: "volume-watch", pools: draft.pools, config: parsed.config });
     }
     await navigate({ to: "/agents/$agentId", params: { agentId: created.id }, search: { tab: "overview" } });
   };
