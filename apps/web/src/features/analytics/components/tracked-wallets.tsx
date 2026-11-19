@@ -16,8 +16,8 @@ import { Pagination, PoolFilter } from "@/features/portfolio/components/table-co
 import { collapseZeros } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
+import { trpc } from "@/trpc/client";
 import { age } from "../analytics";
-import { getTrackedPositions } from "../analytics.functions";
 import { trackedQuery } from "../analytics.queries";
 import {
   type PnlFilter,
@@ -544,7 +544,7 @@ function RefreshButton({
   const queryClient = useQueryClient();
   const now = useNow(data.scannedAt);
   const refresh = useMutation({
-    mutationFn: () => getTrackedPositions({ data: { pool, page, pageSize, ...filter, refresh: true } }),
+    mutationFn: () => trpc.analytics.tracked.query({ pool, page, pageSize, ...filter, refresh: true }),
     onSuccess: async (next) => {
       // The other pages come from the old scan; they refetch when opened.
       await queryClient.invalidateQueries({ queryKey: ["analytics", "tracked", pool], refetchType: "none" });

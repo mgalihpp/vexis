@@ -1,6 +1,5 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeaders } from "@tanstack/react-start/server";
 import { APIError } from "better-auth/api";
+import { publicProcedure, router } from "@/trpc/init.server";
 import { type AuthError, type AuthResult, JoinInput, SignInInput } from "./auth";
 import { getAuth, getViewerFromHeaders, INVITE_HEADER, inviteRejection } from "./auth.server";
 
@@ -18,37 +17,30 @@ function toAuthError(error: unknown, fallback: AuthError): AuthResult {
   return { ok: false, error: fallback };
 }
 
-export const getViewer = createServerFn({ method: "GET" }).handler(() =>
-  getViewerFromHeaders(new Headers(getRequestHeaders())),
-);
-
-export const signIn = createServerFn({ method: "POST" })
-  .validator(SignInInput)
-  .handler(async ({ data }): Promise<AuthResult> => {
+export const authRouter = router({
+  viewer: publicProcedure.query(({ ctx }) => getViewerFromHeaders(ctx.headers)),
+  signIn: publicProcedure.input(SignInInput).mutation(async ({ ctx, input }): Promise<AuthResult> => {
     try {
-      await getAuth().api.signInEmail({ body: data, headers: new Headers(getRequestHeaders()) });
+      await getAuth().api.signInEmail({ body: input, headers: ctx.headers });
       return { ok: true };
     } catch (error) {
       return toAuthError(error, "credentials");
     }
-  });
-
-export const join = createServerFn({ method: "POST" })
-  .validator(JoinInput)
-  .handler(async ({ data }): Promise<AuthResult> => {
-    const headers = new Headers(getRequestHeaders());
-    headers.set(INVITE_HEADER, data.invite);
+  }),
+  join: publicProcedure.input(JoinInput).mutation(async ({ ctx, input }): Promise<AuthResult> => {
+    const headers = new Headers(ctx.headers);
+    headers.set(INVITE_HEADER, input.invite);
     try {
       await getAuth().api.signUpEmail({
-        body: { email: data.email, password: data.password, name: data.email.split("@")[0] ?? data.email },
+        body: { email: input.email, password: input.password, name: input.email.split("@")[0] ?? input.email },
         headers,
       });
       return { ok: true };
     } catch (error) {
       return toAuthError(error, "server");
     }
-  });
-
-export const signOut = createServerFn({ method: "POST" }).handler(async () => {
-  await getAuth().api.signOut({ headers: new Headers(getRequestHeaders()) });
+  }),
+  signOut: publicProcedure.mutation(async ({ ctx }) => {
+    await getAuth().api.signOut({ headers: ctx.headers });
+  }),
 });

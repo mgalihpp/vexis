@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { trpc } from "@/trpc/client";
 import { type Bar, type Currency, convertBars, sumVolume, type TimeframeId, type VolumePoint } from "../analytics";
-import { getOlderBars } from "../analytics.functions";
 import { chartQuery } from "../analytics.queries";
 import type { loadAnalytics } from "../analytics.server";
 import type { ChartBar } from "./candle-chart";
@@ -143,7 +143,8 @@ function Chart({
     if (status.state !== "idle" || oldest === undefined) return;
     status.state = "loading";
     setLoadingOlder(true);
-    getOlderBars({ data: { pool, tf, before: oldest } })
+    trpc.analytics.olderBars
+      .query({ pool, tf, before: oldest })
       .then((r) => {
         if (r.bars.length === 0) {
           status.state = "done";

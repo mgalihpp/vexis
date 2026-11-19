@@ -26,8 +26,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { AgentsBar, BarPill } from "@/features/agents/components/agent-layout";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
+import { trpc } from "@/trpc/client";
 import { bubbles, deskStatuses, type OfficeView, pauseView } from "../office";
-import { killSwitchFn, resumeOfficeFn } from "../office.functions";
 import { type FeedFilter, officeQuery } from "../office.queries";
 import { AgentCard } from "./agent-card";
 import { ApprovalPanel } from "./approval-panel";
@@ -234,8 +234,8 @@ function Office({
 /** The kill switch, or Resume while a pause the owner may lift is on. An admin stop offers neither. */
 function StopControl({ view, now }: { view: OfficeView; now: number }) {
   const [confirming, setConfirming] = useState(false);
-  const kill = useOfficeMutation(killSwitchFn);
-  const resume = useOfficeMutation(resumeOfficeFn);
+  const kill = useOfficeMutation(trpc.office.killSwitch.mutate);
+  const resume = useOfficeMutation(trpc.office.resume.mutate);
   const pause = pauseView(view.config, now);
   if (pause.state === "paused") {
     if (!pause.canResume) return null;

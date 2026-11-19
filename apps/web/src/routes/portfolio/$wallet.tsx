@@ -6,10 +6,10 @@ import { Notice } from "@/features/portfolio/components/notice";
 import { PairFilter, RangePicker } from "@/features/portfolio/components/range-picker";
 import { WalletBar } from "@/features/portfolio/components/wallet-bar";
 import { RANGE_PRESETS, type RangePreset } from "@/features/portfolio/portfolio";
-import { WalletAddress } from "@/features/portfolio/portfolio.functions";
 import { portfolioQuery } from "@/features/portfolio/portfolio.queries";
 import { useTabSwipe } from "@/features/portfolio/tab-swipe";
 import { usePortfolio } from "@/features/portfolio/use-portfolio-view";
+import { WalletAddress } from "@/lib/address";
 import { useWallets } from "@/stores/wallets";
 
 const RANGE_IDS = RANGE_PRESETS.map((p) => p.id) as [RangePreset, ...RangePreset[]];

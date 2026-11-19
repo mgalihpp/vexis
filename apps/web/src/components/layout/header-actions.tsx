@@ -4,10 +4,10 @@ import { BellIcon, LogOutIcon, SettingsIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { signOut } from "@/features/auth/auth.functions";
 import { NotificationsDialog } from "@/features/notifications/components/notifications-dialog";
 import { SettingsDialog, type SettingsSection } from "@/features/settings/components/settings-dialog";
 import { useNotifications } from "@/stores/notifications";
+import { trpc } from "@/trpc/client";
 
 export function HeaderActions() {
   const unread = useNotifications((s) => s.items.filter((n) => !n.read).length);
@@ -73,7 +73,7 @@ function SignOutButton() {
   const leave = async () => {
     setPending(true);
     try {
-      await signOut();
+      await trpc.auth.signOut.mutate();
       // Another user may sign in on this browser next, so nothing cached for this one may stay.
       queryClient.clear();
       await router.navigate({ to: "/" });

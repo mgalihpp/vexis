@@ -324,7 +324,7 @@ export function relative(ms: number, now: number) {
 export function useAdminAction<A, R>(fn: (arg: A) => Promise<R>, onDone?: (result: R) => void) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: fn,
+    mutationFn: (arg: A) => fn(arg),
     onSuccess: async (result) => {
       await qc.invalidateQueries({ queryKey: ["admin"] });
       onDone?.(result);

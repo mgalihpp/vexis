@@ -5,8 +5,8 @@ import { CheckIcon, LoaderCircleIcon } from "lucide-react";
 import { type ComponentProps, type FormEvent, useId, useState } from "react";
 import { Logo } from "@/components/icons";
 import { isNetworkError } from "@/lib/query";
+import { trpc } from "@/trpc/client";
 import { AUTH_ERROR_MESSAGE, type AuthError, type AuthMode, safeRedirect } from "../auth";
-import { join, signIn } from "../auth.functions";
 import { viewerQuery } from "../auth.queries";
 
 type FormError = AuthError | "network" | "terms";
@@ -42,8 +42,8 @@ export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite
     try {
       const result =
         mode === "join"
-          ? await join({ data: { email, password, invite: code } })
-          : await signIn({ data: { email, password } });
+          ? await trpc.auth.join.mutate({ email, password, invite: code })
+          : await trpc.auth.signIn.mutate({ email, password });
       if (!result.ok) {
         setError(result.error);
         return;

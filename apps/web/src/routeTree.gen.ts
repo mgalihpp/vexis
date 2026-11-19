@@ -29,6 +29,7 @@ import { Route as AgentsNewRouteImport } from './routes/agents/new'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio/index'
 import { Route as PortfolioWalletRouteImport } from './routes/portfolio/$wallet'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiTrpcSplatRouteImport } from './routes/api/trpc/$'
 import { Route as PortfolioWalletIndexRouteImport } from './routes/portfolio/$wallet/index'
 import { Route as PortfolioWalletActiveRouteImport } from './routes/portfolio/$wallet/active'
 import { Route as PortfolioWalletBalancesRouteImport } from './routes/portfolio/$wallet/balances'
@@ -135,6 +136,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTrpcSplatRoute = ApiTrpcSplatRouteImport.update({
+  id: '/api/trpc/$',
+  path: '/api/trpc/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortfolioWalletIndexRoute = PortfolioWalletIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/agents/': typeof AgentsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/agents': typeof AgentsIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/agents/': typeof AgentsIndexRoute
   '/portfolio/': typeof PortfolioIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/trpc/$': typeof ApiTrpcSplatRoute
   '/portfolio/$wallet/active': typeof PortfolioWalletActiveRoute
   '/portfolio/$wallet/balances': typeof PortfolioWalletBalancesRoute
   '/portfolio/$wallet/closed': typeof PortfolioWalletClosedRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/agents/'
     | '/portfolio/'
     | '/api/auth/$'
+    | '/api/trpc/$'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/agents'
     | '/portfolio'
     | '/api/auth/$'
+    | '/api/trpc/$'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/agents/'
     | '/portfolio/'
     | '/api/auth/$'
+    | '/api/trpc/$'
     | '/portfolio/$wallet/active'
     | '/portfolio/$wallet/balances'
     | '/portfolio/$wallet/closed'
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   AgentsIndexRoute: typeof AgentsIndexRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiTrpcSplatRoute: typeof ApiTrpcSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -483,6 +496,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/trpc/$': {
+      id: '/api/trpc/$'
+      path: '/api/trpc/$'
+      fullPath: '/api/trpc/$'
+      preLoaderRoute: typeof ApiTrpcSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portfolio/$wallet/': {
       id: '/portfolio/$wallet/'
       path: '/'
@@ -576,6 +596,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgentsIndexRoute: AgentsIndexRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiTrpcSplatRoute: ApiTrpcSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

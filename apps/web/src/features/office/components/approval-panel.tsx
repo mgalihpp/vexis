@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { shortAddr } from "@/lib/format";
+import { trpc } from "@/trpc/client";
 import {
   AGENT_INFO,
   autopilotDecisions,
@@ -15,7 +16,6 @@ import {
   proposalFacts,
   waitingProposals,
 } from "../office";
-import { decideProposalFn } from "../office.functions";
 import { Meter, PanelEmpty, Section, sol, usd, useOfficeMutation } from "./office-ui";
 
 const TODAY: { status: "approved" | "rejected" | "expired" | "failed" | "done"; label: string }[] = [
@@ -100,13 +100,13 @@ const STATUS_TEXT: Partial<Record<ProposalView["status"], string>> = {
 };
 
 function ProposalCard({ proposal: p, now, stopped }: { proposal: ProposalView; now: number; stopped: boolean }) {
-  const decide = useOfficeMutation(decideProposalFn);
+  const decide = useOfficeMutation(trpc.office.decide.mutate);
   const left = countdown(p, now);
   const checks = p.risk?.checks ?? null;
   const passed = checks?.filter((c) => c.ok).length ?? 0;
   const pool = p.poolName ?? shortAddr(p.poolAddress);
   const busy = decide.isPending;
-  const choose = (decision: "approve" | "reject") => decide.mutate({ data: { proposalId: p.id, decision } });
+  const choose = (decision: "approve" | "reject") => decide.mutate({ proposalId: p.id, decision });
 
   return (
     <section

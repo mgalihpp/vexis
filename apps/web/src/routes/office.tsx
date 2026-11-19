@@ -2,10 +2,10 @@ import { createFileRoute, stripSearchParams } from "@tanstack/react-router";
 import { OFFICE_AGENTS } from "@vexis/shared/office";
 import { z } from "zod";
 import { telegramQuery } from "@/features/agents/agents.queries";
-import { PoolAddress } from "@/features/analytics/analytics.functions";
 import { OfficePage } from "@/features/office/components/office-page";
 import { OfficeSkeleton } from "@/features/office/components/office-skeleton";
 import { officeFeedQuery, officeQuery } from "@/features/office/office.queries";
+import { PoolAddress } from "@/lib/address";
 
 const OfficeSearch = z.object({
   agent: z.enum(OFFICE_AGENTS).optional().catch(undefined),

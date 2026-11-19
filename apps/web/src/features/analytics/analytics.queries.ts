@@ -1,11 +1,11 @@
 import { queryOptions } from "@tanstack/react-query";
+import { trpc } from "@/trpc/client";
 import type { TimeframeId } from "./analytics";
-import { getAnalytics, getChart, getTrackedPositions, getTraders } from "./analytics.functions";
 
 export const analyticsQuery = (input: { pool?: string | undefined }) =>
   queryOptions({
     queryKey: ["analytics", input.pool ?? null],
-    queryFn: () => getAnalytics({ data: input }),
+    queryFn: () => trpc.analytics.get.query(input),
   });
 
 /** Positions change slowly and each scan costs RPC and rate-limit budget, so this query does not poll. */
@@ -26,7 +26,7 @@ export const trackedQuery = (input: {
   const sort = input.sort ?? "recent";
   return queryOptions({
     queryKey: ["analytics", "tracked", input.pool, page, pageSize, query, range, pnl, sort],
-    queryFn: () => getTrackedPositions({ data: { pool: input.pool, page, pageSize, query, range, pnl, sort } }),
+    queryFn: () => trpc.analytics.tracked.query({ pool: input.pool, page, pageSize, query, range, pnl, sort }),
     staleTime: 5 * 60_000,
     // Poll while the pool-wide totals are still loading.
     refetchInterval: (q) => (q.state.data?.ok && q.state.data.totals.running ? 2000 : false),
@@ -39,7 +39,7 @@ const TRADERS_MS = 60_000;
 export const tradersQuery = (pool: string) =>
   queryOptions({
     queryKey: ["analytics", "traders", pool],
-    queryFn: () => getTraders({ data: { pool } }),
+    queryFn: () => trpc.analytics.traders.query({ pool }),
     staleTime: TRADERS_MS,
     refetchInterval: TRADERS_MS,
   });
@@ -47,5 +47,5 @@ export const tradersQuery = (pool: string) =>
 export const chartQuery = (input: { pool: string; tf: TimeframeId }) =>
   queryOptions({
     queryKey: ["analytics", "chart", input.pool, input.tf],
-    queryFn: () => getChart({ data: input }),
+    queryFn: () => trpc.analytics.chart.query(input),
   });

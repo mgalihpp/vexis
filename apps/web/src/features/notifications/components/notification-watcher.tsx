@@ -6,7 +6,7 @@ import { useNotifications } from "@/stores/notifications";
 import { usePools } from "@/stores/pools";
 import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
-import { getWatch } from "../notifications.functions";
+import { trpc } from "@/trpc/client";
 import { playAlert } from "../sound";
 
 const MAX_WATCHED = 20;
@@ -38,10 +38,12 @@ export function NotificationWatcher() {
         groups.set(pool.timeframe, group);
       }
       const walletWatch = wallets.length
-        ? await getWatch({ data: { wallets, pools: [], timeframe: spikeTimeframe } })
+        ? await trpc.notifications.watch.query({ wallets, pools: [], timeframe: spikeTimeframe })
         : { wallets: [], pools: [] };
       const poolWatches = await Promise.all(
-        [...groups].map(([timeframe, group]) => getWatch({ data: { wallets: [], pools: group, timeframe } })),
+        [...groups].map(([timeframe, group]) =>
+          trpc.notifications.watch.query({ wallets: [], pools: group, timeframe }),
+        ),
       );
       return { wallets: walletWatch.wallets, pools: poolWatches.flatMap((watch) => watch.pools) };
     },

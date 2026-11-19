@@ -18,14 +18,14 @@ import { Spinner } from "@/components/ui/spinner";
 import { describeFilter, type PoolFilter } from "@/features/agents/agents";
 import { FormError } from "@/features/agents/components/agent-ui";
 import { useOfficeMutation } from "@/features/office/components/office-ui";
-import { saveScreenFn } from "@/features/office/office.functions";
 import { officeEnabledQuery } from "@/features/office/office.queries";
+import { trpc } from "@/trpc/client";
 
 /** "Scout pools like these": the screener's bounds become the office's custom pool filter. Only for an office owner. */
 export function OfficeButton({ filter }: { filter: PoolFilter }) {
   const navigate = useNavigate();
   const { data: enabled } = useQuery(officeEnabledQuery);
-  const save = useOfficeMutation(saveScreenFn);
+  const save = useOfficeMutation(trpc.office.saveScreen.mutate);
   const [confirming, setConfirming] = useState(false);
   if (!enabled) return null;
 
@@ -58,7 +58,7 @@ export function OfficeButton({ filter }: { filter: PoolFilter }) {
               onClick={(e) => {
                 e.preventDefault();
                 save.mutate(
-                  { data: { preset: "custom", custom: filter } },
+                  { preset: "custom", custom: filter },
                   {
                     onSuccess: () => {
                       setConfirming(false);

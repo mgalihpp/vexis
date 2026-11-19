@@ -3,7 +3,7 @@ import { SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { compactUsd } from "@/features/portfolio/money";
-import { findPools } from "../analytics.functions";
+import { trpc } from "@/trpc/client";
 import type { PoolSearchHit } from "../analytics.types";
 
 /** Text box with a leading search icon, shared by the desktop popover and the phone sheet. */
@@ -37,7 +37,8 @@ export function usePoolHits(query: string, enabled: boolean) {
     if (!enabled || !q) return setHits([]);
     let live = true;
     const timer = setTimeout(() => {
-      findPools({ data: { query: q } })
+      trpc.analytics.search
+        .query({ query: q })
         .then((r) => live && setHits(r))
         .catch(() => live && setHits([]));
     }, 250);

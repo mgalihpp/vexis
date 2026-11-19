@@ -1,3 +1,4 @@
+import { trpc } from "@/trpc/client";
 // The auto-rebalance agent's own pieces: its rule form, the wallet it manages, its overview and history.
 
 import { useSuspenseQuery } from "@tanstack/react-query";
@@ -43,12 +44,6 @@ import {
   STATUS_LABEL,
   solText,
 } from "../agents";
-import {
-  removeRebalanceWalletFn,
-  saveAgentConfig,
-  saveRebalanceRpcUrlFn,
-  saveRebalanceWalletFn,
-} from "../agents.functions";
 import { rebalancesQuery, walletQuery } from "../agents.queries";
 import { Delivery, Panel, PoolCell, StatCard } from "./agent-layout";
 import {
@@ -284,7 +279,7 @@ export function RebalanceRuleSection({
 }) {
   const initial = rebalanceFields(agent.config);
   const [fields, setFields] = useState<RebalanceFields>(initial);
-  const save = useAgentMutation(saveAgentConfig);
+  const save = useAgentMutation(trpc.agents.saveConfig.mutate);
   const result = parseRebalanceFields(fields);
   const dirty = JSON.stringify(fields) !== JSON.stringify(initial);
   const update = (next: RebalanceFields) => {
@@ -323,7 +318,7 @@ export function RebalanceRuleSection({
           onClick={() =>
             result.ok &&
             save.mutate(
-              { data: { agentId: agent.id, kind: "auto-rebalance", config: result.config } },
+              { agentId: agent.id, kind: "auto-rebalance", config: result.config },
               {
                 onSuccess: () => {
                   onDirty(false);
@@ -395,7 +390,7 @@ const isHttpsUrl = (v: string) => URL.canParse(v) && new URL(v).protocol === "ht
 
 /** Replaces only the RPC URL. Inline, under the host it replaces. */
 function RpcForm({ onDone }: { onDone: () => void }) {
-  const save = useAgentMutation((rpcUrl: string) => saveRebalanceRpcUrlFn({ data: { rpcUrl } }));
+  const save = useAgentMutation((rpcUrl: string) => trpc.agents.wallet.saveRpcUrl.mutate({ rpcUrl }));
   const [url, setUrl] = useState("");
   return (
     <form
@@ -443,9 +438,9 @@ function RpcForm({ onDone }: { onDone: () => void }) {
 export function WalletPanel() {
   const { data } = useSuspenseQuery(walletQuery);
   const save = useAgentMutation((input: { secretKey: string; rpcUrl: string }) =>
-    saveRebalanceWalletFn({ data: input }),
+    trpc.agents.wallet.save.mutate(input),
   );
-  const remove = useAgentMutation(() => removeRebalanceWalletFn());
+  const remove = useAgentMutation(() => trpc.agents.wallet.remove.mutate());
   const [secret, setSecret] = useState("");
   const [rpcUrl, setRpcUrl] = useState("");
   const [replacingRpc, setReplacingRpc] = useState(false);

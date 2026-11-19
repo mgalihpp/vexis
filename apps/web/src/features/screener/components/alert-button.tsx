@@ -16,9 +16,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { describeFilter, type PoolFilter, presetLabel, screenerPreset } from "@/features/agents/agents";
-import { alertOnFilterFn } from "@/features/agents/agents.functions";
 import { agentsQuery } from "@/features/agents/agents.queries";
 import { FormError, useAgentMutation } from "@/features/agents/components/agent-ui";
+import { trpc } from "@/trpc/client";
 
 /**
  * "Alert on pools like these": the screener's bounds become a custom volume-spike filter. The user's volume spike
@@ -27,7 +27,7 @@ import { FormError, useAgentMutation } from "@/features/agents/components/agent-
 export function AlertButton({ filter }: { filter: PoolFilter }) {
   const navigate = useNavigate();
   const { data } = useQuery(agentsQuery);
-  const save = useAgentMutation(alertOnFilterFn);
+  const save = useAgentMutation(trpc.agents.alertOnFilter.mutate);
   const [confirming, setConfirming] = useState(false);
   const agent = data?.agents.find((a) => a.kind === "volume-watch");
   const preset = agent && screenerPreset(agent);
@@ -67,7 +67,7 @@ export function AlertButton({ filter }: { filter: PoolFilter }) {
               onClick={(e) => {
                 e.preventDefault();
                 save.mutate(
-                  { data: { custom: filter } },
+                  { custom: filter },
                   {
                     onSuccess: ({ id }) => {
                       setConfirming(false);

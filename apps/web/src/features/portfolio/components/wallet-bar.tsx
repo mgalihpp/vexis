@@ -2,10 +2,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { ChevronDownIcon, CopyIcon, ExternalLinkIcon, SaveIcon, SearchIcon, StarIcon } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { WalletAddress } from "@/lib/address";
 import { shortAddr } from "@/lib/format";
 import { useSettings } from "@/stores/settings";
 import { useWallets } from "@/stores/wallets";
-import { WalletAddress } from "../portfolio.functions";
 
 export function WalletSearch({
   autoFocus = false,
