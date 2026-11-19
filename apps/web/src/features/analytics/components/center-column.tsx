@@ -4,7 +4,8 @@ import { type ReactNode, useRef, useState } from "react";
 import { AnimatedNumber } from "@/components/animated-number";
 import { Segmented } from "@/features/portfolio/components/segmented";
 import { compactUsd, pct } from "@/features/portfolio/money";
-import { type Currency, ratio, STAT_WINDOWS, TIMEFRAMES, type TimeframeId } from "../analytics";
+import { FeePace } from "@/features/screener/components/fee-pace";
+import { type Currency, feeTvlWindows, ratio, STAT_WINDOWS, TIMEFRAMES, type TimeframeId } from "../analytics";
 import type { PoolView, SiblingPool } from "../analytics.types";
 import { CandleChart, type ChartBar } from "./candle-chart";
 import { CollapseToggle, Label, NA, Panel, usePanelOpen } from "./ui";
@@ -16,6 +17,7 @@ interface StatItem {
   color?: string;
   tip?: string;
   sub?: ReactNode;
+  node?: ReactNode;
 }
 
 export function VolumeStats({ pool, volume7d }: { pool: PoolView; volume7d: number | null }) {
@@ -38,6 +40,7 @@ export function VolumeStats({ pool, volume7d }: { pool: PoolView; volume7d: numb
       color: "text-loss",
       tip: TOKEN_WIDE,
     },
+    { label: "Fee Pace", value: null, node: <FeePace feeTvl={feeTvlWindows(pool.windows, pool.tvl)} /> },
     ...STAT_WINDOWS.filter((w) => w !== "24h").map((w): StatItem => {
       const { volume, fees } = pool.windows[w];
       return {
@@ -71,7 +74,7 @@ export function VolumeStats({ pool, volume7d }: { pool: PoolView; volume7d: numb
           <div className="flex flex-col gap-0.5" title={item.tip}>
             <Label>{item.label}</Label>
             <span className={`num text-sm font-semibold ${item.color ?? ""}`}>
-              {item.value === null ? NA : <AnimatedNumber value={item.value} format={item.format} />}
+              {item.node ?? (item.value === null ? NA : <AnimatedNumber value={item.value} format={item.format} />)}
             </span>
             {item.sub && <span className="num text-[11px] text-muted-foreground">{item.sub}</span>}
           </div>

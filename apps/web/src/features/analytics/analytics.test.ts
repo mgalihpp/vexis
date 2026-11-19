@@ -6,6 +6,7 @@ import {
   binDistribution,
   convertBars,
   feeMode,
+  feeTvlWindows,
   protocolFeePct,
   ratio,
   sumVolume,
@@ -77,6 +78,13 @@ describe("binDistribution", () => {
 test("ratio guards an empty denominator", () => {
   expect(ratio(5, 0)).toBe(0);
   expect(ratio(6, 3)).toBe(2);
+});
+
+test("feeTvlWindows divides each window by TVL", () => {
+  const w = (n: number) => ({ volume: 0, fees: n });
+  const windows = { "30m": w(1), "1h": w(2), "2h": w(3), "4h": w(4), "12h": w(5), "24h": w(6) };
+  expect(feeTvlWindows(windows, 100)["24h"]).toBeCloseTo(0.06);
+  expect(feeTvlWindows(windows, 0)["1h"]).toBe(0);
 });
 
 test("sumVolume", () => {
