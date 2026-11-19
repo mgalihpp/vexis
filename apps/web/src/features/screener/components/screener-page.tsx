@@ -47,10 +47,8 @@ import {
   CONCENTRATED_PCT,
   type FeeWindow,
   FLOOR,
-  feePace,
   MCAP_MAX_STEPS,
   MCAP_MIN_STEPS,
-  momentum,
   type Screener,
   type ScreenerPool,
   SORT_KEYS,
@@ -69,6 +67,7 @@ import {
   warnings,
 } from "../screener";
 import { AlertButton } from "./alert-button";
+import { FeePace, times } from "./fee-pace";
 import { OfficeButton } from "./office-button";
 
 export interface ScreenerView {
@@ -110,7 +109,6 @@ function percent(v: number | null) {
   const digits = v >= 100 ? 0 : v >= 10 ? 1 : v >= 0.1 || v === 0 ? 2 : 3;
   return `${v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`;
 }
-const times = (v: number | null) => (v === null ? DASH : `${v >= 10 ? v.toFixed(1) : v.toFixed(2)}×`);
 const signedPct = (v: number | null) =>
   v === null ? DASH : `${v > 0 ? "+" : ""}${Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)}%`;
 const toneOf = (v: number | null) => (v === null ? "text-muted-foreground" : tone(v));
@@ -780,36 +778,6 @@ function Heat({ value, top, className = "" }: { value: number; top: number; clas
   );
 }
 
-/** Six bars, 24h ago on the left and the last 30 minutes on the right; a bar above the day's average is lime. */
-function Pace({ pool }: { pool: ScreenerPool }) {
-  const pace = feePace(pool.feeTvl);
-  const average = pool.feeTvl["24h"] / 24;
-  const peak = Math.max(...pace);
-  const m = momentum(pool.feeTvl);
-  const tone =
-    m === null ? "text-muted-foreground" : m >= 1.25 ? "text-profit" : m < 0.75 ? "text-muted-foreground" : "";
-  return (
-    <div
-      className="relative z-10 flex items-end gap-2"
-      title={m === null ? "No fees in the last 24h" : `Last hour is ${times(m)} the 24h hourly average`}
-    >
-      <span className="flex h-5 items-end gap-0.5" aria-hidden="true">
-        {pace.map((rate, i) => (
-          <span
-            // biome-ignore lint/suspicious/noArrayIndexKey: six fixed stretches of time, never reordered
-            key={i}
-            className={`w-1.5 rounded-[1px] ${rate > average ? "bg-brand" : "bg-foreground/25"}`}
-            style={{ height: `${peak > 0 ? Math.max(10, (rate / peak) * 100) : 10}%` }}
-          />
-        ))}
-      </span>
-      <span className={`num text-[11px] font-medium ${tone}`}>
-        <Num value={m} format={times} />
-      </span>
-    </div>
-  );
-}
-
 function Money({ usd, solPrice }: { usd: number; solPrice: number | null }) {
   return (
     <div className="flex flex-col items-end leading-tight">
@@ -867,7 +835,7 @@ function PoolRow({ pool, rank, top, now, solPrice, win, open, onToggle }: RowPro
         </span>
         <PriceTrend pool={pool} className="hidden xl:flex" />
         <Heat value={pool.feeTvl["24h"]} top={top} className="items-end" />
-        <Pace pool={pool} />
+        <FeePace feeTvl={pool.feeTvl} />
         <span className="num text-right">
           <Num value={apr(pool.feeTvl)} format={percent} />
         </span>
@@ -933,7 +901,7 @@ function PoolCard({ pool, rank, top, now, solPrice, win }: Omit<RowProps, "open"
           <Money usd={pool.tvl} solPrice={solPrice} />
         </CardStat>
         <CardStat label="Fee pace">
-          <Pace pool={pool} />
+          <FeePace feeTvl={pool.feeTvl} />
         </CardStat>
         <CardStat label="APR">
           <span className="num font-medium">

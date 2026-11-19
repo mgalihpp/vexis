@@ -115,6 +115,10 @@ export function binDistribution(
 /** `0` when the denominator is empty so a dead pool shows 0x, not Infinity. */
 export const ratio = (num: number, den: number) => (den > 0 ? num / den : 0);
 
+/** Fee/TVL per window as a fraction, in the shape the screener's `feePace` reads. */
+export const feeTvlWindows = (windows: Record<StatWindow, { fees: number }>, tvl: number) =>
+  Object.fromEntries(STAT_WINDOWS.map((w) => [w, ratio(windows[w].fees, tvl)])) as Record<StatWindow, number>;
+
 export const perMinute = (perDay: number) => perDay / 1440;
 
 /** Evenly spaced axis values: `count` points from `min` to `max`, inclusive. */
