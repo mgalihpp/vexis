@@ -32,8 +32,8 @@ type NavTarget = "/portfolio" | "/analytics" | "/screener" | "/agents" | "/offic
 
 const MOBILE_LINKS: { to: NavTarget; label: string; badge?: string }[] = [
   { to: "/portfolio", label: "Portfolio" },
-  { to: "/analytics", label: "Analytics" },
   { to: "/screener", label: "Screener" },
+  { to: "/analytics", label: "Analytics" },
   { to: "/agents", label: "Agents", badge: "BETA" },
   { to: "/office", label: "Office", badge: "BETA" },
 ];
@@ -102,8 +102,8 @@ function AppHeader({ isAdmin }: { isAdmin: boolean }) {
         </Link>
         <nav className="hidden items-center gap-5 md:flex">
           <NavItem to="/portfolio">Portfolio</NavItem>
-          <NavItem to="/analytics">Analytics</NavItem>
           <NavItem to="/screener">Screener</NavItem>
+          <NavItem to="/analytics">Analytics</NavItem>
           <NavItem to="/agents" badge="BETA">
             Agents
           </NavItem>

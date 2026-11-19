@@ -751,8 +751,8 @@ const FOOTER_LINKS = [
     title: "Product",
     links: [
       ["/portfolio", "Portfolio"],
-      ["/analytics", "Analytics"],
       ["/screener", "Screener"],
+      ["/analytics", "Analytics"],
       ["/agents", "Agents"],
     ],
   },
