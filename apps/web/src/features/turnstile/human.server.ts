@@ -2,7 +2,6 @@
 // cookie, so nothing is stored. Without TURNSTILE_SECRET_KEY the gate is off, which keeps dev and CI as they were.
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { createMiddleware } from "@tanstack/react-start";
 
 export const HUMAN_COOKIE = "vexis_human";
 export const VERIFY_PATH = "/__verify";
@@ -97,7 +96,7 @@ async function done(token){
 const NO_STORE = { "cache-control": "no-store" };
 
 /** Runs before every request Start handles. Verified visitors pass; everyone else gets the challenge page. */
-export const humanGate = createMiddleware({ type: "request" }).server(async ({ request, next }) => {
+export async function humanGate<T>({ request, next }: { request: Request; next: () => T }): Promise<T | Response> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   const siteKey = process.env.TURNSTILE_SITE_KEY;
   if (!secret || !siteKey) return next();
@@ -132,4 +131,4 @@ export const humanGate = createMiddleware({ type: "request" }).server(async ({ r
     status: 200,
     headers: { ...NO_STORE, "content-type": "text/html; charset=utf-8" },
   });
-});
+}
