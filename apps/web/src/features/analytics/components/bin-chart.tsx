@@ -4,6 +4,9 @@ import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { compactSol, compactUsd, formatPrice, pct } from "@/features/portfolio/money";
 import { type DistributionBar, ratio } from "../analytics";
 
+// About 8px a bar in the narrow column; a wider range merges neighbouring bins instead of drawing hairlines.
+export const MAX_BARS = 41;
+
 /**
  * The stacked bin bars of the pool's Liquidity Distribution: token X (brand) over token Y (SOL color) per bar, a
  * marker with the pool price on the active bin, a tooltip per bar and four price labels. The pool panel and every

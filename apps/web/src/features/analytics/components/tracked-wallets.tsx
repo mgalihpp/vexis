@@ -33,7 +33,7 @@ import {
   type TrackedSort,
   type TrackedWallet,
 } from "../tracked";
-import { BinChart } from "./bin-chart";
+import { BinChart, MAX_BARS } from "./bin-chart";
 import { amount, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
@@ -232,7 +232,7 @@ function PositionDistribution({
   if (xUsd == null || yUsd == null || data.bins.length === 0) {
     return <p className="text-xs text-muted-foreground">{NA}</p>;
   }
-  const bars = positionBars(data.bins, data.activeBinId, data.bins.length).map((b) => ({
+  const bars = positionBars(data.bins, data.activeBinId, MAX_BARS).map((b) => ({
     id: b.id,
     lastId: b.lastId,
     price: b.price,
