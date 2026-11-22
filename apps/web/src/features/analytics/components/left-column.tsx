@@ -21,7 +21,7 @@ import { shortAddr } from "@/lib/format";
 import { usePools } from "@/stores/pools";
 import { age, binDistribution, perMinute, ratio } from "../analytics";
 import type { ChainView, PoolTokenView, PoolView, SiblingPool } from "../analytics.types";
-import { BinChart } from "./bin-chart";
+import { BinChart, MAX_BARS } from "./bin-chart";
 import { PoolCard, tinyUsd } from "./center-column";
 import { PoolHitList, SearchInput, usePoolHits } from "./pool-search";
 import { compact, Label, NA, Panel, Row } from "./ui";
@@ -317,9 +317,6 @@ export function PoolTokens({ pool }: { pool: PoolView }) {
     </Panel>
   );
 }
-
-// About 8px a bar in the narrow column; a wider zoom merges neighbouring bins instead of drawing hairlines.
-const MAX_BARS = 41;
 
 export function LiquidityDistribution({ pool, chain }: { pool: PoolView; chain: ChainView | null }) {
   const [reach, setReach] = useState(20);
