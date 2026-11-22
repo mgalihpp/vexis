@@ -97,38 +97,6 @@ export function inRangeStatus(input: {
   return lowerBinId <= activeBinId && activeBinId <= upperBinId;
 }
 
-export interface RangeBar {
-  /** Where the position's range starts and ends on the bar, 0 to 1. */
-  start: number;
-  end: number;
-  /** Where the active bin sits on the bar, 0 to 1. */
-  active: number;
-  /** Bins between the active bin and the nearest edge of the range; 0 when inside it. */
-  outside: number;
-  side: "below" | "inside" | "above";
-}
-
-/**
- * Lays a position's bin range and the pool's active bin on one bar. The bar spans both, padded by a quarter of that
- * span (at least two bins) on each side, so a range far from the price still shows where the price is.
- */
-export function rangeBar(lower: number, upper: number, active: number): RangeBar {
-  const lo = Math.min(lower, active);
-  const hi = Math.max(upper, active);
-  const pad = Math.max(2, (hi - lo + 1) / 4);
-  const from = lo - pad;
-  const width = hi + 1 + pad - from;
-  const at = (bin: number) => (bin - from) / width;
-  const side = active < lower ? "below" : active > upper ? "above" : "inside";
-  return {
-    start: at(lower),
-    end: at(upper + 1),
-    active: at(active + 0.5),
-    outside: side === "below" ? lower - active : side === "above" ? active - upper : 0,
-    side,
-  };
-}
-
 /** Sum of the known values, or null when every value is unknown. */
 export function sumKnown(values: ReadonlyArray<number | null>): number | null {
   let total: number | null = null;
@@ -195,4 +163,55 @@ export function groupByOwner(positions: readonly TrackedPosition[]): TrackedWall
     pnlSol: sumKnown(list.map((p) => p.pnlSol)),
   }));
   return wallets.sort((a, b) => b.positions.length - a.positions.length || a.owner.localeCompare(b.owner));
+}
+
+/** One bin of a position: its price and the token amounts it holds, in token units. */
+export interface PositionBin {
+  id: number;
+  price: number;
+  x: number;
+  y: number;
+}
+
+export type PositionBinsResult =
+  | { ok: true; activeBinId: number; bins: PositionBin[] }
+  | { ok: false; message: string };
+
+export interface PositionBar {
+  /** First and last bin of the bar, equal unless neighbouring bins were merged. */
+  id: number;
+  lastId: number;
+  price: number;
+  lastPrice: number;
+  /** Token units in all the bar's bins. */
+  x: number;
+  y: number;
+  /** Bins in the bar, so a merged bar can be drawn per bin and stand as tall as a lone bin does. */
+  count: number;
+  side: "below" | "active" | "above";
+}
+
+/**
+ * The position's bins in price order, merged into at most `maxBars` bars. Merging is cut outward from the active bin,
+ * which stays a bar of its own, so a bar never mixes token Y (below) with token X (above).
+ */
+export function positionBars(bins: readonly PositionBin[], activeId: number, maxBars: number): PositionBar[] {
+  const sorted = [...bins].sort((a, b) => a.id - b.id);
+  const size = Math.max(1, Math.ceil(sorted.length / maxBars));
+  const bars = new Map<string, PositionBar>();
+  for (const b of sorted) {
+    const side = b.id < activeId ? "below" : b.id > activeId ? "above" : "active";
+    const key = side === "active" ? "active" : `${side}:${Math.ceil(Math.abs(b.id - activeId) / size)}`;
+    const bar = bars.get(key);
+    if (bar) {
+      bar.lastId = b.id;
+      bar.lastPrice = b.price;
+      bar.x += b.x;
+      bar.y += b.y;
+      bar.count++;
+    } else {
+      bars.set(key, { id: b.id, lastId: b.id, price: b.price, lastPrice: b.price, x: b.x, y: b.y, count: 1, side });
+    }
+  }
+  return [...bars.values()].sort((a, b) => a.id - b.id);
 }

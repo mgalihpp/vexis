@@ -4,8 +4,9 @@ import {
   groupByOwner,
   inRangeStatus,
   type PnlFilter,
+  type PositionBin,
+  positionBars,
   type RangeFilter,
-  rangeBar,
   sortByLiquidity,
   sumKnown,
   type TrackedPosition,
@@ -56,39 +57,6 @@ describe("sortByLiquidity", () => {
       { id: "e", v: 0 },
     ];
     expect(sortByLiquidity(rows, (r) => r.v).map((r) => r.id)).toEqual(["c", "a", "d", "e", "b"]);
-  });
-});
-
-describe("rangeBar", () => {
-  test("puts an active bin inside the range between the range's edges", () => {
-    const bar = rangeBar(100, 109, 104);
-    expect(bar.side).toBe("inside");
-    expect(bar.outside).toBe(0);
-    expect(bar.start).toBeGreaterThan(0);
-    expect(bar.end).toBeLessThan(1);
-    expect(bar.active).toBeGreaterThan(bar.start);
-    expect(bar.active).toBeLessThan(bar.end);
-  });
-
-  test("keeps a price below the range on the bar and counts the bins to the range", () => {
-    const bar = rangeBar(100, 109, 90);
-    expect(bar.side).toBe("below");
-    expect(bar.outside).toBe(10);
-    expect(bar.active).toBeGreaterThan(0);
-    expect(bar.active).toBeLessThan(bar.start);
-  });
-
-  test("keeps a price above the range on the bar", () => {
-    const bar = rangeBar(100, 109, 130);
-    expect(bar.side).toBe("above");
-    expect(bar.outside).toBe(21);
-    expect(bar.active).toBeGreaterThan(bar.end);
-    expect(bar.active).toBeLessThan(1);
-  });
-
-  test("treats both edge bins as inside", () => {
-    expect(rangeBar(100, 109, 100).side).toBe("inside");
-    expect(rangeBar(100, 109, 109).side).toBe("inside");
   });
 });
 
@@ -180,5 +148,37 @@ describe("groupByOwner", () => {
   test("a wallet with no PnL values reports null, not zero", () => {
     const [wallet] = groupByOwner([pos({ address: "p1", owner: "A" })]);
     expect(wallet?.pnlSol).toBeNull();
+  });
+});
+
+describe("positionBars", () => {
+  const bins = (ids: number[]): PositionBin[] => ids.map((id) => ({ id, price: id / 10, x: 1, y: 2 }));
+
+  test("one bar per bin while they fit, split by side of the active bin", () => {
+    const bars = positionBars(bins([8, 9, 10, 11]), 10, 10);
+    expect(bars.map((b) => [b.id, b.side])).toEqual([
+      [8, "below"],
+      [9, "below"],
+      [10, "active"],
+      [11, "above"],
+    ]);
+  });
+
+  test("merged bars never cross the active bin and keep the token totals", () => {
+    const ids = Array.from({ length: 21 }, (_, i) => i);
+    const bars = positionBars(bins(ids), 10, 5);
+    expect(bars.length).toBeLessThanOrEqual(5 + 2);
+    expect(bars.filter((b) => b.side === "active")).toHaveLength(1);
+    for (const b of bars) {
+      if (b.side === "below") expect(b.lastId).toBeLessThan(10);
+      if (b.side === "above") expect(b.id).toBeGreaterThan(10);
+    }
+    expect(bars.reduce((n, b) => n + b.x, 0)).toBe(21);
+    expect(bars.reduce((n, b) => n + b.count, 0)).toBe(21);
+  });
+
+  test("a position wholly below the active bin has no active or above bar", () => {
+    const bars = positionBars(bins([1, 2, 3]), 50, 10);
+    expect(bars.every((b) => b.side === "below")).toBe(true);
   });
 });
