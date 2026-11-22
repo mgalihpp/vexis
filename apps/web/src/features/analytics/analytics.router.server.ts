@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { PoolAddress } from "@/lib/address";
+import { PoolAddress, SolanaAddress } from "@/lib/address";
 import { router, viewerProcedure } from "@/trpc/init.server";
 import { TIMEFRAMES, type TimeframeId } from "./analytics";
 import { loadAnalytics, loadChart, loadOlder, searchPools } from "./analytics.server";
-import { trackedPositions } from "./tracked.server";
+import { positionBins, trackedPositions } from "./tracked.server";
 import { loadTraders } from "./traders.server";
 
 const TF_IDS = TIMEFRAMES.map((t) => t.id) as [TimeframeId, ...TimeframeId[]];
@@ -45,6 +45,9 @@ export const analyticsRouter = router({
         input.sort,
       ),
     ),
+  trackedBins: viewerProcedure
+    .input(z.object({ pool: PoolAddress, position: SolanaAddress }))
+    .query(({ input }) => positionBins(input.pool, input.position)),
   olderBars: viewerProcedure
     .input(z.object({ pool: PoolAddress, tf: z.enum(TF_IDS), before: z.number().int().positive() }))
     .query(({ input }) => loadOlder(input)),

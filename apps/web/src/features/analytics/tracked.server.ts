@@ -7,6 +7,7 @@ import {
   filterWallets,
   inRangeStatus,
   type PoolTotals,
+  type PositionBinsResult,
   sortByLiquidity,
   sumKnown,
   TRACKED_PAGE_SIZES,
@@ -23,7 +24,18 @@ import {
 const DLMM_PROGRAM = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
 
 // The SDK exports the account filters. Load its CJS build like analytics does.
+interface DlmmPool {
+  tokenX: { mint: { decimals: number } };
+  tokenY: { mint: { decimals: number } };
+  getActiveBin: () => Promise<{ binId: number }>;
+  getPosition: (address: PublicKey) => Promise<{
+    positionData: {
+      positionBinData: { binId: number; pricePerToken: string; positionXAmount: string; positionYAmount: string }[];
+    };
+  }>;
+}
 interface DlmmSdk {
+  create: (connection: Connection, pool: PublicKey) => Promise<DlmmPool>;
   positionV2Filter: () => GetProgramAccountsFilter;
   positionLbPairFilter: (lbPair: PublicKey) => GetProgramAccountsFilter;
 }
@@ -391,4 +403,48 @@ export function trackedPositions(
   sort: TrackedSort = "recent",
 ): Promise<TrackedResult> {
   return buildPage(pool, page, pageSize, refresh, filter, sort);
+}
+
+const BINS_CACHE_MS = 15_000;
+const binsCache: Cache<PositionBinsResult> = new Map();
+
+/**
+ * The bins of one open position, read on chain through the SDK, so it costs RPC and no datapi budget. Only a position
+ * the pool's own scan listed is read, so the procedure cannot be pointed at an arbitrary account.
+ */
+export async function positionBins(pool: string, position: string): Promise<PositionBinsResult> {
+  const scan = await scanFor(pool).catch(() => null);
+  if (!scan?.groups.some((g) => g.positions.some((p) => p.address === position))) {
+    return { ok: false, message: "This position is no longer open in the pool." };
+  }
+  return cached(binsCache, `${pool}:${position}`, BINS_CACHE_MS, async (): Promise<PositionBinsResult> => {
+    try {
+      const dlmm = await sdk.create(connection, new PublicKey(pool));
+      const [active, { positionData }] = await Promise.all([
+        dlmm.getActiveBin(),
+        dlmm.getPosition(new PublicKey(position)),
+      ]);
+      const dx = 10 ** dlmm.tokenX.mint.decimals;
+      const dy = 10 ** dlmm.tokenY.mint.decimals;
+      return {
+        ok: true,
+        activeBinId: active.binId,
+        bins: positionData.positionBinData.map((b) => ({
+          id: b.binId,
+          price: Number(b.pricePerToken),
+          x: Number(b.positionXAmount) / dx,
+          y: Number(b.positionYAmount) / dy,
+        })),
+      };
+    } catch (e) {
+      // The scan is cached for five minutes, so a position closed since then is gone from the chain.
+      const closed = e instanceof Error && /not found/i.test(e.message);
+      return {
+        ok: false,
+        message: closed
+          ? "This position was closed since the last scan."
+          : "The position's bins could not be read from the Solana RPC.",
+      };
+    }
+  });
 }

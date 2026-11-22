@@ -14,15 +14,16 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { Pagination, PoolFilter } from "@/features/portfolio/components/table-controls";
 import { collapseZeros } from "@/features/portfolio/money";
+import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { useStamp } from "@/features/timezone/timezone";
 import { useNow } from "@/hooks/use-now";
 import { trpc } from "@/trpc/client";
 import { age } from "../analytics";
-import { trackedQuery } from "../analytics.queries";
+import { trackedBinsQuery, trackedQuery } from "../analytics.queries";
 import {
   type PnlFilter,
+  positionBars,
   type RangeFilter,
-  rangeBar,
   sumKnown,
   TRACKED_PAGE_SIZES,
   TRACKED_REFRESH_MS,
@@ -32,10 +33,11 @@ import {
   type TrackedSort,
   type TrackedWallet,
 } from "../tracked";
+import { BinChart } from "./bin-chart";
 import { amount, NA, short, sol, solAmount, solRound, tone, Updated, usd } from "./ui";
 import { WalletAvatar } from "./wallet-avatar";
 
-type Token = { symbol: string; icon: string | null };
+type Token = { symbol: string; icon: string | null; price?: number | null };
 
 export const TRACKED_NOTE = "Deposits are all-time token amounts. Fees and PnL are all-time, from Meteora.";
 
@@ -195,55 +197,6 @@ function PositionHeader() {
   );
 }
 
-const MAX_BIN_BLOCKS = 120;
-
-// The portfolio's distribution colors: token Y below the price, token X above, the active bin blending both.
-const BIN_COLOR = {
-  below: "bg-foreground/70",
-  active: "bg-linear-to-r from-foreground/70 to-brand",
-  above: "bg-brand",
-};
-
-/**
- * The position's bins colored like the portfolio's active-position distribution, on a track wide enough to show the
- * price tick when it sits outside the range.
- */
-function RangeVisual({ p }: { p: TrackedPosition }) {
-  const { lowerBinId: lower, upperBinId: upper, activeBinId: active } = p;
-  if (lower == null || upper == null || active == null) return null;
-  const bar = rangeBar(lower, upper, active);
-  const where = bar.side === "inside" ? "inside the range" : `${plural(bar.outside, "bin")} ${bar.side} the range`;
-  const label = `Bins ${lower} to ${upper}. Active bin ${active} is ${where}.`;
-  const count = upper - lower + 1;
-  const side = (b: number): keyof typeof BIN_COLOR => (b < active ? "below" : b > active ? "above" : "active");
-  // One block per bin, or for a very wide position three blocks sized by their bin counts.
-  const segments =
-    count <= MAX_BIN_BLOCKS
-      ? Array.from({ length: count }, (_, i) => ({ key: lower + i, side: side(lower + i), grow: 1 }))
-      : [
-          { key: 0, side: "below" as const, grow: Math.max(0, Math.min(active, upper + 1) - lower) },
-          { key: 1, side: "active" as const, grow: active >= lower && active <= upper ? 1 : 0 },
-          { key: 2, side: "above" as const, grow: Math.max(0, upper - Math.max(active, lower - 1)) },
-        ].filter((s) => s.grow > 0);
-  return (
-    <div role="img" aria-label={label} title={label} className="relative my-1.5 h-3 w-full">
-      <div
-        className={`absolute inset-y-0 flex ${count <= 60 ? "gap-px" : ""}`}
-        style={{ left: `${bar.start * 100}%`, width: `${(bar.end - bar.start) * 100}%` }}
-      >
-        {segments.map((s) => (
-          <div
-            key={s.key}
-            className={`h-full rounded-[0.05rem] ${BIN_COLOR[s.side]}`}
-            style={{ flexGrow: s.grow, flexBasis: 0 }}
-          />
-        ))}
-      </div>
-      <div className="absolute -top-1 bottom-0 w-px bg-foreground" style={{ left: `${bar.active * 100}%` }} />
-    </div>
-  );
-}
-
 function TokenAmount({ value, token }: { value: number | null; token: Token }) {
   return (
     <span className="flex min-w-0 items-center gap-1">
@@ -255,12 +208,76 @@ function TokenAmount({ value, token }: { value: number | null; token: Token }) {
   );
 }
 
+/**
+ * What one position holds in each bin, read on chain when the row is opened, drawn like the pool's Liquidity
+ * Distribution. A position is at most 70 bins wide, so every bin keeps its own bar.
+ */
+function PositionDistribution({
+  pool,
+  p,
+  base,
+  quote,
+}: {
+  pool: string;
+  p: TrackedPosition;
+  base: Token;
+  quote: Token;
+}) {
+  const { data, isPending } = useQuery(trackedBinsQuery(pool, p.address));
+  const solUsd = useQuery(pricesQuery).data?.sol ?? null;
+  if (isPending) return <div className="h-40 animate-pulse rounded-md bg-background/60" />;
+  if (!data?.ok) return <p className="text-xs text-loss">{data?.message ?? "The bins could not be read."}</p>;
+  const xUsd = base.price ?? null;
+  const yUsd = quote.price ?? null;
+  if (xUsd == null || yUsd == null || data.bins.length === 0) {
+    return <p className="text-xs text-muted-foreground">{NA}</p>;
+  }
+  const bars = positionBars(data.bins, data.activeBinId, data.bins.length).map((b) => ({
+    id: b.id,
+    lastId: b.lastId,
+    price: b.price,
+    lastPrice: b.lastPrice,
+    xUsd: b.x * xUsd,
+    yUsd: b.y * yUsd,
+    height: (b.x * xUsd + b.y * yUsd) / b.count,
+    active: b.side === "active",
+  }));
+  const poolPrice = data.bins.find((b) => b.id === data.activeBinId)?.price ?? null;
+  const side = data.activeBinId < (bars[0]?.id ?? 0) ? "below" : "above";
+  const outside = bars.every((b) => !b.active);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-3 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <i className="size-2 rounded-full bg-brand" />
+          {base.symbol}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="size-2 rounded-full" style={{ background: "var(--sol)" }} />
+          {quote.symbol}
+        </span>
+        {outside && (
+          <span className="ml-auto">
+            Pool price is {side} this range{p.activeBinId == null ? "" : ` (bin ${p.activeBinId})`}
+          </span>
+        )}
+      </div>
+      <BinChart bars={bars} x={base.symbol} y={quote.symbol} poolPrice={poolPrice ?? 0} solUsd={solUsd} />
+    </div>
+  );
+}
+
 function PositionRow({
+  pool,
+  visible,
   p,
   scannedAt,
   base,
   quote,
 }: {
+  pool: string;
+  /** Whether the wallet card is open; the chart reads the chain only then. */
+  visible: boolean;
   p: TrackedPosition;
   scannedAt: number;
   base: Token;
@@ -283,15 +300,9 @@ function PositionRow({
         {p.inRange != null && <RangePill inRange={p.inRange ? 1 : 0} known={1} total={1} />}
       </div>
       <Cell label="Range" className="col-span-full @2xl:col-span-1">
-        {/* Price and bar share a line until the table layout, where the column is too narrow for both. */}
-        <div className="flex flex-col @md:flex-row @md:items-center @md:gap-4 @2xl:flex-col @2xl:items-stretch @2xl:gap-0">
-          <span className="truncate font-semibold">
-            {price(p.minPrice)} – {price(p.maxPrice)}
-          </span>
-          <div className="min-w-0 flex-1">
-            <RangeVisual p={p} />
-          </div>
-        </div>
+        <span className="truncate font-semibold">
+          {price(p.minPrice)} – {price(p.maxPrice)}
+        </span>
       </Cell>
       <Cell label="Deposits">
         <TokenAmount value={p.depositX} token={base} />
@@ -322,6 +333,11 @@ function PositionRow({
           </span>
         )}
       </Cell>
+      {visible && (
+        <div className="col-span-full rounded-md bg-background/60 p-2.5">
+          <PositionDistribution pool={pool} p={p} base={base} quote={quote} />
+        </div>
+      )}
     </li>
   );
 }
@@ -350,19 +366,22 @@ function SummaryStat({
 }
 
 function WalletCard({
+  pool,
   wallet,
   scannedAt,
   base,
   quote,
 }: {
+  pool: string;
   wallet: TrackedWallet;
   scannedAt: number;
   base: Token;
   quote: Token;
 }) {
   const t = totals(wallet.positions);
+  const [open, setOpen] = useState(false);
   return (
-    <details className="group text-xs">
+    <details className="group text-xs" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary className="flex cursor-pointer list-none items-center gap-2.5 rounded-md px-1 py-2.5 hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
         <WalletAvatar address={wallet.owner} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -400,7 +419,15 @@ function WalletCard({
         <PositionHeader />
         <ul className="flex flex-col divide-y divide-border/60">
           {wallet.positions.map((p) => (
-            <PositionRow key={p.address} p={p} scannedAt={scannedAt} base={base} quote={quote} />
+            <PositionRow
+              key={p.address}
+              pool={pool}
+              visible={open}
+              p={p}
+              scannedAt={scannedAt}
+              base={base}
+              quote={quote}
+            />
           ))}
         </ul>
       </div>
@@ -659,7 +686,7 @@ export function TrackedBody({ pool, base, quote }: { pool: string; base: Token; 
           ) : (
             <div className="flex flex-col divide-y">
               {wallets.map((w) => (
-                <WalletCard key={w.owner} wallet={w} scannedAt={data.scannedAt} base={base} quote={quote} />
+                <WalletCard key={w.owner} pool={pool} wallet={w} scannedAt={data.scannedAt} base={base} quote={quote} />
               ))}
             </div>
           )}

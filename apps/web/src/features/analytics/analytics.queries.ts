@@ -33,6 +33,14 @@ export const trackedQuery = (input: {
   });
 };
 
+/** One position's bins, read on chain when its row is opened; the server caches them 15 s, so this does not poll. */
+export const trackedBinsQuery = (pool: string, position: string) =>
+  queryOptions({
+    queryKey: ["analytics", "tracked-bins", pool, position],
+    queryFn: () => trpc.analytics.trackedBins.query({ pool, position }),
+    staleTime: 15_000,
+  });
+
 const TRADERS_MS = 60_000;
 
 /** Polls at the server's recent trades cache pace; the Solana Tracker lists behind it are cached a day. */
