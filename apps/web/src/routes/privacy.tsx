@@ -5,7 +5,7 @@ import { LegalPage } from "@/features/legal/legal-page";
 export const Route = createFileRoute("/privacy")({
   head: () => ({ meta: [{ title: "Privacy Policy | Vexis" }] }),
   component: () => (
-    <LegalPage title="Privacy Policy" updated="8 November 2026">
+    <LegalPage title="Privacy Policy" updated="23 November 2026">
       <p>This policy explains what Vexis stores, why, who else sees it and how to have it deleted.</p>
 
       <h2>What we store</h2>
@@ -48,9 +48,7 @@ export const Route = createFileRoute("/privacy")({
       </p>
 
       <h2>Who else sees it</h2>
-      <p>
-        We do not sell your data, show ads or use tracking or analytics scripts. We share data only to run the service:
-      </p>
+      <p>We do not sell your data or show ads. We share data only to run the service:</p>
       <ul>
         <li>Supabase hosts our database, and our server provider hosts the app.</li>
         <li>Resend sends invite emails, so it receives the address we write to.</li>
@@ -60,13 +58,20 @@ export const Route = createFileRoute("/privacy")({
         </li>
         <li>Telegram delivers your alerts through your bot, so it receives the alert text.</li>
         <li>The RPC provider you choose receives your agent wallet&apos;s reads and transactions.</li>
+        <li>
+          Microsoft Clarity records how the app is used, so it receives your clicks, scrolls, the pages you visit and
+          the text on them, along with the browser you use. The page URL is part of that recording, so a wallet address
+          in a portfolio link is included. Field contents, dropdowns and passwords are always masked. Numbers and email
+          addresses are masked under Clarity&apos;s default settings.
+        </li>
       </ul>
       <p>We may also share data if the law requires it.</p>
 
       <h2>In your browser</h2>
       <p>
-        Vexis sets a sign-in cookie. Local storage keeps your theme, your favourite and recently viewed wallets, and any
-        alert sound you upload. These stay on your device and are never sent to us.
+        Vexis sets a sign-in cookie. Clarity sets its own cookie to group a visit into one recording. Local storage
+        keeps your theme, your favourite and recently viewed wallets, and any alert sound you upload. Those
+        local-storage values stay on your device and are never sent to us.
       </p>
 
       <h2>Security</h2>

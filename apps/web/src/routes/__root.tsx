@@ -16,6 +16,7 @@ import { isPublicPath } from "@/features/auth/auth";
 import { viewerQuery } from "@/features/auth/auth.queries";
 import { pricesQuery } from "@/features/portfolio/portfolio.queries";
 import { themeScript } from "@/features/theme/theme";
+import { useClarity } from "@/lib/clarity";
 import appCss from "@/styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -64,6 +65,7 @@ function RootLayout() {
   const { data: prices } = useSuspenseQuery(pricesQuery);
   const { viewer } = Route.useRouteContext();
   const bare = useRouterState({ select: (s) => isPublicPath(s.location.pathname) });
+  useClarity();
   if (bare) return <Outlet />;
   return (
     <AppShell prices={prices} isAdmin={viewer?.role === "admin"}>
