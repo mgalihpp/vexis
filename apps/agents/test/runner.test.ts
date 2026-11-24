@@ -780,8 +780,13 @@ describe("format", () => {
     expect(linkButtons([line()], "https://vexis.test/")).toEqual([
       { text: "View pool on Vexis", url: "https://vexis.test/analytics?pool=P" },
     ]);
-    expect(linkButtons([line(), line({ name: "SOL-USDC", poolAddress: "Q" })], "https://vexis.test")).toEqual([
-      { text: "View DOGE-SOL", url: "https://vexis.test/analytics?pool=P" },
+    expect(
+      linkButtons(
+        [line({ binStep: 10 }), line({ name: "SOL-USDC", poolAddress: "Q", binStep: undefined })],
+        "https://vexis.test",
+      ),
+    ).toEqual([
+      { text: "View DOGE-SOL (bin step 10)", url: "https://vexis.test/analytics?pool=P" },
       { text: "View SOL-USDC", url: "https://vexis.test/analytics?pool=Q" },
     ]);
     expect(linkButtons([line()], "http://localhost:3000")).toEqual([]);
