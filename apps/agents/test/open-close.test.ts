@@ -44,13 +44,14 @@ describe("planOpen", () => {
   });
 
   test.each([
-    ["no SOL side", { side: null }],
-    ["active bin left the range", { activeBin: 111 }],
-    ["inverted range", { lowerBin: 111 }],
-    ["wider than one position", { lowerBin: 30, upperBin: 100 }],
-    ["nothing to deposit", { amountLamports: 0n }],
-  ] as const)("refuses: %s", (_, o) => {
-    expect(open(o).ok).toBe(false);
+    ["no SOL side", { side: null }, /no SOL side/],
+    ["active bin left the range", { activeBin: 111 }, /active bin 111 left/],
+    ["inverted range", { lowerBin: 111 }, /above upper bin/],
+    ["wider than one position", { lowerBin: 30, upperBin: 100 }, /71 bins is wider than 70/],
+    ["nothing to deposit", { amountLamports: 0n }, /nothing to deposit/],
+    ["under the reserve", { nativeLamports: SOL }, /under the .* reserve/],
+  ] as const)("refuses: %s", (_, o, reason) => {
+    expect(open(o)).toMatchObject({ ok: false, reason: expect.stringMatching(reason) });
   });
 });
 

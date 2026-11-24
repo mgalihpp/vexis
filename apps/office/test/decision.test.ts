@@ -9,6 +9,18 @@ import {
 import type { z } from "zod";
 import { POOL } from "./fakes.ts";
 
+const openWith = (over: object) =>
+  JSON.stringify({
+    action: "open",
+    pool: POOL,
+    strategy: "Spot",
+    lowerBin: 0,
+    upperBin: 1,
+    amountSol: 1,
+    rationale: "r",
+    ...over,
+  });
+
 describe("parseDecision", () => {
   test("reads the JSON object out of a fence or prose", () => {
     const reply = 'Here you go:\n```json\n{"veto": false, "note": "Fine."}\n```';
@@ -29,54 +41,25 @@ describe("parseDecision", () => {
     expect(parseDecision(StrategistDecision, '{"action":"skip","reason":"Nothing good."}').ok).toBe(true);
   });
 
-  test.each<[string, z.ZodType, string]>([
-    ["no JSON", ScoutDecision, "I would pick JUP-SOL."],
-    ["broken JSON", ScoutDecision, '{"candidates": [}'],
-    ["no candidates", ScoutDecision, '{"candidates": []}'],
-    ["six candidates", ScoutDecision, JSON.stringify({ candidates: Array(6).fill({ pool: POOL, reason: "r" }) })],
-    ["not an address", ScoutDecision, '{"candidates": [{"pool": "JUP-SOL", "reason": "r"}]}'],
+  test.each<[string, z.ZodType, string, string]>([
+    ["no JSON", ScoutDecision, "I would pick JUP-SOL.", ""],
+    ["broken JSON", ScoutDecision, '{"candidates": [}', ""],
+    ["no candidates", ScoutDecision, '{"candidates": []}', "candidates"],
     [
-      "unknown strategy",
-      StrategistDecision,
-      JSON.stringify({
-        action: "open",
-        pool: POOL,
-        strategy: "Wide",
-        lowerBin: 0,
-        upperBin: 1,
-        amountSol: 1,
-        rationale: "r",
-      }),
+      "six candidates",
+      ScoutDecision,
+      JSON.stringify({ candidates: Array(6).fill({ pool: POOL, reason: "r" }) }),
+      "candidates",
     ],
-    [
-      "fractional bin",
-      StrategistDecision,
-      JSON.stringify({
-        action: "open",
-        pool: POOL,
-        strategy: "Spot",
-        lowerBin: 0.5,
-        upperBin: 1,
-        amountSol: 1,
-        rationale: "r",
-      }),
-    ],
-    [
-      "zero size",
-      StrategistDecision,
-      JSON.stringify({
-        action: "open",
-        pool: POOL,
-        strategy: "Spot",
-        lowerBin: 0,
-        upperBin: 1,
-        amountSol: 0,
-        rationale: "r",
-      }),
-    ],
-    ["veto as text", RiskDecision, '{"veto": "no", "note": "n"}'],
-    ["empty summary", ManagerDecision, '{"summary": ""}'],
-  ])("drops %s", (_, schema, text) => {
-    expect(parseDecision(schema, text).ok).toBe(false);
+    ["not an address", ScoutDecision, '{"candidates": [{"pool": "JUP-SOL", "reason": "r"}]}', "candidates.0.pool"],
+    ["unknown strategy", StrategistDecision, openWith({ strategy: "Wide" }), "strategy"],
+    ["fractional bin", StrategistDecision, openWith({ lowerBin: 0.5 }), "lowerBin"],
+    ["zero size", StrategistDecision, openWith({ amountSol: 0 }), "amountSol"],
+    ["veto as text", RiskDecision, '{"veto": "no", "note": "n"}', "veto"],
+    ["empty summary", ManagerDecision, '{"summary": ""}', "summary"],
+  ])("drops %s", (_, schema, text, field) => {
+    const parsed = parseDecision(schema, text);
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.error).toContain(field);
   });
 });

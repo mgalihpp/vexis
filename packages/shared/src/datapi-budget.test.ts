@@ -51,6 +51,7 @@ describe("datapiFetch", () => {
   });
 
   it("holds background work at the reserve but lets a user request through", async () => {
+    expect(BACKGROUND_RESERVE).toBe(60);
     const budget = new DatapiBudget();
     const w = world([{ status: 200 }]);
     budget.remaining = BACKGROUND_RESERVE;
