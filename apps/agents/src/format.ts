@@ -47,7 +47,7 @@ export type LinkButton = { readonly text: string; readonly url: string };
  * `VEXIS_WEB_URL` (dev) gives none and the alert goes out as text only.
  */
 export function linkButtons(
-  lines: ReadonlyArray<Pick<SpikeLine, "name" | "poolAddress">>,
+  lines: ReadonlyArray<Pick<SpikeLine, "name" | "poolAddress"> & { readonly binStep?: number | undefined }>,
   webUrl: string,
 ): LinkButton[] {
   const base = webUrl.replace(/\/+$/, "");
@@ -55,7 +55,10 @@ export function linkButtons(
     return [];
   }
   return lines.map((line) => ({
-    text: lines.length === 1 ? "View pool on Vexis" : `View ${line.name}`,
+    text:
+      lines.length === 1
+        ? "View pool on Vexis"
+        : `View ${line.name}${line.binStep === undefined ? "" : ` (bin step ${line.binStep})`}`,
     url: `${base}/analytics?pool=${line.poolAddress}`,
   }));
 }
