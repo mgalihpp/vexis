@@ -168,7 +168,7 @@ export function ChartPanel({
             {toggle}
           </div>
         </div>
-        <div className="-mx-3 overflow-x-auto px-3">
+        <div>
           <Segmented
             variant="muted"
             value={tf}
