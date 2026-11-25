@@ -26,6 +26,10 @@ export function usePanelOpen(key: string) {
   return [open, toggle] as const;
 }
 
+/** Underline tab shared by the panels' headers; the open one carries the brand bar. */
+export const tabClass =
+  "relative -mb-px px-3 py-2 text-xs font-medium text-muted-foreground/70 after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 hover:text-muted-foreground aria-selected:text-foreground aria-selected:after:bg-brand";
+
 export function CollapseToggle({ open, onToggle, name }: { open: boolean; onToggle: () => void; name: string }) {
   return (
     <button

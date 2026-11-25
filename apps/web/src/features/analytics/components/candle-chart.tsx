@@ -182,11 +182,14 @@ export function CandleChart({
             ["L", shown.low],
             ["C", shown.close],
           ] as const
-        ).map(([k, v]) => (
-          <span key={k} className={tone}>
-            {k} {exact.format(v)}
-          </span>
-        ))}
+        )
+          // On a phone the legend stays on one line until a candle is touched.
+          .filter(([k]) => !narrow || hover !== null || k === "C")
+          .map(([k, v]) => (
+            <span key={k} className={tone}>
+              {k} {exact.format(v)}
+            </span>
+          ))}
         <span className={tone}>{signedPct(change)}</span>
         <span className="text-muted-foreground">
           {metric === "fees" ? "Fees" : "Vol"} {prefix}

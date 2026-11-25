@@ -8,7 +8,12 @@ import { FeePace } from "@/features/screener/components/fee-pace";
 import { type Currency, feeTvlWindows, ratio, STAT_WINDOWS, TIMEFRAMES, type TimeframeId } from "../analytics";
 import type { PoolView, SiblingPool } from "../analytics.types";
 import { CandleChart, type ChartBar } from "./candle-chart";
-import { CollapseToggle, Label, NA, Panel, usePanelOpen } from "./ui";
+import { CollapseToggle, Label, NA, Panel, tabClass, usePanelOpen } from "./ui";
+
+const METRIC_TABS = [
+  { id: "volume", label: "Volume" },
+  { id: "fees", label: "Fees" },
+] as const;
 
 interface StatItem {
   label: string;
@@ -134,25 +139,23 @@ export function ChartPanel({
   return (
     <div className="relative shrink-0" style={{ height }}>
       <Panel className="h-full min-h-0 gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-semibold">{metric === "volume" ? "Volume" : "Fees"} Chart</h2>
-          <span className="h-4 w-px bg-border" />
-          <Segmented
-            variant="muted"
-            value={metric}
-            onChange={(metric) => onChange({ metric })}
-            options={[
-              { value: "volume", label: "Volume" },
-              { value: "fees", label: "Fees" },
-            ]}
-          />
-          <Segmented
-            variant="muted"
-            value={tf}
-            onChange={onTimeframe}
-            options={TIMEFRAMES.map((t) => ({ value: t.id, label: t.label }))}
-          />
-          <div className="ml-auto flex items-center gap-1.5">
+        <div className="-mx-3 -mt-3 flex items-center justify-between gap-2 border-b pr-3 pl-1">
+          <h2 className="sr-only">{metric === "volume" ? "Volume" : "Fees"} Chart</h2>
+          <div role="tablist" aria-label="Chart metric" className="flex items-center">
+            {METRIC_TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={t.id === metric}
+                onClick={() => onChange({ metric: t.id })}
+                className={tabClass}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
             <Segmented
               variant="muted"
               value={currency}
@@ -164,6 +167,14 @@ export function ChartPanel({
             />
             {toggle}
           </div>
+        </div>
+        <div className="-mx-3 overflow-x-auto px-3">
+          <Segmented
+            variant="muted"
+            value={tf}
+            onChange={onTimeframe}
+            options={TIMEFRAMES.map((t) => ({ value: t.id, label: t.label }))}
+          />
         </div>
         {bars === null ? (
           <div className="min-h-0 flex-1 animate-pulse rounded-md bg-muted" />
