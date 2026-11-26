@@ -427,6 +427,17 @@
     .vx-dotted::before, .vx-dotted::after { animation: none; }
     .vx-dotted::after { opacity: 0; }
   }
+  /* Dusk landscapes behind the four feature cards: photo, then a soft green tint, then a dark fade so text stays readable. */
+  .content-home-1-wrapper.vx-scene { background-color: #0c0f0b; background-image: radial-gradient(circle, rgb(255 255 255 / .1) 1px, transparent 1.5px), linear-gradient(180deg, rgb(10 12 9 / .3) 0%, rgb(12 14 11 / .55) 50%, rgb(14 15 13 / .9) 100%), linear-gradient(150deg, rgb(186 244 72 / .16), rgb(186 244 72 / .03) 60%), var(--vx-scene); background-size: 12px 12px, cover, cover, cover; background-repeat: repeat, no-repeat, no-repeat, no-repeat; background-position: 0 0, center, center, var(--vx-scene-pos, center); }
+  .vx-scene-peak { --vx-scene: url("/landing/dusk-peak.webp"); --vx-scene-pos: 35% 50%; }
+  .vx-scene-lake { --vx-scene: url("/landing/dusk-lake.webp"); --vx-scene-pos: 50% 70%; }
+  .vx-scene-ridge { --vx-scene: url("/landing/dusk-ridge.webp"); --vx-scene-pos: 50% 40%; }
+  .vx-scene-aurora { --vx-scene: url("/landing/dusk-aurora.webp"); --vx-scene-pos: 50% 30%; }
+  .vx-scene .vx-pnl { background: radial-gradient(120% 90% at 100% 0%, rgb(38 58 18 / .8), rgb(17 17 17 / .72) 65%); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); }
+  .vx-scene .vx-pnl-back { background: rgb(22 22 22 / .7); }
+  .vx-scene .vx-sc { background: rgb(24 24 27 / .76); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); }
+  .vx-scene .vx-window { background: rgb(9 9 11 / .8); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); }
+  .vx-scene .vx-phone { background: radial-gradient(120% 90% at 50% 0%, rgb(38 58 18 / .78), rgb(16 16 16 / .74) 70%); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); }
   .vx-pnl-stage { position: relative; width: 100%; height: 196px; margin: 22px 0 16px; }
   .vx-pnl { position: absolute; top: 14px; left: 50%; width: 236px; margin-left: -118px; display: flex; flex-direction: column; align-items: flex-start; padding: 14px 16px 16px; border-radius: 16px; text-align: left; background: radial-gradient(120% 90% at 100% 0%, #263a12, #111 65%); box-shadow: 0 0 0 1px #3a3a3a, 0 30px 50px -20px rgb(0 0 0 / .9); transform: rotate(-3deg); }
   .vx-pnl-back { height: 168px; background: #161616; transform: translate(14px, 6px) rotate(5deg); opacity: .7; }
