@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { z } from "zod";
 import { safeRedirect } from "@/features/auth/auth";
+import { captchaQuery } from "@/features/auth/auth.queries";
 import { LoginScreen } from "@/features/auth/components/login-screen";
 
 const LoginSearch = z.object({
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/login")({
   beforeLoad: ({ context, search }) => {
     if (context.viewer) throw redirect({ to: safeRedirect(search.redirect) });
   },
+  loader: ({ context }) => context.queryClient.ensureQueryData(captchaQuery),
   head: () => ({ meta: [{ title: "Sign in | Vexis" }] }),
   component: LoginRoute,
 });

@@ -26,6 +26,7 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AgentsIndexRouteImport } from './routes/agents/index'
 import { Route as AgentsAgentIdRouteImport } from './routes/agents/$agentId'
 import { Route as AgentsNewRouteImport } from './routes/agents/new'
+import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as PortfolioIndexRouteImport } from './routes/portfolio/index'
 import { Route as PortfolioWalletRouteImport } from './routes/portfolio/$wallet'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -121,6 +122,11 @@ const AgentsNewRoute = AgentsNewRouteImport.update({
   path: '/agents/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssetsSplatRoute = AssetsSplatRouteImport.update({
+  id: '/assets/$',
+  path: '/assets/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortfolioIndexRoute = PortfolioIndexRouteImport.update({
   id: '/portfolio/',
   path: '/portfolio/',
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
+  '/assets/$': typeof AssetsSplatRoute
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/agents/': typeof AgentsIndexRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
+  '/assets/$': typeof AssetsSplatRoute
   '/admin': typeof AdminIndexRoute
   '/agents': typeof AgentsIndexRoute
   '/portfolio': typeof PortfolioIndexRoute
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/agents/$agentId': typeof AgentsAgentIdRoute
   '/agents/new': typeof AgentsNewRoute
+  '/assets/$': typeof AssetsSplatRoute
   '/portfolio/$wallet': typeof PortfolioWalletRouteWithChildren
   '/admin/': typeof AdminIndexRoute
   '/agents/': typeof AgentsIndexRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
+    | '/assets/$'
     | '/portfolio/$wallet'
     | '/admin/'
     | '/agents/'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
+    | '/assets/$'
     | '/admin'
     | '/agents'
     | '/portfolio'
@@ -323,6 +334,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/agents/$agentId'
     | '/agents/new'
+    | '/assets/$'
     | '/portfolio/$wallet'
     | '/admin/'
     | '/agents/'
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   AgentsAgentIdRoute: typeof AgentsAgentIdRoute
   AgentsNewRoute: typeof AgentsNewRoute
+  AssetsSplatRoute: typeof AssetsSplatRoute
   PortfolioWalletRoute: typeof PortfolioWalletRouteWithChildren
   AgentsIndexRoute: typeof AgentsIndexRoute
   PortfolioIndexRoute: typeof PortfolioIndexRoute
@@ -475,6 +488,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgentsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assets/$': {
+      id: '/assets/$'
+      path: '/assets/$'
+      fullPath: '/assets/$'
+      preLoaderRoute: typeof AssetsSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portfolio/': {
       id: '/portfolio/'
       path: '/portfolio'
@@ -592,6 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   AgentsAgentIdRoute: AgentsAgentIdRoute,
   AgentsNewRoute: AgentsNewRoute,
+  AssetsSplatRoute: AssetsSplatRoute,
   PortfolioWalletRoute: PortfolioWalletRouteWithChildren,
   AgentsIndexRoute: AgentsIndexRoute,
   PortfolioIndexRoute: PortfolioIndexRoute,
