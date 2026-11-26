@@ -71,7 +71,7 @@ bun run dev:web        # TanStack Start dev server, http://localhost:3000
 bun run dev:agents     # the alert runner (needs DATABASE_URL, TOKEN_ENC_KEY, RPC_ENC_KEY, WALLET_PRIVATE_KEY)
 bun run dev:office     # the office runtime (needs DATABASE_URL, TOKEN_ENC_KEY, RPC_ENC_KEY)
 bun test               # all tests (bun:test), across every workspace
-bun test apps/web/src/features/portfolio/portfolio.test.ts   # one file
+bun test apps/web/src/features/portfolio/tests/portfolio.test.ts   # one file
 bun test -t "month calendar"                                  # by test name
 bun run typecheck      # tsc --noEmit in every workspace
 bun run lint           # biome check .   (lint:fix to apply)
@@ -93,6 +93,7 @@ Build target is a flag, not code: `NITRO_PRESET=node-server bun run build`. Prod
 
 - `bun run lint`, `bun run typecheck` and `bun test` are what CI runs, in that order, plus `bun run build`. Run them before you push.
 - Test the behavior that can break, in the pure module that owns it: `portfolio.ts`, `analytics.ts`, `agents.ts`, `spike.ts`. Those modules exist so the math can be tested without an API, a database or a browser.
+- Test files live in a `tests/` folder beside the module they test (`features/portfolio/tests/portfolio.test.ts`, `packages/shared/src/tests/`); the runner and the office runtime keep theirs in `apps/*/test/`.
 - Test at one layer, the lowest one that fails. Do not repeat the same case in a wrapper test or in a second tab's copy of the same logic.
 - Extend before you add: when a case already exists in a test file, add a row or an assertion there instead of a new `it`.
 - Leave out tests for what types already guarantee, copy text, mock-call mirrors and props rendered to static markup.
