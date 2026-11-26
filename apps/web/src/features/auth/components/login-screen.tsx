@@ -1,13 +1,14 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { cn } from "cn";
 import { CheckIcon, LoaderCircleIcon } from "lucide-react";
 import { type ComponentProps, type FormEvent, useId, useState } from "react";
 import { Logo } from "@/components/icons";
+import { TurnstileWidget } from "@/features/turnstile/turnstile-widget";
 import { isNetworkError } from "@/lib/query";
 import { trpc } from "@/trpc/client";
 import { AUTH_ERROR_MESSAGE, type AuthError, type AuthMode, safeRedirect } from "../auth";
-import { viewerQuery } from "../auth.queries";
+import { captchaQuery, viewerQuery } from "../auth.queries";
 
 type FormError = AuthError | "network" | "terms";
 
@@ -17,7 +18,7 @@ const COPY = {
 } as const;
 
 /** Errors about the whole form go in the banner; the rest sit under the field they are about. */
-const BANNER_ERRORS: FormError[] = ["credentials", "email-taken", "server", "network"];
+const BANNER_ERRORS: FormError[] = ["credentials", "email-taken", "captcha", "server", "network"];
 
 export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite?: string; redirect?: string }) {
   const navigate = useNavigate();
@@ -29,8 +30,16 @@ export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
   const [pending, setPending] = useState(false);
+  const { data: siteKey } = useSuspenseQuery(captchaQuery);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
   const copy = COPY[mode];
-  const ready = agreed && email.length > 0 && password.length > 0 && (mode === "sign-in" || code.length > 0);
+  const ready =
+    agreed &&
+    email.length > 0 &&
+    password.length > 0 &&
+    (mode === "sign-in" || code.length > 0) &&
+    (!siteKey || captcha !== null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -42,10 +51,12 @@ export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite
     try {
       const result =
         mode === "join"
-          ? await trpc.auth.join.mutate({ email, password, invite: code })
-          : await trpc.auth.signIn.mutate({ email, password });
+          ? await trpc.auth.join.mutate({ email, password, invite: code, captcha: captcha ?? undefined })
+          : await trpc.auth.signIn.mutate({ email, password, captcha: captcha ?? undefined });
       if (!result.ok) {
         setError(result.error);
+        // A Turnstile token is good for one check, so a failed attempt needs a new one.
+        if (siteKey) setCaptchaReset((n) => n + 1);
         return;
       }
       queryClient.removeQueries({ queryKey: viewerQuery.queryKey });
@@ -165,6 +176,17 @@ export function LoginScreen({ mode, invite, redirect }: { mode: AuthMode; invite
             </label>
             {error === "terms" && <p className="ml-[26px] text-xs text-loss">Accept the terms to continue.</p>}
           </div>
+
+          {siteKey && (
+            <TurnstileWidget
+              siteKey={siteKey}
+              resetKey={captchaReset}
+              onToken={(token) => {
+                setCaptcha(token);
+                if (token && error === "captcha") setError(null);
+              }}
+            />
+          )}
 
           <button
             type="submit"

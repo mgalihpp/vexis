@@ -1,6 +1,6 @@
 // Server-only Better Auth instance. Email + password only, and sign-up needs a usable invite: the invite code
 // travels in the INVITE_HEADER request header, so the same gate covers both our `join` server function and a
-// direct POST to /api/auth/sign-up/email.
+// direct POST to /api/auth/sign-up/email. The Turnstile token travels the same way, in TURNSTILE_HEADER.
 
 import { getDb } from "@vexis/db/client";
 import { findUsableInvite, redeemInvite } from "@vexis/db/queries";
@@ -10,12 +10,14 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { eq } from "drizzle-orm";
+import { TURNSTILE_HEADER, turnstileAccepts, turnstileSiteKey } from "@/features/turnstile/turnstile.server";
 import type { Viewer } from "./auth";
 
 export const INVITE_HEADER = "x-vexis-invite";
 
 const INVITE_REJECTED = "INVITE_REJECTED";
 const INVITE_OTHER_EMAIL = "INVITE_OTHER_EMAIL";
+const CAPTCHA_REJECTED = "CAPTCHA_REJECTED";
 
 function rejectInvite(): never {
   throw new APIError("FORBIDDEN", { code: INVITE_REJECTED, message: "Invite code is invalid or has expired." });
@@ -24,6 +26,10 @@ function rejectInvite(): never {
 // Says only that the email differs, never which email the invite is for.
 function rejectOtherEmail(): never {
   throw new APIError("FORBIDDEN", { code: INVITE_OTHER_EMAIL, message: "This invite is for a different email." });
+}
+
+function rejectCaptcha(): never {
+  throw new APIError("FORBIDDEN", { code: CAPTCHA_REJECTED, message: "Confirm you are human and try again." });
 }
 
 function createAuth() {
@@ -42,6 +48,11 @@ function createAuth() {
     session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/sign-in/email" && ctx.path !== "/sign-up/email") return;
+        if (turnstileSiteKey()) {
+          const ip = ctx.headers?.get("x-forwarded-for")?.split(",")[0]?.trim();
+          if (!(await turnstileAccepts(ctx.headers?.get(TURNSTILE_HEADER), ip))) rejectCaptcha();
+        }
         if (ctx.path !== "/sign-up/email") return;
         const token = ctx.headers?.get(INVITE_HEADER);
         const email = String(ctx.body?.email ?? "").toLowerCase();
@@ -92,9 +103,10 @@ export async function getFreshViewerFromHeaders(headers: Headers): Promise<Viewe
   return { id, email, name, role: role === "admin" ? "admin" : "member" };
 }
 
-/** Which invite check a sign-up failed, if any. */
-export function inviteRejection(error: unknown): "invite" | "invite-email" | null {
+/** Which invite or Turnstile check a sign-in or sign-up failed, if any. */
+export function hookRejection(error: unknown): "invite" | "invite-email" | "captcha" | null {
   if (!(error instanceof APIError)) return null;
+  if (error.body?.code === CAPTCHA_REJECTED) return "captcha";
   if (error.body?.code === INVITE_REJECTED) return "invite";
   if (error.body?.code === INVITE_OTHER_EMAIL) return "invite-email";
   return null;

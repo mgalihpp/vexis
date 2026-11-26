@@ -5,6 +5,8 @@ import { z } from "zod";
 export const SignInInput = z.object({
   email: z.email().trim().toLowerCase(),
   password: z.string().min(1),
+  /** Turnstile token from the form; checked by the server only when Turnstile is configured. */
+  captcha: z.string().max(4096).optional(),
 });
 
 export const JoinInput = SignInInput.extend({
@@ -22,7 +24,14 @@ export interface Viewer {
 }
 
 /** Why a sign-in or join failed. Network failures never reach the server, so the client adds that one. */
-export type AuthError = "credentials" | "invite" | "invite-email" | "email-taken" | "weak-password" | "server";
+export type AuthError =
+  | "credentials"
+  | "invite"
+  | "invite-email"
+  | "email-taken"
+  | "weak-password"
+  | "captcha"
+  | "server";
 
 export type AuthResult = { ok: true } | { ok: false; error: AuthError };
 
@@ -32,6 +41,7 @@ export const AUTH_ERROR_MESSAGE: Record<AuthError | "network", string> = {
   "invite-email": "This invite is for a different email.",
   "email-taken": "An account with this email already exists.",
   "weak-password": "Use at least 8 characters.",
+  captcha: "Verification failed. Check the box again.",
   server: "Something went wrong. Try again.",
   network: "Can’t reach the server. Try again.",
 };

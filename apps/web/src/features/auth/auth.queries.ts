@@ -8,3 +8,11 @@ export const viewerQuery = queryOptions({
   staleTime: 5 * 60_000,
   refetchInterval: false,
 });
+
+/** The Turnstile site key, read at runtime so it needs no build variable; null means Turnstile is off. */
+export const captchaQuery = queryOptions({
+  queryKey: ["captcha"],
+  queryFn: () => trpc.auth.captcha.query(),
+  staleTime: Number.POSITIVE_INFINITY,
+  refetchInterval: false,
+});

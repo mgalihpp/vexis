@@ -43,6 +43,10 @@ if [ "$kind" = web ]; then
   mkdir .output.new
   tar -xzf "$INCOMING/web-output.tgz" -C .output.new --strip-components=1
   if [ -n "$(find .output.new -xtype l)" ]; then echo "broken symlinks in the build"; rm -rf .output.new; exit 1; fi
+  # Session replays still load CSS/JS by the hashed names of earlier builds; the /assets/$ route serves them from here.
+  mkdir -p asset-archive
+  if [ -d .output/public/assets ]; then cp -pn .output/public/assets/* asset-archive/ 2>/dev/null || true; fi
+  find asset-archive -type f -mtime +30 -delete
   swap_in() { rm -rf .output.prev; if [ -d .output ]; then mv .output .output.prev; fi; mv .output.new .output; }
   swap_back() { if [ -d .output.prev ]; then rm -rf .output; cp -a .output.prev .output; else return 1; fi; }
 else
