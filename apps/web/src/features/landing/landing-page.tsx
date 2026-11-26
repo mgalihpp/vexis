@@ -373,7 +373,7 @@ function Benefits() {
               </p>
               <Checks items={["Full Position History", "Daily Profit Calendar"]} />
             </div>
-            <div className="content-home-1-wrapper home-3-value vx-dotted" data-reveal="">
+            <div className="content-home-1-wrapper home-3-value vx-dotted vx-scene vx-scene-peak" data-reveal="">
               <h4>Your profit, day by day</h4>
               <PnlCard />
               <p className="small-paragraph">
@@ -383,7 +383,10 @@ function Benefits() {
           </div>
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
-            <div className="content-home-1-wrapper home-3-central-block vx-sc-card vx-dotted" data-reveal="">
+            <div
+              className="content-home-1-wrapper home-3-central-block vx-sc-card vx-dotted vx-scene vx-scene-lake"
+              data-reveal=""
+            >
               <ScreenerCards />
             </div>
             <div className="content-benefits-wrapper small-content">
@@ -405,13 +408,19 @@ function Benefits() {
               </p>
               <Checks items={["Live Liquidity Map", "Smart Wallet Tracking"]} />
             </div>
-            <div className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted" data-reveal="">
+            <div
+              className="content-home-1-wrapper home-3-central-block vx-bins-card vx-dotted vx-scene vx-scene-ridge"
+              data-reveal=""
+            >
               <AnalyticsWindow />
             </div>
           </div>
           <div className="benefit-line" data-reveal="" />
           <div className="benefits-wrapper central-block">
-            <div className="content-home-1-wrapper last-item-home-3 vx-tg-card vx-dotted" data-reveal="">
+            <div
+              className="content-home-1-wrapper last-item-home-3 vx-tg-card vx-dotted vx-scene vx-scene-aurora"
+              data-reveal=""
+            >
               <h4 className="relative">Alerts that find you</h4>
               <AlertPhone />
               <p className="small-paragraph">Be the first to know when a pool heats up, wherever you are.</p>

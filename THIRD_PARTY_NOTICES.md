@@ -12,6 +12,17 @@ Vexis reads data from these services under their own terms. None of them is affi
 | [Solana Tracker](https://www.solanatracker.io) | Top traders and KOL trades                                   | [solanatracker.io](https://www.solanatracker.io)                              |
 | [Telegram](https://telegram.org)               | Alerts through each user's own bot                           | [Bot terms](https://telegram.org/tos/bot-developers)                          |
 
+## Photos
+
+The landscapes behind the landing page feature cards are from [Unsplash](https://unsplash.com), used under the [Unsplash License](https://unsplash.com/license). They are resized and recompressed for the web.
+
+| File                                       | Photo                                                                                                                           | Photographer                                    |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `apps/web/public/landing/dusk-peak.webp`   | [Sun setting behind a mountain peak](https://unsplash.com/photos/the-sun-is-setting-behind-a-mountain-peak-xy-XbcdU4Ec)         | [Quick PS](https://unsplash.com/@quickps)       |
+| `apps/web/public/landing/dusk-lake.webp`   | [Trees near a lake at sunset](https://unsplash.com/photos/green-trees-near-body-of-water-during-sunset-9aKjJ9CTYgw)             | [David Pizzo](https://unsplash.com/@dapizzo)    |
+| `apps/web/public/landing/dusk-ridge.webp`  | [Sun setting over the mountains](https://unsplash.com/photos/the-sun-is-setting-over-the-mountains-in-the-distance-ocyZCS9a0qo) | [ran liwen](https://unsplash.com/@nikol_royce)  |
+| `apps/web/public/landing/dusk-aurora.webp` | [Trees under the aurora borealis](https://unsplash.com/photos/silhouette-of-trees-near-aurora-borealis-at-night-62V7ntlKgL8)    | [Vincent Guth](https://unsplash.com/@vingtcent) |
+
 ## Open source
 
 Vexis is built on open source software, mainly:
