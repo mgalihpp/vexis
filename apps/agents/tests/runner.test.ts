@@ -9,6 +9,7 @@ import type { Telegram } from "../src/services/telegram.ts";
 import { WalletLock } from "../src/services/wallet-lock.ts";
 import { cycle } from "../src/volume/cycle.ts";
 import { prune, RETENTION_MS } from "../src/volume/ingest.ts";
+import { activeBinFromPrice } from "../src/volume/price.ts";
 import { screenerCycle } from "../src/volume/screener.ts";
 import {
   chainPosition,
@@ -149,7 +150,7 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([
       {
         chatId: 42n,
-        text: `⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$5.0k</b>\nMedian 5m: $100\nSpike: <b>50.0×</b>\nBin step: 25`,
+        text: `⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$5.0k</b>\nMedian 5m: $100\nSpike: <b>50.0×</b>\nPrice: —\nActive bin: —\nBin step: 25`,
         botToken: "user-bot-token",
         buttons: [{ text: "View pool on Vexis", url: "https://vexis.test/analytics?pool=POOL1" }],
       },
@@ -755,13 +756,34 @@ describe("format", () => {
     poolAddress: "P",
     baselineMin: 30,
     spike: { vol1m: 18_400, baseline: 2_900, ratio: 6.2 },
+    price: { quote: 0.00041234, quoteSymbol: "SOL", usd: 0.085123, activeBinId: -3125 },
     ...over,
   });
 
   test("matches the agreed message", () => {
     expect(formatMessage([line()])).toBe(
-      "⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$18.4k</b>\nMedian 30m: $2.9k\nSpike: <b>6.2×</b>\nBin step: 25",
+      "⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$18.4k</b>\nMedian 30m: $2.9k\nSpike: <b>6.2×</b>\nPrice: <b>0.0004123 SOL</b> ($0.08512)\nActive bin: -3125\nBin step: 25",
     );
+  });
+
+  test("price: a dash when unknown, no USD repeat on a stablecoin quote", () => {
+    expect(formatMessage([line({ price: null })])).toContain("Price: —\nActive bin: —");
+    expect(
+      formatMessage([line({ price: { quote: 142.5, quoteSymbol: "USDC", usd: 142.5, activeBinId: null } })]),
+    ).toContain("Price: <b>142.5 USDC</b>\nActive bin: —");
+  });
+
+  test("activeBinFromPrice inverts the bin price, decimals included", () => {
+    const ui = (bin: number, step: number, dx: number, dy: number) => (1 + step / 10_000) ** bin * 10 ** (dx - dy);
+    for (const [bin, step, dx, dy] of [
+      [100, 25, 9, 9],
+      [-5_123, 10, 6, 9],
+      [8_000, 80, 9, 6],
+      [0, 1, 5, 5],
+    ] as const) {
+      expect(activeBinFromPrice(ui(bin, step, dx, dy), step, dx, dy)).toBe(bin);
+    }
+    expect(activeBinFromPrice(0, 25, 9, 9)).toBeNull();
   });
 
   test("a zero baseline reads without an infinite ratio", () => {

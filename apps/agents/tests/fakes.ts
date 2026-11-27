@@ -356,7 +356,15 @@ export function quietHistory(pool: string, count: number, volume = 100): NewMinu
 }
 
 export function reading(overrides: Partial<PoolReading> = {}): PoolReading {
-  return { address: "POOL1", name: "DOGE-SOL", binStep: 25, tvl: 1_000_000, cumulativeVolume: 0, ...overrides };
+  return {
+    address: "POOL1",
+    name: "DOGE-SOL",
+    binStep: 25,
+    tvl: 1_000_000,
+    cumulativeVolume: 0,
+    price: null,
+    ...overrides,
+  };
 }
 
 export const TEST_RPC = "https://rpc.test/?api-key=secret-key";

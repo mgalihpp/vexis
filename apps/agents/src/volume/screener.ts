@@ -110,6 +110,7 @@ const notifyScreener = Effect.fn("notifyScreener")(function* (
     ({ reading, spike }): SpikeLine => ({
       name: reading.name,
       binStep: reading.binStep,
+      price: reading.price,
       poolAddress: reading.address,
       baselineMin: rule.baseline,
       spike,

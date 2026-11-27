@@ -139,6 +139,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
     return {
       name: reading?.name ?? hit.watch.label ?? hit.watch.poolAddress,
       binStep: reading?.binStep,
+      price: reading?.price,
       poolAddress: hit.watch.poolAddress,
       baselineMin: hit.config.baseline,
       spike: hit.spike,

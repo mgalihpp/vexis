@@ -1,4 +1,5 @@
 import type { FeeMode } from "@vexis/shared/agents";
+import type { PoolPrice } from "./volume/price.ts";
 import type { Spike } from "./volume/spike.ts";
 
 const oneDecimal = (n: number) => n.toFixed(1);
@@ -10,9 +11,22 @@ export function formatUsd(n: number): string {
   return `$${Math.round(n)}`;
 }
 
+/** Four significant digits without an exponent: `0.0004123`, `1,235`. */
+const formatPrice = (n: number) => n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+const USD_QUOTES = new Set(["USDC", "USDT"]);
+
+function priceRows(price: PoolPrice | null | undefined): string[] {
+  if (!price) return ["Price: —", "Active bin: —"];
+  const quote = `${formatPrice(price.quote)}${price.quoteSymbol ? ` ${escapeHtml(price.quoteSymbol)}` : ""}`;
+  const usd = price.usd === null || USD_QUOTES.has(price.quoteSymbol) ? "" : ` ($${formatPrice(price.usd)})`;
+  return [`Price: <b>${quote}</b>${usd}`, `Active bin: ${price.activeBinId ?? "—"}`];
+}
+
 export type SpikeLine = {
   readonly name: string;
   readonly binStep: number | undefined;
+  /** Undefined when the pool was missing from this minute's reading. */
+  readonly price?: PoolPrice | null | undefined;
   readonly poolAddress: string;
   /** Minutes in the baseline window, for the "Median 30m" label. */
   readonly baselineMin: number;
@@ -29,6 +43,7 @@ export function formatSpike(line: SpikeLine): string {
     `Volume 1m: <b>${formatUsd(vol1m)}</b>`,
     `Median ${line.baselineMin}m: ${formatUsd(baseline)}`,
     `Spike: <b>${Number.isFinite(ratio) ? `${oneDecimal(ratio)}×` : "from zero"}</b>`,
+    ...priceRows(line.price),
     ...(line.binStep === undefined ? [] : [`Bin step: ${line.binStep}`]),
   ];
   return [`⚡ <b>Volume spike</b> ${escapeHtml(line.name)}`, "", ...rows].join("\n");
