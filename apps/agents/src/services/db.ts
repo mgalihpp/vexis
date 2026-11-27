@@ -110,6 +110,10 @@ export type NewAlert = {
   readonly vol1m: number;
   readonly baseline: number;
   readonly ratio: number;
+  readonly price: number | null;
+  readonly priceUnit: string | null;
+  readonly priceUsd: number | null;
+  readonly activeBinId: number | null;
   readonly at: Date;
 };
 

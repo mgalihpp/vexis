@@ -6,6 +6,7 @@ import { formatMessage, linkButtons, type SpikeLine } from "../format.ts";
 import { Db, TELEGRAM_NOT_LINKED, TELEGRAM_RELINK, type Watch } from "../services/db.ts";
 import type { PoolReading } from "../services/meteora.ts";
 import { Telegram } from "../services/telegram.ts";
+import { alertPriceColumns } from "./price.ts";
 import { evaluateSpike, type Spike } from "./spike.ts";
 
 type Config = AgentConfig<"volume-watch">;
@@ -129,6 +130,7 @@ const notifyAgent = Effect.fn("notifyAgent")(function* (
         vol1m: hit.spike.vol1m,
         baseline: hit.spike.baseline,
         ratio: hit.spike.ratio,
+        ...alertPriceColumns(pools.get(hit.watch.poolAddress)?.price),
         at,
       })),
     )

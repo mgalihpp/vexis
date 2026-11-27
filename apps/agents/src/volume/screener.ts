@@ -9,6 +9,7 @@ import { Meteora, type ScreenerReading } from "../services/meteora.ts";
 import { ScreenerHistory } from "../services/screener-history-store.ts";
 import { Telegram } from "../services/telegram.ts";
 import { volumeTarget } from "./evaluate.ts";
+import { alertPriceColumns } from "./price.ts";
 import type { History } from "./screener-history.ts";
 import { evaluateSpike, type Spike } from "./spike.ts";
 
@@ -104,7 +105,14 @@ const notifyScreener = Effect.fn("notifyScreener")(function* (
 
   const at = new Date(now);
   const ids = yield* db.recordAlerts(
-    sent.map(({ reading, spike }) => ({ agentId, userId, poolAddress: reading.address, ...spike, at })),
+    sent.map(({ reading, spike }) => ({
+      agentId,
+      userId,
+      poolAddress: reading.address,
+      ...spike,
+      ...alertPriceColumns(reading.price),
+      at,
+    })),
   );
   const lines = sent.map(
     ({ reading, spike }): SpikeLine => ({

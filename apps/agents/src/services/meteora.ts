@@ -30,6 +30,8 @@ const PriceFields = {
   pool_config: Schema.Struct({ bin_step: Schema.Number }),
 };
 
+const USD_QUOTES = new Set(["USDC", "USDT"]);
+
 function poolPrice(p: {
   readonly current_price?: number | null | undefined;
   readonly pool_config: { readonly bin_step: number };
@@ -41,8 +43,8 @@ function poolPrice(p: {
   const { token_x: x, token_y: y } = p;
   return {
     quote,
-    quoteSymbol: y.symbol ?? "",
-    usd: x.price != null && x.price > 0 ? x.price : null,
+    unit: x.symbol && y.symbol ? `${y.symbol}/${x.symbol}` : (y.symbol ?? ""),
+    usd: x.price != null && x.price > 0 && !USD_QUOTES.has(y.symbol ?? "") ? x.price : null,
     activeBinId:
       x.decimals == null || y.decimals == null
         ? null

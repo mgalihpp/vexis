@@ -1,10 +1,21 @@
-/** What the alert shows of a pool's price: token Y per token X at the active bin, in USD too, and that bin's id. */
+/**
+ * What the alert shows of a pool's price: token Y per token X at the active bin (`SOL/DOGE`, as on Analytics), token
+ * X in USD (null when the quote already is USD), and that bin's id.
+ */
 export type PoolPrice = {
   readonly quote: number;
-  readonly quoteSymbol: string;
+  readonly unit: string;
   readonly usd: number | null;
   readonly activeBinId: number | null;
 };
+
+/** The `agent_alerts` columns for a price, all null when it is unknown. */
+export const alertPriceColumns = (price: PoolPrice | null | undefined) => ({
+  price: price?.quote ?? null,
+  priceUnit: price?.unit || null,
+  priceUsd: price?.usd ?? null,
+  activeBinId: price?.activeBinId ?? null,
+});
 
 /**
  * The datapi's `current_price` is the active bin's price in UI units, so the bin is

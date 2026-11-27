@@ -11,14 +11,14 @@ export function formatUsd(n: number): string {
   return `$${Math.round(n)}`;
 }
 
-/** Four significant digits without an exponent: `0.0004123`, `1,235`. */
-const formatPrice = (n: number) => n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
-const USD_QUOTES = new Set(["USDC", "USDT"]);
+/** Like Analytics' pool price: three significant digits below 1 (`0.000794`), four decimals above. */
+const formatPrice = (n: number) =>
+  n.toLocaleString("en-US", n < 1 ? { maximumSignificantDigits: 3 } : { maximumFractionDigits: 4 });
 
 function priceRows(price: PoolPrice | null | undefined): string[] {
   if (!price) return ["Price: —", "Active bin: —"];
-  const quote = `${formatPrice(price.quote)}${price.quoteSymbol ? ` ${escapeHtml(price.quoteSymbol)}` : ""}`;
-  const usd = price.usd === null || USD_QUOTES.has(price.quoteSymbol) ? "" : ` ($${formatPrice(price.usd)})`;
+  const quote = `${formatPrice(price.quote)}${price.unit ? ` ${escapeHtml(price.unit)}` : ""}`;
+  const usd = price.usd === null ? "" : ` ($${formatPrice(price.usd)})`;
   return [`Price: <b>${quote}</b>${usd}`, `Active bin: ${price.activeBinId ?? "—"}`];
 }
 

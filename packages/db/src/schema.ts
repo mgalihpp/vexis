@@ -335,6 +335,11 @@ export const agentAlerts = pgTable(
     baseline: doublePrecision("baseline").notNull(),
     /** vol1m / baseline. */
     ratio: doublePrecision("ratio").notNull(),
+    /** Pool price at the alert in `price_unit` (`SOL/DOGE`), token X in USD, and the active bin. Null when unknown. */
+    price: doublePrecision("price"),
+    priceUnit: text("price_unit"),
+    priceUsd: doublePrecision("price_usd"),
+    activeBinId: integer("active_bin_id"),
     delivered: boolean("delivered").notNull().default(false),
     error: text("error"),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
