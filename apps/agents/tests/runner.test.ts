@@ -9,6 +9,7 @@ import type { Telegram } from "../src/services/telegram.ts";
 import { WalletLock } from "../src/services/wallet-lock.ts";
 import { cycle } from "../src/volume/cycle.ts";
 import { prune, RETENTION_MS } from "../src/volume/ingest.ts";
+import { activeBinFromPrice } from "../src/volume/price.ts";
 import { screenerCycle } from "../src/volume/screener.ts";
 import {
   chainPosition,
@@ -133,6 +134,8 @@ describe("evaluate and notify", () => {
 
   test("a spike writes an alert, sends one message and marks it delivered", async () => {
     const s = spikeScenario(5000);
+    const price = { quote: 0.000794, unit: "SOL/DOGE", usd: 0.0578, activeBinId: -3125 };
+    s.meteora.readings = s.meteora.readings.map((r) => ({ ...r, price }));
     await s.run(cycle());
     expect(s.db.alerts).toMatchObject([
       {
@@ -142,6 +145,10 @@ describe("evaluate and notify", () => {
         vol1m: 5000,
         baseline: 100,
         ratio: 50,
+        price: 0.000794,
+        priceUnit: "SOL/DOGE",
+        priceUsd: 0.0578,
+        activeBinId: -3125,
         delivered: true,
         error: null,
       },
@@ -149,7 +156,7 @@ describe("evaluate and notify", () => {
     expect(s.telegram.sent).toEqual([
       {
         chatId: 42n,
-        text: `⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$5.0k</b>\nMedian 5m: $100\nSpike: <b>50.0×</b>\nBin step: 25`,
+        text: `⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$5.0k</b>\nMedian 5m: $100\nSpike: <b>50.0×</b>\nPrice: <b>0.000794 SOL/DOGE</b> ($0.0578)\nActive bin: -3125\nBin step: 25`,
         botToken: "user-bot-token",
         buttons: [{ text: "View pool on Vexis", url: "https://vexis.test/analytics?pool=POOL1" }],
       },
@@ -755,13 +762,34 @@ describe("format", () => {
     poolAddress: "P",
     baselineMin: 30,
     spike: { vol1m: 18_400, baseline: 2_900, ratio: 6.2 },
+    price: { quote: 0.00079412, unit: "SOL/DOGE", usd: 0.057761, activeBinId: -3125 },
     ...over,
   });
 
   test("matches the agreed message", () => {
     expect(formatMessage([line()])).toBe(
-      "⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$18.4k</b>\nMedian 30m: $2.9k\nSpike: <b>6.2×</b>\nBin step: 25",
+      "⚡ <b>Volume spike</b> DOGE-SOL\n\nVolume 1m: <b>$18.4k</b>\nMedian 30m: $2.9k\nSpike: <b>6.2×</b>\nPrice: <b>0.000794 SOL/DOGE</b> ($0.0578)\nActive bin: -3125\nBin step: 25",
     );
+  });
+
+  test("price: a dash when unknown, no USD beside a USD quote", () => {
+    expect(formatMessage([line({ price: null })])).toContain("Price: —\nActive bin: —");
+    expect(
+      formatMessage([line({ price: { quote: 142.5, unit: "USDC/SOL", usd: null, activeBinId: null } })]),
+    ).toContain("Price: <b>142.5 USDC/SOL</b>\nActive bin: —");
+  });
+
+  test("activeBinFromPrice inverts the bin price, decimals included", () => {
+    const ui = (bin: number, step: number, dx: number, dy: number) => (1 + step / 10_000) ** bin * 10 ** (dx - dy);
+    for (const [bin, step, dx, dy] of [
+      [100, 25, 9, 9],
+      [-5_123, 10, 6, 9],
+      [8_000, 80, 9, 6],
+      [0, 1, 5, 5],
+    ] as const) {
+      expect(activeBinFromPrice(ui(bin, step, dx, dy), step, dx, dy)).toBe(bin);
+    }
+    expect(activeBinFromPrice(0, 25, 9, 9)).toBeNull();
   });
 
   test("a zero baseline reads without an infinite ratio", () => {

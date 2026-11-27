@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TokenIcon } from "@/features/portfolio/components/pool-identity";
 import { type Sort, SortHead } from "@/features/portfolio/components/table-controls";
-import { compactUsd, timeAgo } from "@/features/portfolio/money";
+import { compactUsd, formatPrice, timeAgo } from "@/features/portfolio/money";
 import { useStamp } from "@/features/timezone/timezone";
 import { shortAddr } from "@/lib/format";
 import { type AlertView, type PairTokens, ratioText } from "../agents";
@@ -201,7 +201,7 @@ export const ALERT_SORTS = {
   ratio: (a: AlertView) => a.ratio,
 } satisfies Record<AlertSortKey, (a: AlertView) => number>;
 
-const ALERT_COLUMNS = 6;
+const ALERT_COLUMNS = 8;
 
 /** Alerts as table rows. With `sort` the number columns sort; without it they are plain headers. */
 export function AlertsTable({
@@ -235,6 +235,8 @@ export function AlertsTable({
           {head("vol1m", "Volume 1m", "text-right")}
           {head("baseline", "Median", "text-right")}
           {head("ratio", "Spike", "text-right")}
+          <TableHead className="text-right">Price</TableHead>
+          <TableHead className="text-right">Active bin</TableHead>
           <TableHead className="pr-3.25 text-right">Telegram</TableHead>
         </TableRow>
       </TableHeader>
@@ -258,6 +260,10 @@ export function AlertsTable({
             <TableCell className="text-right font-medium">{compactUsd(a.vol1m)}</TableCell>
             <TableCell className="text-right text-muted-foreground">{compactUsd(a.baseline)}</TableCell>
             <TableCell className="text-right font-semibold text-brand">{ratioText(a.ratio)}</TableCell>
+            <TableCell className="text-right">
+              <AlertPrice price={a.price} />
+            </TableCell>
+            <TableCell className="text-right">{a.activeBinId ?? "—"}</TableCell>
             <TableCell className="pr-3.25 text-right">
               <Delivery alert={a} />
             </TableCell>
@@ -265,6 +271,19 @@ export function AlertsTable({
         ))}
       </TableBody>
     </Table>
+  );
+}
+
+function AlertPrice({ price }: { price: AlertView["price"] }) {
+  if (!price) return <span className="text-muted-foreground">—</span>;
+  return (
+    <>
+      <div className="font-medium">
+        {formatPrice(price.quote)}
+        {price.unit && ` ${price.unit}`}
+      </div>
+      {price.usd !== null && <div className="text-muted-foreground">${formatPrice(price.usd)}</div>}
+    </>
   );
 }
 

@@ -120,6 +120,9 @@ export interface AlertView {
   vol1m: number;
   baseline: number;
   ratio: number;
+  /** Pool price at the alert in `unit` (`SOL/DOGE`), token X in USD; null for alerts from before it was stored. */
+  price: { quote: number; unit: string | null; usd: number | null } | null;
+  activeBinId: number | null;
   delivered: boolean;
   error: string | null;
   at: number;

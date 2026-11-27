@@ -4,6 +4,7 @@ import { type FilterPool, filterPool } from "@vexis/shared/screen";
 import { Config, Context, Effect, flow, Layer, Option, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import { MeteoraError } from "../errors.ts";
+import { activeBinFromPrice, type PoolPrice } from "../volume/price.ts";
 
 export type PoolReading = {
   readonly address: string;
@@ -12,10 +13,44 @@ export type PoolReading = {
   readonly tvl: number;
   /** All-time USD volume. The per-minute volume is the delta between two readings. */
   readonly cumulativeVolume: number;
+  /** Null when the datapi leaves the price out; the alert then shows a dash. */
+  readonly price: PoolPrice | null;
 };
 
 /** A screener pool: its reading plus what the screener filter reads of it. */
 export type ScreenerReading = PoolReading & FilterPool;
+
+const PriceToken = Schema.Struct({
+  symbol: Schema.optional(Schema.NullOr(Schema.String)),
+  decimals: Schema.optional(Schema.NullOr(Schema.Number)),
+  price: Schema.optional(Schema.NullOr(Schema.Number)),
+});
+const PriceFields = {
+  current_price: Schema.optional(Schema.NullOr(Schema.Number)),
+  pool_config: Schema.Struct({ bin_step: Schema.Number }),
+};
+
+const USD_QUOTES = new Set(["USDC", "USDT"]);
+
+function poolPrice(p: {
+  readonly current_price?: number | null | undefined;
+  readonly pool_config: { readonly bin_step: number };
+  readonly token_x: typeof PriceToken.Type;
+  readonly token_y: typeof PriceToken.Type;
+}): PoolPrice | null {
+  const quote = p.current_price;
+  if (quote == null || !(quote > 0)) return null;
+  const { token_x: x, token_y: y } = p;
+  return {
+    quote,
+    unit: x.symbol && y.symbol ? `${y.symbol}/${x.symbol}` : (y.symbol ?? ""),
+    usd: x.price != null && x.price > 0 && !USD_QUOTES.has(y.symbol ?? "") ? x.price : null,
+    activeBinId:
+      x.decimals == null || y.decimals == null
+        ? null
+        : activeBinFromPrice(quote, p.pool_config.bin_step, x.decimals, y.decimals),
+  };
+}
 
 const PoolsResponse = Schema.Struct({
   data: Schema.Array(
@@ -23,13 +58,16 @@ const PoolsResponse = Schema.Struct({
       address: Schema.String,
       name: Schema.String,
       tvl: Schema.Number,
-      pool_config: Schema.Struct({ bin_step: Schema.Number }),
       cumulative_metrics: Schema.Struct({ volume: Schema.Number }),
+      token_x: PriceToken,
+      token_y: PriceToken,
+      ...PriceFields,
     }),
   ),
 });
 
 const ScreenerToken = Schema.Struct({
+  ...PriceToken.fields,
   address: Schema.String,
   is_verified: Schema.optional(Schema.NullOr(Schema.Boolean)),
   freeze_authority_disabled: Schema.optional(Schema.NullOr(Schema.Boolean)),
@@ -43,7 +81,7 @@ const ScreenerResponse = Schema.Struct({
       tvl: Schema.Number,
       volume: Schema.Struct({ "24h": Schema.Number }),
       is_blacklisted: Schema.Boolean,
-      pool_config: Schema.Struct({ bin_step: Schema.Number }),
+      ...PriceFields,
       cumulative_metrics: Schema.Struct({ volume: Schema.Number }),
       token_x: ScreenerToken,
       token_y: ScreenerToken,
@@ -115,6 +153,7 @@ export class Meteora extends Context.Service<
             binStep: p.pool_config.bin_step,
             tvl: p.tvl,
             cumulativeVolume: p.cumulative_metrics.volume,
+            price: poolPrice(p),
           }),
         );
       });
@@ -168,6 +207,7 @@ export class Meteora extends Context.Service<
             address: p.address,
             name: p.name,
             cumulativeVolume: p.cumulative_metrics.volume,
+            price: poolPrice(p),
             ...filterPool({
               tvl: p.tvl,
               volume24h: p.volume["24h"],

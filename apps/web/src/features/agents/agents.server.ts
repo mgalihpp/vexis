@@ -179,6 +179,8 @@ export async function loadAlerts(userId: string): Promise<AlertsData> {
         vol1m: a.vol1m,
         baseline: a.baseline,
         ratio: a.ratio,
+        price: a.price === null ? null : { quote: a.price, unit: a.priceUnit, usd: a.priceUsd },
+        activeBinId: a.activeBinId,
         delivered: a.delivered,
         error: a.error,
         at: a.at.getTime(),
